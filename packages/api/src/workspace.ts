@@ -1,4 +1,5 @@
 import { LOCALES } from "@roundcut/auth/locale";
+import { REVISION_SCOPES } from "@roundcut/db/revision-terms";
 import z from "zod";
 
 export const WORKSPACE_CURRENCIES = [
@@ -24,3 +25,15 @@ export const workspaceSettingsSchema = z.object({
 });
 
 export type WorkspaceSettings = z.infer<typeof workspaceSettingsSchema>;
+
+export const INCLUDED_ROUNDS_MAX = 10;
+export const EXTRA_ROUND_PRICE_MAX_CENTS = 10_000_000;
+export const EXTRA_ROUND_DELAY_MAX_DAYS = 90;
+
+export const revisionTermsSchema = z.object({
+  extraRoundDelayDays: z.int().min(0).max(EXTRA_ROUND_DELAY_MAX_DAYS),
+  extraRoundPriceCents: z.int().min(0).max(EXTRA_ROUND_PRICE_MAX_CENTS),
+  includedRounds: z.int().min(0).max(INCLUDED_ROUNDS_MAX),
+  requirePayment: z.boolean(),
+  scope: z.enum(REVISION_SCOPES),
+});

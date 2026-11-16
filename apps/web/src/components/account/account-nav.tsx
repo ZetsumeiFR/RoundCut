@@ -4,6 +4,7 @@ import { cn } from "@roundcut/ui/lib/utils";
 import {
   Building2Icon,
   MonitorSmartphoneIcon,
+  RepeatIcon,
   ShieldCheckIcon,
 } from "lucide-react";
 import Link from "next/link";
@@ -13,6 +14,7 @@ import type { Messages } from "@/i18n/messages";
 
 const SECTIONS = [
   { href: "/account/workspace", icon: Building2Icon, key: "workspace" },
+  { href: "/account/terms", icon: RepeatIcon, key: "terms" },
   { href: "/account/security", icon: ShieldCheckIcon, key: "security" },
   { href: "/account/sessions", icon: MonitorSmartphoneIcon, key: "sessions" },
 ] as const;
@@ -29,7 +31,7 @@ export function AccountNav({
   return (
     <nav
       aria-label={label}
-      className="-mx-1 overflow-x-auto px-1 pb-1 md:mx-0 md:w-44 md:shrink-0 md:overflow-visible md:p-0"
+      className="-mx-1 overflow-x-auto px-1 pb-1 md:mx-0 md:w-52 md:shrink-0 md:overflow-visible md:p-0"
     >
       <ul className="flex w-max gap-1 md:w-full md:flex-col">
         {SECTIONS.map(({ href, icon: Icon, key }) => {

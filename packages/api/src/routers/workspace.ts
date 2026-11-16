@@ -3,7 +3,7 @@ import { workspace } from "@roundcut/db/schema/workspace";
 import { eq } from "drizzle-orm";
 
 import { protectedProcedure } from "../index";
-import { workspaceSettingsSchema } from "../workspace";
+import { revisionTermsSchema, workspaceSettingsSchema } from "../workspace";
 
 const BASIS_POINTS_PER_PERCENT = 100;
 
@@ -15,6 +15,7 @@ const toWorkspace = (row: WorkspaceRow) => ({
   id: row.id,
   locale: row.locale,
   name: row.name,
+  revisionTerms: row.revisionTerms,
   timezone: row.timezone,
 });
 
@@ -68,6 +69,26 @@ export const workspaceRouter = {
         .returning();
       if (!row) {
         throw new Error("Workspace update returned no row");
+      }
+      return toWorkspace(row);
+    }),
+  updateTerms: protectedProcedure
+    .input(revisionTermsSchema)
+    .handler(async ({ context, input }) => {
+      const [row] = await context.db
+        .insert(workspace)
+        .values({
+          name: context.session.user.name,
+          ownerUserId: context.session.user.id,
+          revisionTerms: input,
+        })
+        .onConflictDoUpdate({
+          set: { revisionTerms: input },
+          target: workspace.ownerUserId,
+        })
+        .returning();
+      if (!row) {
+        throw new Error("Workspace terms update returned no row");
       }
       return toWorkspace(row);
     }),

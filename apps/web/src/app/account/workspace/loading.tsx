@@ -1,5 +1,8 @@
-import { WorkspaceSettingsSkeleton } from "@/components/account/workspace-settings-skeleton";
+import {
+  SETTING_ROWS,
+  SettingsSkeleton,
+} from "@/components/account/settings-skeleton";
 
 export default function WorkspaceLoading() {
-  return <WorkspaceSettingsSkeleton />;
+  return <SettingsSkeleton rows={SETTING_ROWS.workspace} />;
 }

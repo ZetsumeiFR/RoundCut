@@ -1,15 +1,12 @@
 import { Card, CardContent, CardHeader } from "@roundcut/ui/components/card";
 import { Skeleton } from "@roundcut/ui/components/skeleton";
 
-const SKELETON_ROWS = [
-  "name",
-  "currency",
-  "vat-rate",
-  "language",
-  "timezone",
-] as const;
+export const SETTING_ROWS = {
+  terms: ["included-rounds", "price", "delay", "payment", "scope"],
+  workspace: ["name", "currency", "vat-rate", "language", "timezone"],
+} as const;
 
-export function WorkspaceSettingsSkeleton() {
+export function SettingsSkeleton({ rows }: { rows: readonly string[] }) {
   return (
     <Card aria-busy="true" className="gap-0 p-0">
       <CardHeader className="gap-2 border-b px-5 py-3">
@@ -17,7 +14,7 @@ export function WorkspaceSettingsSkeleton() {
         <Skeleton className="h-4 w-72 max-w-full" />
       </CardHeader>
       <CardContent className="flex flex-col gap-6 px-5 py-5">
-        {SKELETON_ROWS.map((row) => (
+        {rows.map((row) => (
           <div
             className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"
             key={row}

@@ -1,5 +1,6 @@
-import { integer, pgTable, text, timestamp } from "drizzle-orm/pg-core";
+import { integer, jsonb, pgTable, text, timestamp } from "drizzle-orm/pg-core";
 
+import { DEFAULT_REVISION_TERMS, type RevisionTerms } from "../revision-terms";
 import { user } from "./auth";
 
 // One workspace per account (WS-01). The VAT rate is stored in basis points
@@ -17,6 +18,10 @@ export const workspace = pgTable("workspace", {
     .notNull()
     .unique()
     .references(() => user.id, { onDelete: "cascade" }),
+  revisionTerms: jsonb("revision_terms")
+    .$type<RevisionTerms>()
+    .default(DEFAULT_REVISION_TERMS)
+    .notNull(),
   timezone: text("timezone").default("Europe/Paris").notNull(),
   updatedAt: timestamp("updated_at")
     .defaultNow()
