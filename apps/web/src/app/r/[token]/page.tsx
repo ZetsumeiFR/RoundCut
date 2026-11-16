@@ -17,8 +17,9 @@ export default async function ClientReviewPage({
   const [{ token }, locale] = await Promise.all([params, getLocale()]);
   const messages = getMessages(locale);
 
+  // Fields under 16px make mobile Safari zoom in on focus (REV-08).
   return (
-    <main className="mx-auto flex min-h-svh w-full min-w-0 max-w-4xl flex-col gap-4 px-4 py-4 sm:px-8 sm:py-8">
+    <main className="mx-auto flex min-h-svh w-full min-w-0 max-w-4xl flex-col gap-4 px-4 py-4 sm:px-8 sm:py-8 pointer-coarse:[&_input]:text-base pointer-coarse:[&_textarea]:text-base">
       <ClientReviewView
         locale={locale}
         messages={messages.review}
