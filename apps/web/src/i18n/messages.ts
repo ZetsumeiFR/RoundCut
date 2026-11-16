@@ -718,6 +718,20 @@ const en = {
         timeline: "Timeline",
         unmute: "Unmute",
       },
+      download: {
+        action: "Download the file",
+        available: "Your client can download this version.",
+        clientLabel: "Client download",
+        error: "Couldn't prepare the download. Try again.",
+        policies: {
+          after_approval: "Client: after approval",
+          allowed: "Client: allowed",
+          off: "Client: off",
+        },
+        saved: "Client download updated",
+        saveError: "Couldn't update the client download.",
+        unavailable: "Your client can't download this version yet.",
+      },
       feedback: {
         emptyDescription:
           "Your client's timestamped comments on this version will appear here and as markers on the timeline.",
@@ -1675,6 +1689,21 @@ const fr: Messages = {
         speed: "Vitesse de lecture",
         timeline: "Barre de temps",
         unmute: "Rétablir le son",
+      },
+      download: {
+        action: "Télécharger le fichier",
+        available: "Votre client peut télécharger cette version.",
+        clientLabel: "Téléchargement client",
+        error: "Impossible de préparer le téléchargement. Réessayez.",
+        policies: {
+          after_approval: "Client : après validation",
+          allowed: "Client : autorisé",
+          off: "Client : désactivé",
+        },
+        saved: "Téléchargement client mis à jour",
+        saveError: "Impossible de modifier le téléchargement client.",
+        unavailable:
+          "Votre client ne peut pas encore télécharger cette version.",
       },
       feedback: {
         emptyDescription:
