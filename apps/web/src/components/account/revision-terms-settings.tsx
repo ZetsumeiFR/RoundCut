@@ -16,7 +16,10 @@ import z from "zod";
 
 import { formatMessage, type Messages } from "@/i18n/messages";
 import { orpc } from "@/utils/orpc";
-import { ReviewerRemindersForm } from "./reviewer-reminders-settings";
+import {
+  DeciderRemindersForm,
+  ReviewerRemindersForm,
+} from "./reviewer-reminders-settings";
 import { SettingsCard } from "./settings-card";
 import {
   SettingsAlert,
@@ -338,6 +341,10 @@ export function RevisionTermsSettings({
         <ReviewerRemindersForm
           messages={messages}
           reminders={data.reviewerReminders}
+        />
+        <DeciderRemindersForm
+          messages={messages}
+          reminders={data.deciderReminders}
         />
       </div>
     );

@@ -28,6 +28,12 @@ export const round = pgTable(
     closedNote: text("closed_note"),
     closedReason: text("closed_reason").$type<RoundClosedReason>(),
     createdAt: timestamp("created_at").defaultNow().notNull(),
+    // "Version awaiting your feedback" reminders emailed to the decider while
+    // the round stays open (ROUND-05): how many, and when the last one left.
+    deciderReminderCount: integer("decider_reminder_count")
+      .default(0)
+      .notNull(),
+    deciderReminderSentAt: timestamp("decider_reminder_sent_at"),
     deliverableId: text("deliverable_id")
       .notNull()
       .references(() => deliverable.id, { onDelete: "cascade" }),

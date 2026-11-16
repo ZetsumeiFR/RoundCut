@@ -54,6 +54,19 @@ export const reviewerRemindersSchema = z.object({
 
 export type ReviewerReminders = z.infer<typeof reviewerRemindersSchema>;
 
+// "Version awaiting your feedback" reminder to the decider (ROUND-05): sent
+// this many days after the round opened, then again after the same delay,
+// at most DECIDER_REMINDER_MAX_SENDS times per round.
+export const DECIDER_REMINDER_MAX_DAYS = 30;
+export const DECIDER_REMINDER_MAX_SENDS = 2;
+
+export const deciderRemindersSchema = z.object({
+  delayDays: z.int().min(1).max(DECIDER_REMINDER_MAX_DAYS),
+  enabled: z.boolean(),
+});
+
+export type DeciderReminders = z.infer<typeof deciderRemindersSchema>;
+
 // White label of the review links (REV-10): the logo is a PNG, JPEG or
 // WebP image (same formats as comment attachments) and the accent a hex color.
 export const BRAND_LOGO_MAX_BYTES = 2 * 1024 * 1024;
