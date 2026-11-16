@@ -381,9 +381,12 @@ export function CommentComposer({
           token,
           versionId,
         });
-        await queryClient.invalidateQueries({
-          queryKey: orpc.comment.listForReview.key(),
-        });
+        await Promise.all([
+          queryClient.invalidateQueries({
+            queryKey: orpc.comment.listForReview.key(),
+          }),
+          queryClient.invalidateQueries({ queryKey: orpc.review.round.key() }),
+        ]);
         toast.success(messages.saved);
         positionChosen.current = false;
         setBody("");

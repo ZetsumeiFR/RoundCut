@@ -29,15 +29,6 @@ import { client as api, orpc } from "@/utils/orpc";
 
 type SubmitMessages = Messages["review"]["submit"];
 
-// Top-level comments of the open round make its batch; replies follow their
-// thread, like the server's count.
-const batchCount = (
-  comments: readonly { parentId: string | null; roundId: string | null }[],
-  roundId: string
-) =>
-  comments.filter((item) => item.parentId === null && item.roundId === roundId)
-    .length;
-
 function ConfirmSubmitDialog({
   busy,
   messages,
@@ -80,16 +71,15 @@ function ConfirmSubmitDialog({
 }
 
 // The reviewer's round banner and "Submit my feedback (n)" button (REV-05).
-// Once submitted, the batch is closed: new comments wait for the next round.
+// Once submitted, the batch is closed: new comments wait for the next round
+// (REV-06) and the banner counts them.
 export function SubmitBatch({
-  comments,
   locale,
   messages,
   token,
   versionId,
   workspaceName,
 }: {
-  comments: readonly { parentId: string | null; roundId: string | null }[];
   locale: Locale;
   messages: SubmitMessages;
   token: string;
@@ -158,7 +148,7 @@ export function SubmitBatch({
       />
     );
   }
-  const { includedRounds, round } = current.data;
+  const { includedRounds, pendingCount, round } = current.data;
   if (round === null || round.status === "closed") {
     return null;
   }
@@ -182,16 +172,28 @@ export function SubmitBatch({
           {formatMessage(messages.submittedTitle, { round: round.number })}
         </AlertTitle>
         <AlertDescription>
-          {formatMessage(messages.submittedDescription, {
-            date,
-            workspace: workspaceName,
-          })}
+          <p>
+            {formatMessage(messages.submittedDescription, {
+              date,
+              workspace: workspaceName,
+            })}
+          </p>
+          {pendingCount > 0 ? (
+            <p className="font-medium">
+              {formatMessage(
+                new Intl.PluralRules(locale).select(pendingCount) === "one"
+                  ? messages.pendingOne
+                  : messages.pendingOther,
+                { count: pendingCount }
+              )}
+            </p>
+          ) : null}
         </AlertDescription>
       </Alert>
     );
   }
 
-  const count = batchCount(comments, round.id);
+  const count = round.batchCount;
   return (
     <div className="flex flex-wrap items-center justify-between gap-2 border p-2">
       <Badge variant={extra ? "warning-light" : "info-light"}>

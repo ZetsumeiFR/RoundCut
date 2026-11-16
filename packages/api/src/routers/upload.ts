@@ -1,8 +1,9 @@
 import { ORPCError } from "@orpc/server";
 import { PLAN_MAX_FILE_BYTES } from "@roundcut/db/plan";
+import { comment } from "@roundcut/db/schema/comment";
 import { round } from "@roundcut/db/schema/round";
 import { version } from "@roundcut/db/schema/version";
-import { and, eq, max, ne } from "drizzle-orm";
+import { and, eq, inArray, isNull, max, ne } from "drizzle-orm";
 import z from "zod";
 
 import { protectedProcedure } from "../index";
@@ -190,11 +191,28 @@ export const uploadRouter = {
             number: (last?.number ?? 0) + 1,
             versionId: ready.id,
           })
-          .returning({ number: round.number });
+          .returning({ id: round.id, number: round.number });
         if (!opened) {
           throw new Error("Round insert returned no row");
         }
-        return { ready, round: opened };
+        // Comments written after a batch was submitted waited for this round
+        // (REV-06): they join its batch.
+        await tx
+          .update(comment)
+          .set({ roundId: opened.id })
+          .where(
+            and(
+              isNull(comment.roundId),
+              inArray(
+                comment.versionId,
+                tx
+                  .select({ id: version.id })
+                  .from(version)
+                  .where(eq(version.deliverableId, ready.deliverableId))
+              )
+            )
+          );
+        return { ready, round: { number: opened.number } };
       });
       return {
         ...(await withThumbnail(context.storage, published.ready)),

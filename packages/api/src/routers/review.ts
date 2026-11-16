@@ -58,6 +58,22 @@ async function batchSize(db: Database, roundId: string) {
   return row?.total ?? 0;
 }
 
+// Top-level comments of a version written while no round was open on it:
+// they wait for the next round (REV-06).
+async function pendingSize(db: Database, versionId: string) {
+  const [row] = await db
+    .select({ total: count() })
+    .from(comment)
+    .where(
+      and(
+        eq(comment.versionId, versionId),
+        isNull(comment.roundId),
+        isNull(comment.parentId)
+      )
+    );
+  return row?.total ?? 0;
+}
+
 // Emails the workspace owner, in the workspace language, that a client
 // submitted a batch. The submission is already saved: a mail failure is
 // logged rather than reported to the client, who could not submit again.
@@ -226,8 +242,9 @@ export const reviewRouter = {
       reviewer: context.reviewer,
     };
   }),
-  // The review round of a version and the project's included rounds, for the
-  // reviewer's submit button and banner (REV-05).
+  // The review round of a version with the size of its batch, the comments
+  // waiting for the next round (REV-06) and the project's included rounds,
+  // for the reviewer's submit button and banner (REV-05).
   round: publicProcedure
     .input(versionInput)
     .use(requireReviewLink)
@@ -239,9 +256,16 @@ export const reviewRouter = {
         .select({ termsSnapshot: project.termsSnapshot })
         .from(project)
         .where(eq(project.id, projectId));
+      const current = await findVersionRound(context.db, target.id);
       return {
         includedRounds: terms?.termsSnapshot.includedRounds ?? 0,
-        round: await findVersionRound(context.db, target.id),
+        pendingCount: await pendingSize(context.db, target.id),
+        round: current
+          ? {
+              ...current,
+              batchCount: await batchSize(context.db, current.id),
+            }
+          : null,
       };
     }),
 
