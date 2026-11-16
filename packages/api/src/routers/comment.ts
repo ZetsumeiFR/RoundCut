@@ -13,6 +13,7 @@ import {
   COMMENT_ATTACHMENT_MAX_BYTES,
   COMMENT_ATTACHMENT_TYPES,
   commentAttachmentSchema,
+  commentBatchSchema,
   commentReplySchema,
   commentSchema,
   commentStatusSchema,
@@ -224,11 +225,24 @@ async function checkAttachment(
 const isWithin = (durationMs: number | null, timecodeMs: number | null) =>
   durationMs === null || timecodeMs === null || timecodeMs <= durationMs;
 
+const pastTheEnd = () =>
+  new ORPCError("BAD_REQUEST", {
+    message: "The timecode is past the end of the video",
+  });
+
+// New feedback joins the round open on its version; without one (none yet,
+// or its batch was submitted: REV-05) it waits for the next round (REV-06).
+async function openRoundIdOf(db: Database, versionId: string) {
+  const [openRound] = await db
+    .select({ id: round.id })
+    .from(round)
+    .where(and(eq(round.versionId, versionId), eq(round.status, "open")));
+  return openRound?.id ?? null;
+}
+
 export const commentRouter = {
   // A reviewer's timestamped comment (REV-03) on a published version of the
-  // linked project. It joins the round open on that version; without one
-  // (none yet, or its batch was submitted: REV-05) it waits for the next
-  // round (REV-06).
+  // linked project.
   create: publicProcedure
     .input(commentSchema.extend({ token: reviewTokenSchema }))
     .use(requireReviewLink)
@@ -246,17 +260,12 @@ export const commentRouter = {
           isWithin(target.durationMs, input.endTimecodeMs)
         )
       ) {
-        throw new ORPCError("BAD_REQUEST", {
-          message: "The timecode is past the end of the video",
-        });
+        throw pastTheEnd();
       }
       if (input.attachmentKey) {
         await checkAttachment(context.storage, projectId, input.attachmentKey);
       }
-      const [openRound] = await context.db
-        .select({ id: round.id })
-        .from(round)
-        .where(and(eq(round.versionId, target.id), eq(round.status, "open")));
+      const roundId = await openRoundIdOf(context.db, target.id);
       const [saved] = await context.db
         .insert(comment)
         .values({
@@ -265,7 +274,7 @@ export const commentRouter = {
           body: input.body,
           endTimecodeMs: input.endTimecodeMs,
           reviewerId: author.id,
-          roundId: openRound?.id ?? null,
+          roundId,
           timecodeMs: input.timecodeMs,
           versionId: target.id,
         })
@@ -278,6 +287,42 @@ export const commentRouter = {
         editorName: null,
         reviewerName: author.name,
       });
+    }),
+
+  // Feedback pasted from elsewhere (REV-09): one comment per recognized line,
+  // all created or none.
+  createBatch: publicProcedure
+    .input(commentBatchSchema.extend({ token: reviewTokenSchema }))
+    .use(requireReviewLink)
+    .handler(async ({ context, input }) => {
+      const author = requireReviewer(context.reviewer);
+      const target = await findReviewVersion(
+        context.db,
+        context.reviewLink.projectId,
+        input.versionId
+      );
+      if (
+        !input.comments.every((item) =>
+          isWithin(target.durationMs, item.timecodeMs)
+        )
+      ) {
+        throw pastTheEnd();
+      }
+      const roundId = await openRoundIdOf(context.db, target.id);
+      const saved = await context.db
+        .insert(comment)
+        .values(
+          input.comments.map((item) => ({
+            authorType: "reviewer" as const,
+            body: item.body,
+            reviewerId: author.id,
+            roundId,
+            timecodeMs: item.timecodeMs,
+            versionId: target.id,
+          }))
+        )
+        .returning({ id: comment.id });
+      return { count: saved.length };
     }),
 
   list: protectedProcedure
