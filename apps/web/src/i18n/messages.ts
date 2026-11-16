@@ -702,6 +702,67 @@ const en = {
       title: "Add a client to create a project",
     },
     none: "None",
+    player: {
+      back: "Back to {project}",
+      controls: {
+        enterFullscreen: "Full screen",
+        exitFullscreen: "Exit full screen",
+        marker: "Feedback at {timecode}: {label}",
+        mute: "Mute",
+        nextFrame: "Next frame",
+        pause: "Pause",
+        play: "Play",
+        previousFrame: "Previous frame",
+        shortcuts: "Keyboard shortcuts",
+        speed: "Playback speed",
+        timeline: "Timeline",
+        unmute: "Unmute",
+      },
+      feedback: {
+        emptyDescription:
+          "Your client's timestamped comments on this version will appear here and as markers on the timeline.",
+        emptyTitle: "No feedback yet",
+        title: "Feedback",
+      },
+      loadErrorTitle: "Couldn't load this version",
+      loading: "Loading the player…",
+      newVersion: "New version",
+      notFound: {
+        action: "Back to the project",
+        description:
+          "This version doesn't exist or belongs to another workspace.",
+        title: "Version not found",
+      },
+      round: "Round {current} of {included} included",
+      shortcuts: {
+        description:
+          "The player responds to these keys while this page is open.",
+        fullscreen: "Full screen",
+        help: "Show shortcuts",
+        marker: "Previous / next feedback",
+        mute: "Mute",
+        playPause: "Play / pause",
+        second: "Back / forward 1 second",
+        space: "Space",
+        speed: "Slower / faster",
+        startEnd: "Start / end",
+        step: "Previous / next frame",
+        title: "Keyboard shortcuts",
+      },
+      title: "{deliverable} · V{number}",
+      uploading: {
+        description: "It can be played once its upload has finished.",
+        title: "This version is still uploading",
+      },
+      version: "V{number}",
+      versionLabel: "Version",
+      videoError: {
+        action: "Try again",
+        description:
+          "The file couldn't be read. Try again, or upload this version again.",
+        title: "Couldn't play the video",
+      },
+    },
     retry: "Try again",
     saved: "{name} created",
     status: {
@@ -841,6 +902,7 @@ const en = {
       },
       noVersion: "No version yet",
       openCommentsLabel: "Open feedback: {count}",
+      openVersion: "Play V{number} of {title}",
       round: "Round {current}/{included}",
       roundLabel: "Round {current} of {included} included",
       settings: {
@@ -1592,6 +1654,67 @@ const fr: Messages = {
       title: "Ajoutez un client pour créer un projet",
     },
     none: "Aucun",
+    player: {
+      back: "Retour à {project}",
+      controls: {
+        enterFullscreen: "Plein écran",
+        exitFullscreen: "Quitter le plein écran",
+        marker: "Retour à {timecode} : {label}",
+        mute: "Couper le son",
+        nextFrame: "Image suivante",
+        pause: "Pause",
+        play: "Lecture",
+        previousFrame: "Image précédente",
+        shortcuts: "Raccourcis clavier",
+        speed: "Vitesse de lecture",
+        timeline: "Barre de temps",
+        unmute: "Rétablir le son",
+      },
+      feedback: {
+        emptyDescription:
+          "Les commentaires horodatés de votre client sur cette version apparaîtront ici et en marqueurs sur la barre de temps.",
+        emptyTitle: "Aucun retour pour l'instant",
+        title: "Retours",
+      },
+      loadErrorTitle: "Impossible de charger cette version",
+      loading: "Chargement du lecteur…",
+      newVersion: "Nouvelle version",
+      notFound: {
+        action: "Retour au projet",
+        description:
+          "Cette version n'existe pas ou appartient à un autre espace de travail.",
+        title: "Version introuvable",
+      },
+      round: "Tour {current} sur {included} inclus",
+      shortcuts: {
+        description:
+          "Le lecteur répond à ces touches tant que cette page est ouverte.",
+        fullscreen: "Plein écran",
+        help: "Afficher les raccourcis",
+        marker: "Retour précédent / suivant",
+        mute: "Couper le son",
+        playPause: "Lecture / pause",
+        second: "Reculer / avancer d'une seconde",
+        space: "Espace",
+        speed: "Ralentir / accélérer",
+        startEnd: "Début / fin",
+        step: "Image précédente / suivante",
+        title: "Raccourcis clavier",
+      },
+      title: "{deliverable} · V{number}",
+      uploading: {
+        description: "Elle pourra être lue une fois son upload terminé.",
+        title: "Cette version est encore en cours d'upload",
+      },
+      version: "V{number}",
+      versionLabel: "Version",
+      videoError: {
+        action: "Réessayer",
+        description:
+          "Le fichier n'a pas pu être lu. Réessayez, ou uploadez à nouveau cette version.",
+        title: "Impossible de lire la vidéo",
+      },
+    },
     retry: "Réessayer",
     saved: "{name} créé",
     status: {
@@ -1734,6 +1857,7 @@ const fr: Messages = {
       },
       noVersion: "Aucune version",
       openCommentsLabel: "Retours ouverts : {count}",
+      openVersion: "Lire la V{number} de {title}",
       round: "Tour {current}/{included}",
       roundLabel: "Tour {current} sur {included} inclus",
       settings: {
