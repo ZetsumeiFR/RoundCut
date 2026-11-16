@@ -12,6 +12,9 @@ export default async function DashboardPage() {
   if (!session?.user) {
     redirect("/login");
   }
+  if (!session.user.emailVerified) {
+    redirect("/onboarding");
+  }
 
   return (
     <div>

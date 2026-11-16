@@ -10,6 +10,8 @@ const en = {
       resending: "Sending…",
       resent: "A new verification email is on its way.",
       title: "Check your inbox",
+      unverifiedDescription:
+        "Your email isn't verified yet. We sent a new verification link to {email}: open it to sign in.",
     },
     errors: {
       generic: "Please try again in a moment.",
@@ -69,6 +71,8 @@ const fr: Messages = {
       resending: "Envoi…",
       resent: "Un nouvel email de vérification est en route.",
       title: "Vérifiez votre boîte mail",
+      unverifiedDescription:
+        "Votre email n'est pas encore vérifié. Nous avons envoyé un nouveau lien de vérification à {email} : ouvrez-le pour vous connecter.",
     },
     errors: {
       generic: "Veuillez réessayer dans un instant.",
