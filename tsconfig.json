@@ -1,0 +1,3 @@
+{
+  "extends": "@roundcut/config/tsconfig.base.json"
+}
