@@ -1023,6 +1023,25 @@ const en = {
       title: "This link has expired",
     },
     expiresAt: "Link valid until {date}",
+    identity: {
+      decider: "Decider",
+      description:
+        "Enter your name and email so {workspace} knows who sent the feedback. This device remembers you for 30 days.",
+      email: "Email",
+      emailInvalid: "Enter a valid email address.",
+      errorDescription: "Check your connection and try again.",
+      errorTitle: "Couldn't open the review",
+      name: "Name",
+      nameRequired: "Enter your name.",
+      notAllowedDescription:
+        "Use the address your editor shared this link with, or ask them to add this one.",
+      notAllowedTitle: "This email can't access the review",
+      signedInAs: "Reviewing as {name}",
+      submit: "Open the review",
+      submitting: "Opening…",
+      switch: "Not you?",
+      title: "Who's reviewing?",
+    },
     invalid: {
       description:
         "It may be mistyped or have been replaced. Ask your editor for the current review link.",
@@ -2090,6 +2109,25 @@ const fr: Messages = {
       title: "Ce lien a expiré",
     },
     expiresAt: "Lien valable jusqu'au {date}",
+    identity: {
+      decider: "Décideur",
+      description:
+        "Indiquez votre nom et votre e-mail pour que {workspace} sache qui envoie les retours. Cet appareil vous reconnaîtra pendant 30 jours.",
+      email: "E-mail",
+      emailInvalid: "Saisissez une adresse e-mail valide.",
+      errorDescription: "Vérifiez votre connexion et réessayez.",
+      errorTitle: "Impossible d'ouvrir la revue",
+      name: "Nom",
+      nameRequired: "Saisissez votre nom.",
+      notAllowedDescription:
+        "Utilisez l'adresse à laquelle votre monteur a partagé ce lien, ou demandez-lui d'ajouter celle-ci.",
+      notAllowedTitle: "Cet e-mail n'a pas accès à la revue",
+      signedInAs: "Vous relisez en tant que {name}",
+      submit: "Ouvrir la revue",
+      submitting: "Ouverture…",
+      switch: "Ce n'est pas vous ?",
+      title: "Qui relit ?",
+    },
     invalid: {
       description:
         "Il est peut-être mal saisi ou a été remplacé. Demandez le lien de revue actuel à votre monteur.",

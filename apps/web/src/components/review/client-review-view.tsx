@@ -7,7 +7,7 @@ import { Button } from "@roundcut/ui/components/button";
 import { Badge } from "@roundcut/ui/components/reui/badge";
 import { Skeleton } from "@roundcut/ui/components/skeleton";
 import { cn } from "@roundcut/ui/lib/utils";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   CircleAlertIcon,
   ClapperboardIcon,
@@ -19,8 +19,9 @@ import { useCallback, useState } from "react";
 
 import { VersionThumbnail } from "@/components/projects/version-thumbnail";
 import { formatMessage, type Messages } from "@/i18n/messages";
-import { orpc } from "@/utils/orpc";
+import { client as api, orpc } from "@/utils/orpc";
 import { ReviewState } from "./review-view";
+import { ReviewerIdentityForm } from "./reviewer-identity-form";
 import { type PlayerMarker, VideoPlayer } from "./video-player";
 
 type ReviewMessages = Messages["review"];
@@ -28,7 +29,8 @@ type PlayerMessages = Messages["projects"]["player"];
 type LinkedProject = Awaited<
   ReturnType<AppRouterClient["review"]["resolveLink"]>
 >;
-type LinkedDeliverable = LinkedProject["deliverables"][number];
+type ReviewerProject = Extract<LinkedProject, { deliverables: unknown }>;
+type LinkedDeliverable = ReviewerProject["deliverables"][number];
 
 const MAX_RETRIES = 3;
 // Feedback comments arrive with REV-03; until then no version has markers.
@@ -108,6 +110,60 @@ function DeliverableItem({
   );
 }
 
+function ReviewHeader({
+  locale,
+  messages,
+  onSwitchReviewer,
+  project,
+}: {
+  locale: Locale;
+  messages: ReviewMessages;
+  onSwitchReviewer: () => void;
+  project: LinkedProject;
+}) {
+  const { reviewer } = project;
+  return (
+    <header className="flex flex-col gap-1">
+      <p className="text-muted-foreground text-xs">
+        {formatMessage(messages.sharedBy, {
+          client: project.clientName,
+          workspace: project.workspaceName,
+        })}
+      </p>
+      <h1 className="break-words font-semibold text-lg">{project.name}</h1>
+      {project.expiresAt ? (
+        <p className="text-muted-foreground text-xs">
+          {formatMessage(messages.expiresAt, {
+            date: new Intl.DateTimeFormat(locale, {
+              dateStyle: "long",
+            }).format(project.expiresAt),
+          })}
+        </p>
+      ) : null}
+      {reviewer ? (
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-muted-foreground text-xs">
+          <span className="min-w-0 break-words">
+            {formatMessage(messages.identity.signedInAs, {
+              name: reviewer.name,
+            })}
+          </span>
+          {reviewer.isDecider ? (
+            <Badge variant="info-light">{messages.identity.decider}</Badge>
+          ) : null}
+          <Button
+            className="h-auto p-0 text-xs"
+            onClick={onSwitchReviewer}
+            type="button"
+            variant="link"
+          >
+            {messages.identity.switch}
+          </Button>
+        </div>
+      ) : null}
+    </header>
+  );
+}
+
 function LinkedReview({
   locale,
   messages,
@@ -119,7 +175,7 @@ function LinkedReview({
   messages: ReviewMessages;
   onSourceError: () => void;
   player: PlayerMessages;
-  project: LinkedProject;
+  project: ReviewerProject;
 }) {
   const playable = project.deliverables.filter((item) => item.latestVersion);
   const [selectedId, setSelectedId] = useState(playable[0]?.id);
@@ -129,24 +185,6 @@ function LinkedReview({
 
   return (
     <>
-      <header className="flex flex-col gap-1">
-        <p className="text-muted-foreground text-xs">
-          {formatMessage(messages.sharedBy, {
-            client: project.clientName,
-            workspace: project.workspaceName,
-          })}
-        </p>
-        <h1 className="break-words font-semibold text-lg">{project.name}</h1>
-        {project.expiresAt ? (
-          <p className="text-muted-foreground text-xs">
-            {formatMessage(messages.expiresAt, {
-              date: new Intl.DateTimeFormat(locale, {
-                dateStyle: "long",
-              }).format(project.expiresAt),
-            })}
-          </p>
-        ) : null}
-      </header>
       {selected && version ? (
         <section className="flex flex-col gap-2">
           <div className="flex items-center justify-between gap-2">
@@ -226,6 +264,13 @@ export function ClientReviewView({
   );
   const { refetch } = project;
   const handleRetry = useCallback(() => refetch(), [refetch]);
+  const queryClient = useQueryClient();
+  const handleSwitchReviewer = useCallback(async () => {
+    await api.review.forgetIdentity({ token });
+    await queryClient.invalidateQueries({
+      queryKey: orpc.review.resolveLink.key(),
+    });
+  }, [queryClient, token]);
 
   if (isExpiredLink(project.error)) {
     return (
@@ -263,12 +308,28 @@ export function ClientReviewView({
     return <ClientReviewSkeleton label={messages.loading} />;
   }
   return (
-    <LinkedReview
-      locale={locale}
-      messages={messages}
-      onSourceError={handleRetry}
-      player={player}
-      project={project.data}
-    />
+    <>
+      <ReviewHeader
+        locale={locale}
+        messages={messages}
+        onSwitchReviewer={handleSwitchReviewer}
+        project={project.data}
+      />
+      {project.data.reviewer === null ? (
+        <ReviewerIdentityForm
+          messages={messages.identity}
+          token={token}
+          workspaceName={project.data.workspaceName}
+        />
+      ) : (
+        <LinkedReview
+          locale={locale}
+          messages={messages}
+          onSourceError={handleRetry}
+          player={player}
+          project={project.data}
+        />
+      )}
+    </>
   );
 }
