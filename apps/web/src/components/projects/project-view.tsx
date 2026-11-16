@@ -58,6 +58,7 @@ import {
   CopyIcon,
   FolderIcon,
   HistoryIcon,
+  PlayIcon,
   PlusIcon,
   SearchXIcon,
   UploadIcon,
@@ -202,6 +203,7 @@ function UploadCell({
 
 function buildColumns(
   messages: ProjectsMessages,
+  projectId: string,
   includedRounds: number,
   onUpload: (deliverable: UploadTarget) => void
 ): ColumnDef<DataGridFeatures, DeliverableRow>[] {
@@ -227,9 +229,17 @@ function buildColumns(
       cell: ({ row }) => {
         const version = row.original.review.latestVersion;
         return version ? (
-          <span className="text-sm tabular-nums">
+          <Link
+            aria-label={formatMessage(view.openVersion, {
+              number: version.number,
+              title: row.original.title,
+            })}
+            className="inline-flex items-center gap-1.5 text-sm tabular-nums underline-offset-4 transition-colors hover:text-primary hover:underline"
+            href={`/projects/${projectId}/versions/${version.id}`}
+          >
+            <PlayIcon aria-hidden="true" className="size-3.5" />
             {formatMessage(view.version, { number: version.number })}
-          </span>
+          </Link>
         ) : (
           <span className="text-muted-foreground text-sm">
             {view.noVersion}
@@ -313,8 +323,8 @@ function DeliverablesGrid({
   const [sorting, setSorting] = useState<SortingState>([]);
   const { includedRounds } = project.termsSnapshot;
   const columns = useMemo(
-    () => buildColumns(messages, includedRounds, onUpload),
-    [includedRounds, messages, onUpload]
+    () => buildColumns(messages, project.id, includedRounds, onUpload),
+    [includedRounds, messages, onUpload, project.id]
   );
   const i18n = useMemo(
     () => gridI18n(messages.grid, messages.deliverables.emptyTitle),

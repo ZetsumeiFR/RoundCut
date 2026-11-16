@@ -1,0 +1,70 @@
+"use client";
+
+import { Slider as SliderPrimitive } from "@base-ui/react/slider";
+import { cn } from "@roundcut/ui/lib/utils";
+
+function thumbCount(
+  value: SliderPrimitive.Root.Props["value"],
+  defaultValue: SliderPrimitive.Root.Props["defaultValue"]
+) {
+  if (Array.isArray(value)) {
+    return value.length;
+  }
+  if (Array.isArray(defaultValue)) {
+    return defaultValue.length;
+  }
+  return value === undefined && defaultValue === undefined ? 2 : 1;
+}
+
+function Slider({
+  className,
+  defaultValue,
+  value,
+  min = 0,
+  max = 100,
+  getAriaLabel,
+  getAriaValueText,
+  ...props
+}: SliderPrimitive.Root.Props &
+  Pick<SliderPrimitive.Thumb.Props, "getAriaLabel" | "getAriaValueText">) {
+  const thumbs = Array.from(
+    { length: thumbCount(value, defaultValue) },
+    (_, index) => `thumb-${index}`
+  );
+
+  return (
+    <SliderPrimitive.Root
+      className={cn("data-vertical:h-full data-horizontal:w-full", className)}
+      data-slot="slider"
+      defaultValue={defaultValue}
+      max={max}
+      min={min}
+      thumbAlignment="edge"
+      value={value}
+      {...props}
+    >
+      <SliderPrimitive.Control className="relative flex w-full touch-none select-none items-center data-vertical:h-full data-vertical:min-h-40 data-vertical:w-auto data-vertical:flex-col data-disabled:opacity-50">
+        <SliderPrimitive.Track
+          className="relative grow select-none overflow-hidden rounded-none bg-muted data-horizontal:h-1 data-vertical:h-full data-horizontal:w-full data-vertical:w-1"
+          data-slot="slider-track"
+        >
+          <SliderPrimitive.Indicator
+            className="select-none bg-primary data-horizontal:h-full data-vertical:w-full"
+            data-slot="slider-range"
+          />
+        </SliderPrimitive.Track>
+        {thumbs.map((thumb) => (
+          <SliderPrimitive.Thumb
+            className="relative block size-3 shrink-0 select-none rounded-none border border-ring bg-white ring-ring/50 transition-[color,box-shadow] after:absolute after:-inset-2 hover:ring-1 focus-visible:outline-hidden focus-visible:ring-1 active:ring-1 disabled:pointer-events-none disabled:opacity-50"
+            data-slot="slider-thumb"
+            getAriaLabel={getAriaLabel}
+            getAriaValueText={getAriaValueText}
+            key={thumb}
+          />
+        ))}
+      </SliderPrimitive.Control>
+    </SliderPrimitive.Root>
+  );
+}
+
+export { Slider };

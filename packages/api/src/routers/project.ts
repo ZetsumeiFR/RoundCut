@@ -6,7 +6,7 @@ import { deliverable } from "@roundcut/db/schema/deliverable";
 import { project } from "@roundcut/db/schema/project";
 import { round } from "@roundcut/db/schema/round";
 import { version } from "@roundcut/db/schema/version";
-import { and, asc, desc, eq, inArray, isNull, max, ne } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, isNull, ne } from "drizzle-orm";
 import z from "zod";
 
 import { protectedProcedure } from "../index";
@@ -24,7 +24,7 @@ type Deliverable = ReturnType<typeof toDeliverable>;
 export interface ReviewActivity {
   // Latest round, opened when its version was published (VER-04).
   currentRound: { number: number; status: RoundStatus } | null;
-  latestVersion: { number: number } | null;
+  latestVersion: { id: string; number: number } | null;
   openComments: number;
 }
 
@@ -225,10 +225,11 @@ export const projectRouter = {
         .where(eq(deliverable.projectId, row.project.id))
         .orderBy(asc(deliverable.position));
       // Latest version whose upload finished, per deliverable.
-      const latest = await context.db
+      const published = await context.db
         .select({
           deliverableId: version.deliverableId,
-          number: max(version.number),
+          id: version.id,
+          number: version.number,
         })
         .from(version)
         .innerJoin(deliverable, eq(version.deliverableId, deliverable.id))
@@ -238,9 +239,10 @@ export const projectRouter = {
             ne(version.status, "uploading")
           )
         )
-        .groupBy(version.deliverableId);
-      const latestNumbers = new Map(
-        latest.map((item) => [item.deliverableId, item.number])
+        .orderBy(asc(version.number));
+      // Ascending order: the last version seen per deliverable is its latest.
+      const latestVersions = new Map(
+        published.map(({ deliverableId, ...latest }) => [deliverableId, latest])
       );
       const rounds = await context.db
         .select({
@@ -259,17 +261,14 @@ export const projectRouter = {
       return toProject(
         row.project,
         row.client,
-        deliverables.map((item): Deliverable & { review: ReviewActivity } => {
-          const number = latestNumbers.get(item.id);
-          return {
-            ...toDeliverable(item),
-            review: {
-              currentRound: currentRounds.get(item.id) ?? null,
-              latestVersion: number ? { number } : null,
-              openComments: NO_OPEN_COMMENTS,
-            },
-          };
-        })
+        deliverables.map((item): Deliverable & { review: ReviewActivity } => ({
+          ...toDeliverable(item),
+          review: {
+            currentRound: currentRounds.get(item.id) ?? null,
+            latestVersion: latestVersions.get(item.id) ?? null,
+            openComments: NO_OPEN_COMMENTS,
+          },
+        }))
       );
     }),
   indicators: protectedProcedure.handler(
