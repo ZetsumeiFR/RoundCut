@@ -20,7 +20,7 @@ import { formatMessage, type Messages } from "@/i18n/messages";
 type ChecklistMessages = Messages["dashboard"]["checklist"];
 
 interface ChecklistItem {
-  available: boolean;
+  action?: { href: "/clients" | "/onboarding"; label: string };
   description: string;
   done: boolean;
   id: string;
@@ -43,7 +43,7 @@ function ChecklistStatus({
       </Badge>
     );
   }
-  if (!item.available) {
+  if (!item.action) {
     return (
       <Badge size="lg" variant="outline">
         {messages.soon}
@@ -53,48 +53,48 @@ function ChecklistStatus({
   return (
     <Button
       nativeButton={false}
-      render={<Link href="/onboarding" />}
+      render={<Link href={item.action.href} />}
       size="sm"
       variant="outline"
     >
-      {messages.setupAction}
+      {item.action.label}
     </Button>
   );
 }
 
-// Stays on the dashboard until the first review link is sent (WS-03). Clients,
-// projects and review links don't exist yet, so those steps can't be done.
+// Stays on the dashboard until the first review link is sent (WS-03).
+// Projects and review links don't exist yet, so those steps can't be done.
 export function SetupChecklist({
+  hasClient,
   messages,
   setupDone,
 }: {
+  hasClient: boolean;
   messages: ChecklistMessages;
   setupDone: boolean;
 }) {
   const items: ChecklistItem[] = [
     {
-      available: true,
+      action: { href: "/onboarding", label: messages.setupAction },
       description: messages.setupDescription,
       done: setupDone,
       id: "setup",
       title: messages.setup,
     },
     {
-      available: false,
+      action: { href: "/clients", label: messages.firstClientAction },
       description: messages.firstClientDescription,
-      done: false,
+      done: hasClient,
       id: "first-client",
       title: messages.firstClient,
     },
     {
-      available: false,
       description: messages.firstProjectDescription,
       done: false,
       id: "first-project",
       title: messages.firstProject,
     },
     {
-      available: false,
       description: messages.firstLinkDescription,
       done: false,
       id: "first-link",
