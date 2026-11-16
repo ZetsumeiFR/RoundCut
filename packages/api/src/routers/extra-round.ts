@@ -8,15 +8,22 @@ import {
   offerAmounts,
 } from "@roundcut/db/extra-round";
 import { client } from "@roundcut/db/schema/client";
+import { consentRecord } from "@roundcut/db/schema/consent-record";
 import { deliverable } from "@roundcut/db/schema/deliverable";
 import { extraRoundOffer } from "@roundcut/db/schema/extra-round-offer";
 import { project } from "@roundcut/db/schema/project";
 import { reviewer } from "@roundcut/db/schema/reviewer";
+import { version } from "@roundcut/db/schema/version";
 import { workspace } from "@roundcut/db/schema/workspace";
 import { and, desc, eq, gt, isNull, lte, or } from "drizzle-orm";
 import z from "zod";
 
-import type { Notifications } from "../context";
+import {
+  type ConsentShown,
+  consentShownSchema,
+  snapshotHash,
+} from "../consent";
+import type { Notifications, RequestOrigin } from "../context";
 import { publicProcedure, requireReviewLink } from "../index";
 import { reviewTokenSchema } from "../review-link";
 import { isDeciderEmail } from "../reviewer";
@@ -93,6 +100,20 @@ async function acceptedOffer(db: Database, deliverableId: string) {
   return offer ?? null;
 }
 
+// The agreement record of an accepted offer (EXTRA-03), as shown on the page.
+async function offerConsent(db: Database, offerId: string) {
+  const [record] = await db
+    .select({
+      createdAt: consentRecord.createdAt,
+      email: consentRecord.email,
+      name: consentRecord.name,
+      snapshotHash: consentRecord.snapshotHash,
+    })
+    .from(consentRecord)
+    .where(eq(consentRecord.offerId, offerId));
+  return record ?? null;
+}
+
 // The extra round offered on a version (EXTRA-01): null until the included
 // rounds are used up and the client has started a new batch, then the offer
 // with its amounts, delay, payment rule and the decider's answer.
@@ -155,6 +176,8 @@ async function currentOffer(
     ...offerAmounts(offer.priceCents, offer.vatRateBps),
     acceptedAt: offer.acceptedAt,
     acceptedByName: acceptedBy?.name ?? null,
+    consent:
+      offer.status === "accepted" ? await offerConsent(db, offer.id) : null,
     currency: offer.currency,
     deciderName: owner.deciderName,
     delayDays: offer.delayDays,
@@ -225,15 +248,79 @@ async function emailDecider(
   );
 }
 
+// Everything the decider agreed to (EXTRA-03): who, when (UTC), from where,
+// the offer's terms and amounts, what the project is, and the text shown.
+async function agreementSnapshot(
+  db: Database,
+  agreement: {
+    agreedAt: Date;
+    offer: Offer;
+    request: RequestOrigin;
+    shown: ConsentShown;
+    signer: { email: string; id: string; name: string };
+    versionId: string;
+  }
+) {
+  const { offer, signer } = agreement;
+  const [row] = await db
+    .select({
+      deliverableTitle: deliverable.title,
+      projectId: project.id,
+      projectName: project.name,
+      versionNumber: version.number,
+      workspaceName: workspace.name,
+    })
+    .from(version)
+    .innerJoin(deliverable, eq(version.deliverableId, deliverable.id))
+    .innerJoin(project, eq(deliverable.projectId, project.id))
+    .innerJoin(workspace, eq(project.workspaceId, workspace.id))
+    .where(eq(version.id, agreement.versionId));
+  if (!row) {
+    throw new ORPCError("NOT_FOUND", { message: "Version not found" });
+  }
+  return {
+    agreedAt: agreement.agreedAt.toISOString(),
+    kind: "extra_round",
+    offer: {
+      currency: offer.currency,
+      delayDays: offer.delayDays,
+      expiresAt: offer.expiresAt.toISOString(),
+      grossCents: offer.grossCents,
+      id: offer.id,
+      netCents: offer.netCents,
+      requirePayment: offer.requirePayment,
+      round: offer.round,
+      vatCents: offer.vatCents,
+      vatRateBps: offer.vatRateBps,
+    },
+    project: {
+      deliverable: { id: offer.deliverableId, title: row.deliverableTitle },
+      id: row.projectId,
+      name: row.projectName,
+      version: { id: agreement.versionId, number: row.versionNumber },
+      workspace: row.workspaceName,
+    },
+    request: {
+      ip: agreement.request.ip,
+      userAgent: agreement.request.userAgent,
+    },
+    shown: agreement.shown,
+    signer: { email: signer.email, name: signer.name, reviewerId: signer.id },
+    snapshotVersion: 1,
+  };
+}
+
 export const extraRoundRouter = {
   // The decider accepts the offer on screen (EXTRA-02): they tick the
   // agreement and type the code emailed by review.requestOtp. The answer is
-  // recorded once, and proves the decider's email.
+  // recorded once, and proves the decider's email. The agreement record
+  // (EXTRA-03) is written in the same transaction, with the text shown.
   accept: publicProcedure
     .input(
       offerInput.extend({
         agreed: z.literal(true),
         code: reviewerCodeSchema,
+        shown: consentShownSchema,
       })
     )
     .use(requireReviewLink)
@@ -248,34 +335,67 @@ export const extraRoundRouter = {
         input.code
       );
       const now = new Date();
-      const [accepted] = await context.db
-        .update(extraRoundOffer)
-        .set({
-          acceptedAt: now,
-          acceptedByReviewerId: decider.id,
-          status: "accepted",
-        })
-        .where(
-          and(
-            eq(extraRoundOffer.id, offer.id),
-            eq(extraRoundOffer.status, "proposed"),
-            gt(extraRoundOffer.expiresAt, now)
+      const snapshot = await agreementSnapshot(context.db, {
+        agreedAt: now,
+        offer,
+        request: context.request,
+        shown: input.shown,
+        signer: decider,
+        versionId: input.versionId,
+      });
+      const consent = await context.db.transaction(async (tx) => {
+        const [accepted] = await tx
+          .update(extraRoundOffer)
+          .set({
+            acceptedAt: now,
+            acceptedByReviewerId: decider.id,
+            status: "accepted",
+          })
+          .where(
+            and(
+              eq(extraRoundOffer.id, offer.id),
+              eq(extraRoundOffer.status, "proposed"),
+              gt(extraRoundOffer.expiresAt, now)
+            )
           )
-        )
-        .returning({ id: extraRoundOffer.id });
-      if (!accepted) {
-        throw new ORPCError("CONFLICT", {
-          message: "This offer is no longer waiting for an answer",
-        });
-      }
-      await context.db
-        .update(reviewer)
-        .set({ verifiedAt: now })
-        .where(eq(reviewer.id, decider.id));
+          .returning({ id: extraRoundOffer.id });
+        if (!accepted) {
+          throw new ORPCError("CONFLICT", {
+            message: "This offer is no longer waiting for an answer",
+          });
+        }
+        const [record] = await tx
+          .insert(consentRecord)
+          .values({
+            createdAt: now,
+            email: decider.email,
+            ip: context.request.ip,
+            kind: "extra_round",
+            name: decider.name,
+            offerId: offer.id,
+            projectId,
+            reviewerId: decider.id,
+            snapshot,
+            snapshotHash: snapshotHash(snapshot),
+            userAgent: context.request.userAgent,
+          })
+          .returning({
+            createdAt: consentRecord.createdAt,
+            email: consentRecord.email,
+            name: consentRecord.name,
+            snapshotHash: consentRecord.snapshotHash,
+          });
+        await tx
+          .update(reviewer)
+          .set({ verifiedAt: now })
+          .where(eq(reviewer.id, decider.id));
+        return record ?? null;
+      });
       return {
         ...offer,
         acceptedAt: now,
         acceptedByName: decider.name,
+        consent,
         status: "accepted" as const,
       };
     }),

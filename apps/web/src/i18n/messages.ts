@@ -1254,6 +1254,14 @@ const en = {
         invalidCodeOther: "Wrong code. {count} attempts left.",
         offerClosed: "This offer is no longer waiting for an answer.",
         onlyDecider: "Only {decider} can accept this round.",
+        record: {
+          email: "Email",
+          fingerprint: "SHA-256 fingerprint",
+          sealed:
+            "Your identity, the time, your connection and the text and amounts shown are sealed in this record, which can't be changed.",
+          time: "Time (UTC)",
+          title: "Agreement record",
+        },
         resend: "Send a new code",
         sendingCode: "Sending the code…",
       },
@@ -2639,6 +2647,14 @@ const fr: Messages = {
         invalidCodeOther: "Code incorrect. Il reste {count} essais.",
         offerClosed: "Cette proposition n'attend plus de réponse.",
         onlyDecider: "Seul {decider} peut accepter ce tour.",
+        record: {
+          email: "E-mail",
+          fingerprint: "Empreinte SHA-256",
+          sealed:
+            "Votre identité, l'horodatage, votre connexion ainsi que le texte et les montants affichés sont scellés dans ce journal, qui ne peut plus être modifié.",
+          time: "Horodatage (UTC)",
+          title: "Journal d'accord",
+        },
         resend: "Renvoyer un code",
         sendingCode: "Envoi du code…",
       },

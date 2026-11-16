@@ -12,6 +12,7 @@ export const createServerApi = (session: Session) =>
     context: {
       db,
       notifications,
+      request: { ip: null, userAgent: null },
       reviewerCookies: createReviewerCookies(
         reviewerCookieOptions,
         new Headers(),
