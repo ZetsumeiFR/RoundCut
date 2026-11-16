@@ -2,6 +2,7 @@
 
 import { ORPCError } from "@orpc/client";
 import type { AppRouterClient } from "@roundcut/api/routers/index";
+import { DECIDER_REMINDER_MAX_SENDS } from "@roundcut/api/workspace";
 import type { Locale } from "@roundcut/auth/locale";
 import type { DeliverableStatus } from "@roundcut/db/deliverable";
 import type { RoundStatus } from "@roundcut/db/round";
@@ -503,6 +504,14 @@ function RoundItem({
       ? `${rounds.closedReasons.manual}, ${rounds.manualReasons[round.manualCloseReason]}`
       : round.closedReason && rounds.closedReasons[round.closedReason];
     dates.push(reason ? `${closed} (${reason})` : closed);
+  }
+  if (round.deciderReminderCount > 0) {
+    dates.push(
+      formatMessage(rounds.deciderReminded, {
+        count: round.deciderReminderCount,
+        max: DECIDER_REMINDER_MAX_SENDS,
+      })
+    );
   }
   return (
     <li className="flex flex-col gap-1 px-4 py-3">

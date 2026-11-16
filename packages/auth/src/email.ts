@@ -171,6 +171,37 @@ export function unsubmittedFeedbackEmail(
   return { to, ...unsubmittedFeedbackEmails[locale](details) };
 }
 
+export interface AwaitingFeedbackDetails {
+  deciderName: string;
+  deliverableTitle: string;
+  projectName: string;
+  studioName: string;
+  versionNumber: number;
+}
+
+const awaitingFeedbackEmails = {
+  en: (details: AwaitingFeedbackDetails) => ({
+    subject: `${details.projectName}: version awaiting your feedback`,
+    text: `Hello ${details.deciderName},\n\nVersion V${details.versionNumber} of ${details.deliverableTitle} (${details.projectName}) is waiting for your feedback: ${details.studioName} can't move on to the next round until it gets it.\n\nOpen the review link ${details.studioName} shared with you, add your comments and click "Submit my feedback".`,
+  }),
+  fr: (details: AwaitingFeedbackDetails) => ({
+    subject: `${details.projectName} : version en attente de vos retours`,
+    text: `Bonjour ${details.deciderName},\n\nLa version V${details.versionNumber} de ${details.deliverableTitle} (${details.projectName}) est en attente de vos retours : ${details.studioName} ne peut pas passer au tour suivant sans eux.\n\nOuvrez le lien de revue partagé par ${details.studioName}, ajoutez vos commentaires et cliquez sur « Soumettre mes retours ».`,
+  }),
+} satisfies Record<
+  Locale,
+  (details: AwaitingFeedbackDetails) => Omit<EmailMessage, "to">
+>;
+
+// Reminds the client's decider that a version waits for feedback (ROUND-05).
+export function awaitingFeedbackEmail(
+  locale: Locale,
+  to: string,
+  details: AwaitingFeedbackDetails
+): EmailMessage {
+  return { to, ...awaitingFeedbackEmails[locale](details) };
+}
+
 export function resetPasswordEmail(
   locale: Locale,
   to: string,

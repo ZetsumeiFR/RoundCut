@@ -20,6 +20,12 @@ export const workspace = pgTable("workspace", {
   brandLogoKey: text("brand_logo_key"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   currency: text("currency").default("EUR").notNull(),
+  // Reminder emailed to the client's decider while a version waits for
+  // feedback, this many days after the round opened (ROUND-05).
+  deciderReminderDays: integer("decider_reminder_days").default(3).notNull(),
+  deciderReminderEnabled: boolean("decider_reminder_enabled")
+    .default(true)
+    .notNull(),
   defaultVatRateBps: integer("default_vat_rate_bps").default(2000).notNull(),
   id: text("id")
     .primaryKey()

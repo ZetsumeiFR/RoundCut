@@ -127,6 +127,7 @@ export const roundRouter = {
           closedAt: round.closedAt,
           closedNote: round.closedNote,
           closedReason: round.closedReason,
+          deciderReminderCount: round.deciderReminderCount,
           deliverable: { id: deliverable.id, title: deliverable.title },
           id: round.id,
           kind: round.kind,

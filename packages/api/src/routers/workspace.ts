@@ -12,6 +12,7 @@ import {
   BRAND_LOGO_MAX_BYTES,
   brandingSchema,
   brandLogoUploadSchema,
+  deciderRemindersSchema,
   onboardingSchema,
   reviewerRemindersSchema,
   revisionTermsSchema,
@@ -57,6 +58,10 @@ const toWorkspace = async (row: WorkspaceRow, storage: Storage) => ({
     logoUrl: row.brandLogoKey ? await storage.signGet(row.brandLogoKey) : null,
   },
   currency: row.currency,
+  deciderReminders: {
+    delayDays: row.deciderReminderDays,
+    enabled: row.deciderReminderEnabled,
+  },
   defaultVatRate: row.defaultVatRateBps / BASIS_POINTS_PER_PERCENT,
   id: row.id,
   locale: row.locale,
@@ -214,6 +219,28 @@ export const workspaceRouter = {
       }
       if (logoChanged && current.brandLogoKey) {
         await context.storage.deleteObject(current.brandLogoKey);
+      }
+      return toWorkspace(row, context.storage);
+    }),
+  // Turns the "version awaiting your feedback" reminder to deciders on or
+  // off and sets its delay (ROUND-05).
+  updateDeciderReminders: protectedProcedure
+    .input(deciderRemindersSchema)
+    .handler(async ({ context, input }) => {
+      const current = await getOrCreateWorkspace(
+        context.db,
+        context.session.user
+      );
+      const [row] = await context.db
+        .update(workspace)
+        .set({
+          deciderReminderDays: input.delayDays,
+          deciderReminderEnabled: input.enabled,
+        })
+        .where(eq(workspace.id, current.id))
+        .returning();
+      if (!row) {
+        throw new Error("Workspace reminders update returned no row");
       }
       return toWorkspace(row, context.storage);
     }),

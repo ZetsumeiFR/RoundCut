@@ -151,6 +151,19 @@ const en = {
     },
     terms: {
       cancel: "Cancel",
+      deciderReminders: {
+        delay: "Delay",
+        delayDescription:
+          "Days after the version was published, then between the two reminders.",
+        delayInvalid: "Enter a whole number of days between 1 and {max}.",
+        delaySuffix: "days",
+        description:
+          'Emails "Version awaiting your feedback" to the decider while a round stays open without their comments.',
+        enabled: "Remind the decider",
+        enabledDescription: "At most {max} reminders per round.",
+        saved: "Reminders saved.",
+        title: "Decider reminder",
+      },
       delay: "Extra delay",
       delayDescription: "Days added to the due date for each extra round.",
       delayInvalid: "Enter a whole number of days between 0 and {max}.",
@@ -1091,6 +1104,7 @@ const en = {
           manual: "closed manually",
           next_version: "next version published",
         },
+        deciderReminded: "Decider reminded {count}/{max}",
         description:
           "Each round keeps its version and its opening, submission and closing dates.",
         emptyDescription:
@@ -1429,6 +1443,19 @@ const fr: Messages = {
     },
     terms: {
       cancel: "Annuler",
+      deciderReminders: {
+        delay: "Délai",
+        delayDescription:
+          "Jours après la publication de la version, puis entre les deux relances.",
+        delayInvalid: "Saisissez un nombre entier de jours entre 1 et {max}.",
+        delaySuffix: "jours",
+        description:
+          "Envoie « Version en attente de vos retours » au décideur tant qu'un tour reste ouvert sans ses commentaires.",
+        enabled: "Relancer le décideur",
+        enabledDescription: "Au maximum {max} relances par tour.",
+        saved: "Relances enregistrées.",
+        title: "Relance du décideur",
+      },
       delay: "Délai additionnel",
       delayDescription:
         "Jours ajoutés à l'échéance pour chaque tour supplémentaire.",
@@ -2394,6 +2421,7 @@ const fr: Messages = {
           manual: "clos manuellement",
           next_version: "version suivante publiée",
         },
+        deciderReminded: "Décideur relancé {count}/{max}",
         description:
           "Chaque tour garde sa version et ses dates d'ouverture, de soumission et de clôture.",
         emptyDescription:
