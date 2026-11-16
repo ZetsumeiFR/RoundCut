@@ -27,6 +27,16 @@ export type UploadFormat = keyof typeof UPLOAD_FORMATS;
 
 export const UPLOAD_ACCEPT = ".mp4,.mov,video/mp4,video/quicktime";
 
+// The browser draws the thumbnail from the first useful frame (VER-06) and
+// stores it as a JPEG beside the video.
+export const THUMBNAIL_CONTENT_TYPE = "image/jpeg";
+export const THUMBNAIL_MAX_BYTES = 2 * 1024 * 1024;
+
+const KEY_EXTENSION = /\.[^./]+$/;
+
+export const thumbnailKeyOf = (r2Key: string) =>
+  r2Key.replace(KEY_EXTENSION, ".jpg");
+
 const FORMAT_EXTENSION = /\.(mp4|mov)$/i;
 
 export function uploadFormat(fileName: string): UploadFormat | undefined {

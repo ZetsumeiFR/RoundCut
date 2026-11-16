@@ -78,6 +78,7 @@ import { DeliverablesSheet } from "./deliverables-sheet";
 import { DuplicateProjectDialog } from "./duplicate-project-dialog";
 import { formatTargetDate } from "./project-sheet";
 import { STATUS_BADGES } from "./projects-view";
+import { VersionThumbnail } from "./version-thumbnail";
 import { type UploadTarget, VersionUploadSheet } from "./version-upload-sheet";
 
 type ProjectsMessages = Messages["projects"];
@@ -237,7 +238,12 @@ function buildColumns(
             className="inline-flex items-center gap-1.5 text-sm tabular-nums underline-offset-4 transition-colors hover:text-primary hover:underline"
             href={`/projects/${projectId}/versions/${version.id}`}
           >
-            <PlayIcon aria-hidden="true" className="size-3.5" />
+            <VersionThumbnail
+              alt=""
+              className="aspect-video w-12 shrink-0 border object-cover"
+              fallback={<PlayIcon aria-hidden="true" className="size-3.5" />}
+              src={version.thumbnailUrl}
+            />
             {formatMessage(view.version, { number: version.number })}
           </Link>
         ) : (

@@ -861,6 +861,12 @@ const en = {
         ready: "Ready",
         uploading: "Uploading",
       },
+      thumbnail: {
+        alt: "Thumbnail of {name}",
+        missing:
+          "No thumbnail could be drawn from this file: the version will show an icon.",
+        taken: "Thumbnail taken from the first meaningful frame.",
+      },
       title: "New version · {title}",
       tooLarge: {
         description: "Your plan accepts files up to {max}.",
@@ -1815,6 +1821,12 @@ const fr: Messages = {
         interrupted: "Interrompu",
         ready: "Prête",
         uploading: "Upload en cours",
+      },
+      thumbnail: {
+        alt: "Vignette de {name}",
+        missing:
+          "Impossible de tirer une vignette de ce fichier : la version s'affichera avec une icône.",
+        taken: "Vignette prise sur la première image utile.",
       },
       title: "Nouvelle version · {title}",
       tooLarge: {

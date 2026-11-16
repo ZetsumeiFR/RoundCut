@@ -16,6 +16,7 @@ import {
   projectStatusSchema,
 } from "../project";
 import { toDeliverable } from "./deliverable";
+import { thumbnailUrl } from "./version";
 import { getOrCreateWorkspace } from "./workspace";
 
 type ProjectRow = typeof project.$inferSelect;
@@ -24,7 +25,11 @@ type Deliverable = ReturnType<typeof toDeliverable>;
 export interface ReviewActivity {
   // Latest round, opened when its version was published (VER-04).
   currentRound: { number: number; status: RoundStatus } | null;
-  latestVersion: { id: string; number: number } | null;
+  latestVersion: {
+    id: string;
+    number: number;
+    thumbnailUrl: string | null;
+  } | null;
   openComments: number;
 }
 
@@ -230,6 +235,7 @@ export const projectRouter = {
           deliverableId: version.deliverableId,
           id: version.id,
           number: version.number,
+          thumbnailKey: version.thumbnailKey,
         })
         .from(version)
         .innerJoin(deliverable, eq(version.deliverableId, deliverable.id))
@@ -241,8 +247,25 @@ export const projectRouter = {
         )
         .orderBy(asc(version.number));
       // Ascending order: the last version seen per deliverable is its latest.
+      const latest = new Map(
+        published.map(({ deliverableId, ...item }) => [deliverableId, item])
+      );
       const latestVersions = new Map(
-        published.map(({ deliverableId, ...latest }) => [deliverableId, latest])
+        await Promise.all(
+          [...latest].map(
+            async ([deliverableId, { thumbnailKey, ...item }]) =>
+              [
+                deliverableId,
+                {
+                  ...item,
+                  thumbnailUrl: await thumbnailUrl(
+                    context.storage,
+                    thumbnailKey
+                  ),
+                },
+              ] as const
+          )
+        )
       );
       const rounds = await context.db
         .select({

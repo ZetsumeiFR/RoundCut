@@ -327,6 +327,7 @@ export function ReviewView({
                 markers={NO_MARKERS}
                 messages={player}
                 onSourceError={handleSourceError}
+                poster={version.data.thumbnailUrl}
                 src={playback.data.url}
               />
             ) : (

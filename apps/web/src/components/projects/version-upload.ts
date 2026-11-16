@@ -1,5 +1,5 @@
 import type { AppRouterClient } from "@roundcut/api/routers/index";
-import { MAX_SIGNED_PARTS } from "@roundcut/api/upload";
+import { MAX_SIGNED_PARTS, THUMBNAIL_CONTENT_TYPE } from "@roundcut/api/upload";
 
 import { client as api } from "@/utils/orpc";
 
@@ -161,6 +161,22 @@ async function uploadParts({
   } finally {
     signal.removeEventListener("abort", stopAll);
   }
+}
+
+// Stores the thumbnail drawn in the browser beside the video (VER-06).
+export async function sendThumbnail(
+  thumbnail: Blob,
+  versionId: string,
+  signal: AbortSignal
+) {
+  const { url } = await api.upload.signThumbnail({ versionId });
+  await putBlob(
+    url,
+    thumbnail,
+    signal,
+    () => undefined,
+    THUMBNAIL_CONTENT_TYPE
+  );
 }
 
 export function sendFile({
