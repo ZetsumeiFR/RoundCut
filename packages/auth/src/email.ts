@@ -74,6 +74,40 @@ const resetPasswordEmails = {
   }),
 } satisfies Record<Locale, (url: string) => Omit<EmailMessage, "to">>;
 
+export interface InvitationDetails {
+  inviterName: string;
+  role: string;
+  studioName: string;
+  url: string;
+}
+
+const invitationRoles: Record<Locale, Record<string, string>> = {
+  en: { editor: "editor", owner: "owner", viewer: "viewer" },
+  fr: { editor: "éditeur", owner: "propriétaire", viewer: "lecteur" },
+};
+
+const invitationEmails = {
+  en: ({ inviterName, role, studioName, url }: InvitationDetails) => ({
+    subject: `${inviterName} invited you to the ${studioName} Studio on RoundCut`,
+    text: `${inviterName} invited you to join the ${studioName} Studio on RoundCut as ${invitationRoles.en[role] ?? role}.\n\nOpen this link to accept the invitation (valid for 48 hours):\n${url}\n\nNo RoundCut account yet? Sign up with this email address: the invitation will wait for you under Settings > Team.\n\nIf you weren't expecting it, you can ignore this email.`,
+  }),
+  fr: ({ inviterName, role, studioName, url }: InvitationDetails) => ({
+    subject: `${inviterName} vous invite dans le Studio ${studioName} sur RoundCut`,
+    text: `${inviterName} vous invite à rejoindre le Studio ${studioName} sur RoundCut avec le rôle ${invitationRoles.fr[role] ?? role}.\n\nOuvrez ce lien pour accepter l'invitation (valable 48 heures) :\n${url}\n\nPas encore de compte RoundCut ? Inscrivez-vous avec cette adresse email : l'invitation vous attendra dans Paramètres > Équipe.\n\nSi vous n'attendiez pas cette invitation, ignorez cet email.`,
+  }),
+} satisfies Record<
+  Locale,
+  (details: InvitationDetails) => Omit<EmailMessage, "to">
+>;
+
+export function invitationEmail(
+  locale: Locale,
+  to: string,
+  details: InvitationDetails
+): EmailMessage {
+  return { to, ...invitationEmails[locale](details) };
+}
+
 export function resetPasswordEmail(
   locale: Locale,
   to: string,
