@@ -10,7 +10,12 @@ import {
 import { betterAuth } from "better-auth";
 import { nextCookies } from "better-auth/next-js";
 
-import { type EmailConfig, sendEmail, verificationEmail } from "./email";
+import {
+  type EmailConfig,
+  resetPasswordEmail,
+  sendEmail,
+  verificationEmail,
+} from "./email";
 import { resolveLocale } from "./locale";
 import { MIN_PASSWORD_LENGTH } from "./password-policy";
 
@@ -30,6 +35,12 @@ export function createAuth(env: AuthConfig, database: Database) {
       enabled: true,
       minPasswordLength: MIN_PASSWORD_LENGTH,
       requireEmailVerification: true,
+      // A password reset signs the account out everywhere.
+      revokeSessionsOnPasswordReset: true,
+      sendResetPassword: async ({ user: resetUser, url }, request) => {
+        const locale = resolveLocale(request?.headers.get("accept-language"));
+        await sendEmail(env, resetPasswordEmail(locale, resetUser.email, url));
+      },
     },
     emailVerification: {
       autoSignInAfterVerification: true,
