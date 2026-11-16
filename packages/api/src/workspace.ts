@@ -2,6 +2,11 @@ import { LOCALES } from "@roundcut/auth/locale";
 import { REVISION_SCOPES } from "@roundcut/db/revision-terms";
 import z from "zod";
 
+import {
+  COMMENT_ATTACHMENT_TYPES,
+  type CommentAttachmentType,
+} from "./comment";
+
 export const WORKSPACE_CURRENCIES = [
   "EUR",
   "USD",
@@ -37,6 +42,54 @@ export const revisionTermsSchema = z.object({
   requirePayment: z.boolean(),
   scope: z.enum(REVISION_SCOPES),
 });
+
+// White label of the review links (REV-10): the logo is a PNG, JPEG or
+// WebP image (same formats as comment attachments) and the accent a hex color.
+export const BRAND_LOGO_MAX_BYTES = 2 * 1024 * 1024;
+
+export const BRAND_ACCENT_PATTERN = /^#[0-9a-f]{6}$/;
+
+export const brandLogoUploadSchema = z.object({
+  contentType: z.enum(
+    Object.keys(COMMENT_ATTACHMENT_TYPES) as [
+      CommentAttachmentType,
+      ...CommentAttachmentType[],
+    ]
+  ),
+  sizeBytes: z.int().min(1).max(BRAND_LOGO_MAX_BYTES),
+});
+
+export const brandingSchema = z.object({
+  accentColor: z
+    .string()
+    .trim()
+    .toLowerCase()
+    .regex(BRAND_ACCENT_PATTERN)
+    .nullable(),
+  logoKey: z.string().min(1).nullable(),
+});
+
+export type Branding = z.infer<typeof brandingSchema>;
+
+const LINEAR_THRESHOLD = 0.040_45;
+const HEX_CHANNEL_STARTS = [1, 3, 5];
+const LUMA_WEIGHTS = [0.2126, 0.7152, 0.0722];
+// Above this relative luminance, dark text reads better than white.
+const LIGHT_LUMINANCE = 0.179;
+
+// Text drawn on the accent color: black or white, whichever contrasts most
+// (WCAG relative luminance).
+export function accentForeground(hex: string) {
+  const luminance = HEX_CHANNEL_STARTS.reduce((total, start, index) => {
+    const channel = Number.parseInt(hex.slice(start, start + 2), 16) / 255;
+    const linear =
+      channel <= LINEAR_THRESHOLD
+        ? channel / 12.92
+        : ((channel + 0.055) / 1.055) ** 2.4;
+    return total + linear * (LUMA_WEIGHTS[index] ?? 0);
+  }, 0);
+  return luminance > LIGHT_LUMINANCE ? "#0a0a0a" : "#ffffff";
+}
 
 export const onboardingSchema = workspaceSettingsSchema.extend({
   revisionTerms: revisionTermsSchema,

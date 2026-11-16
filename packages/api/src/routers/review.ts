@@ -25,6 +25,7 @@ import { isAllowedReviewer, reviewerIdentitySchema } from "../reviewer";
 import type { FrameRate } from "../timecode";
 import { findReviewVersion, requireReviewer } from "./comment";
 import { thumbnailUrl } from "./version";
+import { brandOf } from "./workspace";
 
 const versionInput = z.object({
   token: reviewTokenSchema,
@@ -172,8 +173,11 @@ export const reviewRouter = {
     const { expiresAt, projectId } = context.reviewLink;
     const [row] = await context.db
       .select({
+        brandAccentColor: workspace.brandAccentColor,
+        brandLogoKey: workspace.brandLogoKey,
         clientName: client.name,
         name: project.name,
+        plan: workspace.plan,
         workspaceName: workspace.name,
       })
       .from(project)
@@ -184,6 +188,7 @@ export const reviewRouter = {
       throw new ORPCError("NOT_FOUND", { message: "Review link not found" });
     }
     const header = {
+      brand: await brandOf(context.storage, row),
       clientName: row.clientName,
       expiresAt,
       name: row.name,

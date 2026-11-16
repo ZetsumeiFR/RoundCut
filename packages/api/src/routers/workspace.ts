@@ -1,22 +1,60 @@
+import { ORPCError } from "@orpc/server";
 import type { Database } from "@roundcut/db";
-import { PLAN_MAX_FILE_BYTES } from "@roundcut/db/plan";
+import { hasWhiteLabel, PLAN_MAX_FILE_BYTES } from "@roundcut/db/plan";
 import { organization } from "@roundcut/db/schema/auth";
 import { workspace } from "@roundcut/db/schema/workspace";
 import { eq } from "drizzle-orm";
 
+import { COMMENT_ATTACHMENT_TYPES } from "../comment";
 import { protectedProcedure } from "../index";
+import type { Storage } from "../storage";
 import {
+  BRAND_LOGO_MAX_BYTES,
+  brandingSchema,
+  brandLogoUploadSchema,
   onboardingSchema,
   revisionTermsSchema,
   type WorkspaceSettings,
   workspaceSettingsSchema,
 } from "../workspace";
+import { checkStoredImage } from "./comment";
 
 const BASIS_POINTS_PER_PERCENT = 100;
 
+const UUID = "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}";
+const LOGO_EXTENSIONS = Object.values(COMMENT_ATTACHMENT_TYPES).join("|");
+
+// Logos live under their workspace so a key can't be borrowed from another.
+const logoPrefix = (workspaceId: string) => `brand/${workspaceId}/`;
+
+const isLogoKeyOf = (workspaceId: string, key: string) =>
+  new RegExp(`^${logoPrefix(workspaceId)}${UUID}\\.(${LOGO_EXTENSIONS})$`).test(
+    key
+  );
+
 type WorkspaceRow = typeof workspace.$inferSelect;
 
-const toWorkspace = (row: WorkspaceRow) => ({
+// The white label shown on review links (REV-10): nothing on plans without
+// it, even when a logo or color was saved on a higher plan.
+export async function brandOf(
+  storage: Storage,
+  row: Pick<WorkspaceRow, "brandAccentColor" | "brandLogoKey" | "plan">
+) {
+  if (!hasWhiteLabel(row.plan)) {
+    return null;
+  }
+  return {
+    accentColor: row.brandAccentColor,
+    logoUrl: row.brandLogoKey ? await storage.signGet(row.brandLogoKey) : null,
+  };
+}
+
+const toWorkspace = async (row: WorkspaceRow, storage: Storage) => ({
+  branding: {
+    accentColor: row.brandAccentColor,
+    logoKey: row.brandLogoKey,
+    logoUrl: row.brandLogoKey ? await storage.signGet(row.brandLogoKey) : null,
+  },
   currency: row.currency,
   defaultVatRate: row.defaultVatRateBps / BASIS_POINTS_PER_PERCENT,
   id: row.id,
@@ -27,6 +65,7 @@ const toWorkspace = (row: WorkspaceRow) => ({
   plan: row.plan,
   revisionTerms: row.revisionTerms,
   timezone: row.timezone,
+  whiteLabel: hasWhiteLabel(row.plan),
 });
 
 const toSettingsColumns = (settings: WorkspaceSettings) => ({
@@ -84,31 +123,95 @@ async function upsertWorkspace(
     .update(organization)
     .set({ name: row.name })
     .where(eq(organization.id, row.id));
-  return toWorkspace(row);
+  return row;
 }
+
+// White label is a Pro and Studio feature (REV-10).
+const requireWhiteLabel = (row: WorkspaceRow) => {
+  if (!hasWhiteLabel(row.plan)) {
+    throw new ORPCError("FORBIDDEN", {
+      message: "White label requires the Pro or Studio plan",
+    });
+  }
+};
 
 export const workspaceRouter = {
   completeOnboarding: protectedProcedure
     .input(onboardingSchema)
-    .handler(({ context, input }) =>
-      upsertWorkspace(context.db, context.session.user.id, {
-        ...toSettingsColumns(input),
-        onboardingCompletedAt: new Date(),
-        revisionTerms: input.revisionTerms,
-      })
-    ),
-  get: protectedProcedure.handler(async ({ context }) =>
-    toWorkspace(await getOrCreateWorkspace(context.db, context.session.user))
-  ),
-  update: protectedProcedure
-    .input(workspaceSettingsSchema)
-    .handler(({ context, input }) =>
-      upsertWorkspace(
-        context.db,
-        context.session.user.id,
-        toSettingsColumns(input)
+    .handler(async ({ context, input }) =>
+      toWorkspace(
+        await upsertWorkspace(context.db, context.session.user.id, {
+          ...toSettingsColumns(input),
+          onboardingCompletedAt: new Date(),
+          revisionTerms: input.revisionTerms,
+        }),
+        context.storage
       )
     ),
+  get: protectedProcedure.handler(async ({ context }) =>
+    toWorkspace(
+      await getOrCreateWorkspace(context.db, context.session.user),
+      context.storage
+    )
+  ),
+  // Where the owner's browser uploads a logo before saving the branding.
+  signLogo: protectedProcedure
+    .input(brandLogoUploadSchema)
+    .handler(async ({ context, input: { contentType } }) => {
+      const row = await getOrCreateWorkspace(context.db, context.session.user);
+      requireWhiteLabel(row);
+      const key = `${logoPrefix(row.id)}${crypto.randomUUID()}.${COMMENT_ATTACHMENT_TYPES[contentType]}`;
+      return { key, url: await context.storage.signPut(key, contentType) };
+    }),
+  update: protectedProcedure
+    .input(workspaceSettingsSchema)
+    .handler(async ({ context, input }) =>
+      toWorkspace(
+        await upsertWorkspace(
+          context.db,
+          context.session.user.id,
+          toSettingsColumns(input)
+        ),
+        context.storage
+      )
+    ),
+  // Saves the logo and accent color of the review links (REV-10). A new
+  // logo must be an image uploaded under this workspace; the replaced one
+  // is deleted from storage.
+  updateBranding: protectedProcedure
+    .input(brandingSchema)
+    .handler(async ({ context, input }) => {
+      const current = await getOrCreateWorkspace(
+        context.db,
+        context.session.user
+      );
+      requireWhiteLabel(current);
+      const logoChanged = input.logoKey !== current.brandLogoKey;
+      if (input.logoKey && logoChanged) {
+        if (!isLogoKeyOf(current.id, input.logoKey)) {
+          throw new ORPCError("BAD_REQUEST", { message: "Unknown logo" });
+        }
+        await checkStoredImage(context.storage, input.logoKey, {
+          label: "Logo",
+          maxBytes: BRAND_LOGO_MAX_BYTES,
+        });
+      }
+      const [row] = await context.db
+        .update(workspace)
+        .set({
+          brandAccentColor: input.accentColor,
+          brandLogoKey: input.logoKey,
+        })
+        .where(eq(workspace.id, current.id))
+        .returning();
+      if (!row) {
+        throw new Error("Workspace branding update returned no row");
+      }
+      if (logoChanged && current.brandLogoKey) {
+        await context.storage.deleteObject(current.brandLogoKey);
+      }
+      return toWorkspace(row, context.storage);
+    }),
   updateTerms: protectedProcedure
     .input(revisionTermsSchema)
     .handler(async ({ context, input }) => {
@@ -127,6 +230,6 @@ export const workspaceRouter = {
       if (!row) {
         throw new Error("Workspace terms update returned no row");
       }
-      return toWorkspace(row);
+      return toWorkspace(row, context.storage);
     }),
 };
