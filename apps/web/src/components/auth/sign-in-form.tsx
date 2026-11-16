@@ -17,10 +17,12 @@ import { useAppForm } from "./auth-form";
 export function SignInForm({
   messages,
   onEmailNotVerified,
+  onForgotPassword,
   onSwitchToSignUp,
 }: {
   messages: Messages["auth"];
   onEmailNotVerified: (email: string) => void;
+  onForgotPassword: () => void;
   onSwitchToSignUp: () => void;
 }) {
   const router = useRouter();
@@ -107,6 +109,14 @@ export function SignInForm({
               )}
             </form.AppField>
           </FieldGroup>
+          <Button
+            className="-mt-2 h-auto self-end p-0"
+            onClick={onForgotPassword}
+            type="button"
+            variant="link"
+          >
+            {signIn.forgotPassword}
+          </Button>
           <form.SubmitButton
             label={signIn.submit}
             pendingLabel={signIn.submitting}

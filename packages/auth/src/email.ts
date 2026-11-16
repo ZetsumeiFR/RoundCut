@@ -62,3 +62,22 @@ export function verificationEmail(
 ): EmailMessage {
   return { to, ...verificationEmails[locale](url) };
 }
+
+const resetPasswordEmails = {
+  en: (url: string) => ({
+    subject: "Reset your RoundCut password",
+    text: `We received a request to reset the password of your RoundCut account.\n\nChoose a new password with this link (valid for 1 hour):\n${url}\n\nIf you did not ask for it, you can ignore this email: your password stays unchanged.`,
+  }),
+  fr: (url: string) => ({
+    subject: "Réinitialisez votre mot de passe RoundCut",
+    text: `Nous avons reçu une demande de réinitialisation du mot de passe de votre compte RoundCut.\n\nChoisissez un nouveau mot de passe avec ce lien (valable 1 heure) :\n${url}\n\nSi vous n'êtes pas à l'origine de cette demande, ignorez cet email : votre mot de passe reste inchangé.`,
+  }),
+} satisfies Record<Locale, (url: string) => Omit<EmailMessage, "to">>;
+
+export function resetPasswordEmail(
+  locale: Locale,
+  to: string,
+  url: string
+): EmailMessage {
+  return { to, ...resetPasswordEmails[locale](url) };
+}

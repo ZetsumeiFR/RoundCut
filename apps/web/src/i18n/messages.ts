@@ -16,6 +16,7 @@ const en = {
     errors: {
       generic: "Please try again in a moment.",
       invalidCredentials: "Invalid email or password.",
+      passwordTooShort: "Password must be at least {min} characters.",
       title: "Something went wrong",
       userExists: "An account already exists with this email.",
     },
@@ -25,12 +26,40 @@ const en = {
       hidePassword: "Hide password",
       name: "Name",
       namePlaceholder: "Jane Doe",
+      newPassword: "New password",
       password: "Password",
       passwordPlaceholder: "At least {min} characters",
       showPassword: "Show password",
     },
+    forgotPassword: {
+      back: "Back to sign in",
+      description:
+        "Enter your account email and we'll send you a link to choose a new password.",
+      sentDescription:
+        "If an account exists for {email}, we sent it a link to reset your password. The link is valid for 1 hour.",
+      sentTitle: "Check your inbox",
+      submit: "Send reset link",
+      submitting: "Sending…",
+      title: "Forgot your password?",
+    },
+    resetPassword: {
+      description:
+        "Choose a new password. You will be signed out of your other devices.",
+      invalidDescription:
+        "This reset link is invalid, already used or expired. Request a new one to continue.",
+      invalidTitle: "Link expired",
+      requestNew: "Request a new link",
+      signIn: "Sign in",
+      submit: "Update password",
+      submitting: "Updating…",
+      successDescription:
+        "Your password has been changed. Sign in with your new password.",
+      successTitle: "Password updated",
+      title: "Choose a new password",
+    },
     signIn: {
       description: "Sign in to continue to your workspace.",
+      forgotPassword: "Forgot password?",
       submit: "Sign in",
       submitting: "Signing in…",
       switchAction: "Create account",
@@ -77,6 +106,8 @@ const fr: Messages = {
     errors: {
       generic: "Veuillez réessayer dans un instant.",
       invalidCredentials: "Email ou mot de passe incorrect.",
+      passwordTooShort:
+        "Le mot de passe doit contenir au moins {min} caractères.",
       title: "Une erreur est survenue",
       userExists: "Un compte existe déjà avec cet email.",
     },
@@ -86,12 +117,40 @@ const fr: Messages = {
       hidePassword: "Masquer le mot de passe",
       name: "Nom",
       namePlaceholder: "Camille Martin",
+      newPassword: "Nouveau mot de passe",
       password: "Mot de passe",
       passwordPlaceholder: "Au moins {min} caractères",
       showPassword: "Afficher le mot de passe",
     },
+    forgotPassword: {
+      back: "Retour à la connexion",
+      description:
+        "Saisissez l'email de votre compte : nous vous enverrons un lien pour choisir un nouveau mot de passe.",
+      sentDescription:
+        "Si un compte existe pour {email}, nous lui avons envoyé un lien de réinitialisation. Le lien est valable 1 heure.",
+      sentTitle: "Vérifiez votre boîte mail",
+      submit: "Envoyer le lien",
+      submitting: "Envoi…",
+      title: "Mot de passe oublié ?",
+    },
+    resetPassword: {
+      description:
+        "Choisissez un nouveau mot de passe. Vos autres appareils seront déconnectés.",
+      invalidDescription:
+        "Ce lien de réinitialisation est invalide, déjà utilisé ou expiré. Demandez-en un nouveau pour continuer.",
+      invalidTitle: "Lien expiré",
+      requestNew: "Demander un nouveau lien",
+      signIn: "Se connecter",
+      submit: "Mettre à jour le mot de passe",
+      submitting: "Mise à jour…",
+      successDescription:
+        "Votre mot de passe a été modifié. Connectez-vous avec votre nouveau mot de passe.",
+      successTitle: "Mot de passe mis à jour",
+      title: "Choisissez un nouveau mot de passe",
+    },
     signIn: {
       description: "Connectez-vous pour accéder à votre espace.",
+      forgotPassword: "Mot de passe oublié ?",
       submit: "Se connecter",
       submitting: "Connexion…",
       switchAction: "Créer un compte",

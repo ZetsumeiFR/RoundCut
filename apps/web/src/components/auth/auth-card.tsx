@@ -9,7 +9,7 @@ export function AuthCard({
 }: {
   title: string;
   description: ReactNode;
-  children: ReactNode;
+  children?: ReactNode;
   footer?: ReactNode;
 }) {
   return (
@@ -29,9 +29,13 @@ export function AuthCard({
             </p>
           </div>
         </CardHeader>
-        <CardContent className="flex flex-col gap-6 px-6 pt-6 pb-6 sm:px-8 sm:pt-7 sm:pb-8">
-          {children}
-        </CardContent>
+        {children ? (
+          <CardContent className="flex flex-col gap-6 px-6 pt-6 pb-6 sm:px-8 sm:pt-7 sm:pb-8">
+            {children}
+          </CardContent>
+        ) : (
+          <div className="pb-8 sm:pb-9" />
+        )}
       </Card>
       {footer ? (
         <p className="text-center text-muted-foreground text-sm">{footer}</p>
