@@ -1125,6 +1125,7 @@ const en = {
       action: "Submit my feedback ({count})",
       alreadySubmitted:
         "This round's feedback was already submitted. New comments will join the next round.",
+      approved: "Version approved on {date} by {name}",
       cancel: "Cancel",
       confirm: "Submit",
       confirmDescription:
@@ -1132,12 +1133,18 @@ const en = {
       confirmTitle: "Submit your feedback?",
       empty: "Add a comment to submit.",
       error: "Couldn't submit your feedback. Try again.",
+      exhausted: "Included rounds used up",
+      exhaustedDescription:
+        "Any further changes will need an extra round, beyond the {included} included.",
+      extraRound: "Round {current}, beyond the {included} included",
+      lastIncluded: "Last included round",
       loadError: "Couldn't load the round.",
       loading: "Loading the round…",
       pendingOne: "1 comment is waiting for the next round.",
       pendingOther: "{count} comments are waiting for the next round.",
       retry: "Try again",
       round: "Round {current} of {included} included",
+      roundClosed: "Round {round} is closed.",
       submitted: "Feedback sent to {workspace}",
       submittedDescription:
         "Sent on {date}. {workspace} has been notified. Comments you add now will open the next round.",
@@ -2302,6 +2309,7 @@ const fr: Messages = {
       action: "Soumettre mes retours ({count})",
       alreadySubmitted:
         "Les retours de ce tour ont déjà été soumis. Les nouveaux retours rejoindront le tour suivant.",
+      approved: "Version validée le {date} par {name}",
       cancel: "Annuler",
       confirm: "Soumettre",
       confirmDescription:
@@ -2309,12 +2317,18 @@ const fr: Messages = {
       confirmTitle: "Soumettre vos retours ?",
       empty: "Ajoutez un retour pour soumettre.",
       error: "Impossible de soumettre vos retours. Réessayez.",
+      exhausted: "Tours inclus épuisés",
+      exhaustedDescription:
+        "Toute nouvelle modification demandera un tour supplémentaire, au-delà des {included} inclus.",
+      extraRound: "Tour {current}, au-delà des {included} inclus",
+      lastIncluded: "Dernier tour inclus",
       loadError: "Impossible de charger le tour.",
       loading: "Chargement du tour…",
       pendingOne: "1 retour est en attente du prochain tour.",
       pendingOther: "{count} retours sont en attente du prochain tour.",
       retry: "Réessayer",
       round: "Tour {current} sur {included} inclus",
+      roundClosed: "Le tour {round} est clos.",
       submitted: "Retours envoyés à {workspace}",
       submittedDescription:
         "Envoyés le {date}. {workspace} a été prévenu. Les retours ajoutés maintenant ouvriront le tour suivant.",

@@ -2,6 +2,7 @@
 
 import { ORPCError } from "@orpc/client";
 import type { Locale } from "@roundcut/auth/locale";
+import type { RoundStatus } from "@roundcut/db/round";
 import {
   AlertDialog,
   AlertDialogCancel,
@@ -17,10 +18,15 @@ import {
   AlertDescription,
   AlertTitle,
 } from "@roundcut/ui/components/reui/alert";
-import { Badge } from "@roundcut/ui/components/reui/badge";
 import { Skeleton } from "@roundcut/ui/components/skeleton";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { CircleCheckIcon, SendIcon, TriangleAlertIcon } from "lucide-react";
+import {
+  BadgeCheckIcon,
+  CircleCheckIcon,
+  RepeatIcon,
+  SendIcon,
+  TriangleAlertIcon,
+} from "lucide-react";
 import { useCallback, useState } from "react";
 import { toast } from "sonner";
 
@@ -28,6 +34,101 @@ import { formatMessage, type Messages } from "@/i18n/messages";
 import { client as api, orpc } from "@/utils/orpc";
 
 type SubmitMessages = Messages["review"]["submit"];
+
+interface BannerRound {
+  number: number;
+  status: RoundStatus;
+}
+
+// What the permanent banner says about the round (REV-07): a round within
+// the included ones, the included rounds used up (the last included round is
+// submitted or closed, or the round is beyond them), and whether it is closed.
+function bannerLines(
+  round: BannerRound,
+  includedRounds: number,
+  messages: SubmitMessages
+) {
+  const extra = round.number > includedRounds;
+  const lastIncluded = round.number === includedRounds;
+  const exhausted = extra || (lastIncluded && round.status !== "open");
+  const label = formatMessage(extra ? messages.extraRound : messages.round, {
+    current: round.number,
+    included: includedRounds,
+  });
+  const lines: string[] = [];
+  if (exhausted) {
+    lines.push(
+      label,
+      formatMessage(messages.exhaustedDescription, {
+        included: includedRounds,
+      })
+    );
+  } else if (lastIncluded) {
+    lines.push(messages.lastIncluded);
+  }
+  if (round.status === "closed") {
+    lines.push(formatMessage(messages.roundClosed, { round: round.number }));
+  }
+  return { exhausted, lines, title: exhausted ? messages.exhausted : label };
+}
+
+// The reviewer's permanent round banner (REV-07): shown whatever the round's
+// state, or the decider's final approval once the version is approved.
+function RoundBanner({
+  approval,
+  includedRounds,
+  locale,
+  messages,
+  round,
+}: {
+  approval: { approvedAt: Date; approverName: string } | null;
+  includedRounds: number;
+  locale: Locale;
+  messages: SubmitMessages;
+  round: BannerRound | null;
+}) {
+  if (approval) {
+    return (
+      <Alert variant="success">
+        <BadgeCheckIcon aria-hidden="true" />
+        <AlertTitle className="line-clamp-none">
+          {formatMessage(messages.approved, {
+            date: new Intl.DateTimeFormat(locale, {
+              day: "2-digit",
+              month: "2-digit",
+            }).format(approval.approvedAt),
+            name: approval.approverName,
+          })}
+        </AlertTitle>
+      </Alert>
+    );
+  }
+  if (round === null) {
+    return null;
+  }
+  const { exhausted, lines, title } = bannerLines(
+    round,
+    includedRounds,
+    messages
+  );
+  return (
+    <Alert variant={exhausted ? "warning" : "info"}>
+      {exhausted ? (
+        <TriangleAlertIcon aria-hidden="true" />
+      ) : (
+        <RepeatIcon aria-hidden="true" />
+      )}
+      <AlertTitle className="line-clamp-none">{title}</AlertTitle>
+      {lines.length > 0 ? (
+        <AlertDescription>
+          {lines.map((line) => (
+            <p key={line}>{line}</p>
+          ))}
+        </AlertDescription>
+      ) : null}
+    </Alert>
+  );
+}
 
 function ConfirmSubmitDialog({
   busy,
@@ -70,9 +171,9 @@ function ConfirmSubmitDialog({
   );
 }
 
-// The reviewer's round banner and "Submit my feedback (n)" button (REV-05).
-// Once submitted, the batch is closed: new comments wait for the next round
-// (REV-06) and the banner counts them.
+// The reviewer's permanent round banner (REV-07) and "Submit my feedback (n)"
+// button (REV-05). Once submitted, the batch is closed: new comments wait for
+// the next round (REV-06) and the submitted notice counts them.
 export function SubmitBatch({
   locale,
   messages,
@@ -148,15 +249,19 @@ export function SubmitBatch({
       />
     );
   }
-  const { includedRounds, pendingCount, round } = current.data;
-  if (round === null || round.status === "closed") {
-    return null;
+  const { approval, includedRounds, pendingCount, round } = current.data;
+  const banner = (
+    <RoundBanner
+      approval={approval}
+      includedRounds={includedRounds}
+      locale={locale}
+      messages={messages}
+      round={round}
+    />
+  );
+  if (approval || round === null || round.status === "closed") {
+    return banner;
   }
-  const roundLabel = formatMessage(messages.round, {
-    current: round.number,
-    included: includedRounds,
-  });
-  const extra = round.number > includedRounds;
 
   if (round.status === "submitted") {
     const date = round.submittedAt
@@ -166,40 +271,41 @@ export function SubmitBatch({
         }).format(round.submittedAt)
       : "";
     return (
-      <Alert variant="info">
-        <CircleCheckIcon aria-hidden="true" />
-        <AlertTitle className="line-clamp-none">
-          {formatMessage(messages.submittedTitle, { round: round.number })}
-        </AlertTitle>
-        <AlertDescription>
-          <p>
-            {formatMessage(messages.submittedDescription, {
-              date,
-              workspace: workspaceName,
-            })}
-          </p>
-          {pendingCount > 0 ? (
-            <p className="font-medium">
-              {formatMessage(
-                new Intl.PluralRules(locale).select(pendingCount) === "one"
-                  ? messages.pendingOne
-                  : messages.pendingOther,
-                { count: pendingCount }
-              )}
+      <div className="flex flex-col gap-2">
+        {banner}
+        <Alert variant="info">
+          <CircleCheckIcon aria-hidden="true" />
+          <AlertTitle className="line-clamp-none">
+            {formatMessage(messages.submittedTitle, { round: round.number })}
+          </AlertTitle>
+          <AlertDescription>
+            <p>
+              {formatMessage(messages.submittedDescription, {
+                date,
+                workspace: workspaceName,
+              })}
             </p>
-          ) : null}
-        </AlertDescription>
-      </Alert>
+            {pendingCount > 0 ? (
+              <p className="font-medium">
+                {formatMessage(
+                  new Intl.PluralRules(locale).select(pendingCount) === "one"
+                    ? messages.pendingOne
+                    : messages.pendingOther,
+                  { count: pendingCount }
+                )}
+              </p>
+            ) : null}
+          </AlertDescription>
+        </Alert>
+      </div>
     );
   }
 
   const count = round.batchCount;
   return (
-    <div className="flex flex-wrap items-center justify-between gap-2 border p-2">
-      <Badge variant={extra ? "warning-light" : "info-light"}>
-        {roundLabel}
-      </Badge>
-      <div className="flex min-w-0 flex-wrap items-center justify-end gap-x-3 gap-y-1">
+    <div className="flex flex-col gap-2">
+      {banner}
+      <div className="flex flex-wrap items-center justify-end gap-x-3 gap-y-1 border p-2">
         {count === 0 ? (
           <span className="text-muted-foreground text-xs">
             {messages.empty}
