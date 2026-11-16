@@ -1,22 +1,38 @@
+import { PLAN_MAX_FILE_BYTES } from "@roundcut/db/plan";
 import z from "zod";
 
 // Upload plan shared by the API and the browser (VER-01). Files up to the
 // threshold go in one presigned PUT; larger ones in fixed-size parts that can
-// be resumed. Format and per-plan size rules come with VER-02.
+// be resumed. Accepted formats and per-plan size limits are VER-02.
 export const MULTIPART_THRESHOLD_BYTES = 100 * 1024 * 1024;
 export const PART_SIZE_BYTES = 16 * 1024 * 1024;
-export const MAX_UPLOAD_BYTES = 5 * 1024 * 1024 * 1024;
+// The largest plan limit; the workspace's own plan narrows it.
+export const MAX_UPLOAD_BYTES = Math.max(...Object.values(PLAN_MAX_FILE_BYTES));
 export const MAX_SIGNED_PARTS = 20;
 export const UPLOAD_FILE_NAME_MAX_LENGTH = 255;
 
 export const partCount = (sizeBytes: number) =>
   Math.ceil(sizeBytes / PART_SIZE_BYTES);
 
-export const isVideoType = (contentType: string) =>
-  contentType.startsWith("video/");
+// The extension decides the format and the stored content type: browsers
+// leave File.type empty for some .mov files.
+export const UPLOAD_FORMATS = {
+  mov: "video/quicktime",
+  mp4: "video/mp4",
+} as const;
+
+export type UploadFormat = keyof typeof UPLOAD_FORMATS;
+
+export const UPLOAD_ACCEPT = ".mp4,.mov,video/mp4,video/quicktime";
+
+const FORMAT_EXTENSION = /\.(mp4|mov)$/i;
+
+export function uploadFormat(fileName: string): UploadFormat | undefined {
+  const extension = FORMAT_EXTENSION.exec(fileName)?.[1]?.toLowerCase();
+  return extension === "mp4" || extension === "mov" ? extension : undefined;
+}
 
 export const createUploadSchema = z.object({
-  contentType: z.string().refine(isVideoType),
   deliverableId: z.string().min(1),
   fileName: z.string().trim().min(1).max(UPLOAD_FILE_NAME_MAX_LENGTH),
   sizeBytes: z.int().min(1).max(MAX_UPLOAD_BYTES),

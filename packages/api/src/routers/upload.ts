@@ -1,15 +1,19 @@
 import { ORPCError } from "@orpc/server";
+import { PLAN_MAX_FILE_BYTES } from "@roundcut/db/plan";
 import { version } from "@roundcut/db/schema/version";
 import { and, eq, max } from "drizzle-orm";
 import z from "zod";
 
 import { protectedProcedure } from "../index";
+import { isSupportedMedia, readMediaTracks } from "../media";
 import {
   createUploadSchema,
   MULTIPART_THRESHOLD_BYTES,
   PART_SIZE_BYTES,
   partCount,
   signPartsSchema,
+  UPLOAD_FORMATS,
+  uploadFormat,
 } from "../upload";
 import { findOwnedDeliverable, findOwnedVersion, toVersion } from "./version";
 import { getOrCreateWorkspace } from "./workspace";
@@ -17,7 +21,6 @@ import { getOrCreateWorkspace } from "./workspace";
 type VersionRow = typeof version.$inferSelect;
 
 const UNIQUE_VIOLATION = "23505";
-const EXTENSION = /\.[a-z0-9]{1,8}$/i;
 
 const isUniqueViolation = (error: unknown) =>
   error instanceof Error &&
@@ -88,6 +91,23 @@ export const uploadRouter = {
           message: "Stored file doesn't match the upload",
         });
       }
+      // The browser checks codecs before sending; this catches files that
+      // bypassed it. A refused file is removed with its version.
+      const format = uploadFormat(row.fileName);
+      const tracks = await readMediaTracks(
+        (offset, length) =>
+          context.storage.readRange(row.r2Key, offset, length),
+        size
+      );
+      if (!(format && tracks && isSupportedMedia(format, tracks))) {
+        await context.storage.deleteObject(row.r2Key);
+        await context.db.delete(version).where(eq(version.id, row.id));
+        throw new ORPCError("UNSUPPORTED_MEDIA_TYPE", {
+          data: { tracks },
+          message:
+            "Only H.264 MP4 (AAC audio) and H.264 MOV files are accepted",
+        });
+      }
       const [ready] = await context.db
         .update(version)
         .set({ status: "ready", uploadId: null })
@@ -107,13 +127,27 @@ export const uploadRouter = {
         context.db,
         context.session.user
       );
+      const format = uploadFormat(input.fileName);
+      if (!format) {
+        throw new ORPCError("UNSUPPORTED_MEDIA_TYPE", {
+          data: { tracks: null },
+          message: "Only MP4 and MOV files are accepted",
+        });
+      }
+      const maxBytes = PLAN_MAX_FILE_BYTES[workspace.plan];
+      if (input.sizeBytes > maxBytes) {
+        throw new ORPCError("PAYLOAD_TOO_LARGE", {
+          data: { maxBytes },
+          message: `Files are limited to ${maxBytes} bytes on this plan`,
+        });
+      }
       const owned = await findOwnedDeliverable(
         context.db,
         workspace.id,
         input.deliverableId
       );
       const id = crypto.randomUUID();
-      const extension = EXTENSION.exec(input.fileName)?.[0].toLowerCase() ?? "";
+      const contentType = UPLOAD_FORMATS[format];
       const [last] = await context.db
         .select({ number: max(version.number) })
         .from(version)
@@ -123,12 +157,12 @@ export const uploadRouter = {
         [row] = await context.db
           .insert(version)
           .values({
-            contentType: input.contentType,
+            contentType,
             deliverableId: owned.id,
             fileName: input.fileName,
             id,
             number: (last?.number ?? 0) + 1,
-            r2Key: `${workspace.id}/${owned.id}/${id}${extension}`,
+            r2Key: `${workspace.id}/${owned.id}/${id}.${format}`,
             sizeBytes: input.sizeBytes,
             uploadedBy: context.session.user.id,
           })

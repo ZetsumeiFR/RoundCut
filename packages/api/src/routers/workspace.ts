@@ -1,4 +1,5 @@
 import type { Database } from "@roundcut/db";
+import { PLAN_MAX_FILE_BYTES } from "@roundcut/db/plan";
 import { organization } from "@roundcut/db/schema/auth";
 import { workspace } from "@roundcut/db/schema/workspace";
 import { eq } from "drizzle-orm";
@@ -20,8 +21,10 @@ const toWorkspace = (row: WorkspaceRow) => ({
   defaultVatRate: row.defaultVatRateBps / BASIS_POINTS_PER_PERCENT,
   id: row.id,
   locale: row.locale,
+  maxUploadBytes: PLAN_MAX_FILE_BYTES[row.plan],
   name: row.name,
   onboardingCompletedAt: row.onboardingCompletedAt,
+  plan: row.plan,
   revisionTerms: row.revisionTerms,
   timezone: row.timezone,
 });

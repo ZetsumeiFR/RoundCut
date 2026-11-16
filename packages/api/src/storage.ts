@@ -134,6 +134,22 @@ export function createStorage(config: StorageConfig) {
       }
     },
 
+    // Reads `length` bytes from `offset`, e.g. to inspect a stored file's
+    // headers without downloading it.
+    async readRange(key: string, offset: number, length: number) {
+      const object = await s3.send(
+        new GetObjectCommand({
+          Bucket: bucket,
+          Key: key,
+          Range: `bytes=${offset}-${offset + length - 1}`,
+        })
+      );
+      if (!object.Body) {
+        throw new Error(`Storage returned no body for ${key}`);
+      }
+      return await object.Body.transformToByteArray();
+    },
+
     signGet(key: string) {
       return getSignedUrl(
         s3,
