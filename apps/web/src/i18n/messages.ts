@@ -156,7 +156,7 @@ const en = {
       delayInvalid: "Enter a whole number of days between 0 and {max}.",
       delaySuffix: "days",
       description:
-        "Defaults applied to your new clients and projects. You can still adjust them per project.",
+        "Defaults applied to your new clients and projects. You can still adjust them per client or per project.",
       includedRounds: "Included rounds",
       includedRoundsDescription: "Revision rounds covered by the flat fee.",
       loadErrorDescription: "Check your connection and try again.",
@@ -349,10 +349,16 @@ const en = {
       "The people you deliver to: who approves, who reviews, and what goes on the billing export.",
     details: {
       address: "Billing address",
+      customTerms: "Specific to this client",
       decider: "Decider",
+      defaultTerms: "Workspace defaults",
+      delayOne: "{count} day",
+      delayOther: "{count} days",
+      no: "No",
       notes: "Notes",
       reviewers: "Other reviewers",
       siren: "SIREN",
+      yes: "Yes",
     },
     edit: "Edit",
     empty: {
@@ -369,6 +375,9 @@ const en = {
       createDescription:
         "The decider approves versions and accepts paid rounds. Other reviewers can comment.",
       createTitle: "New client",
+      customTerms: "Specific plan terms",
+      customTermsDescription:
+        "Override your default plan terms for this client. When off, the client follows your workspace defaults.",
       deciderEmail: "Decider email",
       deciderEmailPlaceholder: "lea@acme.com",
       deciderName: "Decider name",
@@ -677,7 +686,7 @@ const fr: Messages = {
       delayInvalid: "Saisissez un nombre entier de jours entre 0 et {max}.",
       delaySuffix: "jours",
       description:
-        "Valeurs appliquées par défaut à vos nouveaux clients et projets. Vous pouvez les ajuster par projet.",
+        "Valeurs appliquées par défaut à vos nouveaux clients et projets. Vous pouvez les ajuster par client ou par projet.",
       includedRounds: "Tours inclus",
       includedRoundsDescription:
         "Nombre de tours de révision couverts par le forfait.",
@@ -879,10 +888,16 @@ const fr: Messages = {
       "Les personnes pour qui vous livrez : qui valide, qui relit, et ce qui figure dans l'export de facturation.",
     details: {
       address: "Adresse de facturation",
+      customTerms: "Propres à ce client",
       decider: "Décideur",
+      defaultTerms: "Conditions par défaut",
+      delayOne: "{count} jour",
+      delayOther: "{count} jours",
+      no: "Non",
       notes: "Notes",
       reviewers: "Autres relecteurs",
       siren: "SIREN",
+      yes: "Oui",
     },
     edit: "Modifier",
     empty: {
@@ -899,6 +914,9 @@ const fr: Messages = {
       createDescription:
         "Le décideur valide les versions et accepte les tours payants. Les autres relecteurs peuvent commenter.",
       createTitle: "Nouveau client",
+      customTerms: "Conditions propres à ce client",
+      customTermsDescription:
+        "Remplacent vos conditions de forfait par défaut pour ce client. Désactivé, le client suit les conditions de votre espace.",
       deciderEmail: "Email du décideur",
       deciderEmailPlaceholder: "lea@acme.fr",
       deciderName: "Nom du décideur",

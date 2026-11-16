@@ -1,5 +1,7 @@
 import z from "zod";
 
+import { revisionTermsSchema } from "./workspace";
+
 export const CLIENT_NAME_MAX_LENGTH = 120;
 export const CLIENT_ADDRESS_MAX_LENGTH = 300;
 export const CLIENT_NOTES_MAX_LENGTH = 2000;
@@ -41,6 +43,8 @@ export const clientSchema = z.object({
     .array(z.string().trim().toLowerCase().pipe(z.email()))
     .max(CLIENT_REVIEWERS_MAX)
     .transform((emails) => [...new Set(emails)]),
+  // Null keeps the workspace default plan terms.
+  revisionTerms: revisionTermsSchema.nullable(),
   siren: z
     .string()
     .transform(normalizeSiren)
