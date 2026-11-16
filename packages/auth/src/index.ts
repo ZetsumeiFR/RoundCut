@@ -5,11 +5,13 @@ import {
   authRelations,
   rateLimit,
   session,
+  twoFactor as twoFactorTable,
   user,
   verification,
 } from "@roundcut/db/schema/auth";
 import { betterAuth } from "better-auth";
 import { nextCookies } from "better-auth/next-js";
+import { twoFactor } from "better-auth/plugins/two-factor";
 
 import {
   type EmailConfig,
@@ -52,8 +54,12 @@ const googleProvider = ({
       }
     : {};
 
+// Shown as the account issuer in authenticator apps.
+const APP_NAME = "RoundCut";
+
 export function createAuth(env: AuthConfig, database: Database) {
   return betterAuth({
+    appName: APP_NAME,
     baseURL: env.BETTER_AUTH_URL,
     database: drizzleAdapter(database, {
       provider: "pg",
@@ -62,6 +68,7 @@ export function createAuth(env: AuthConfig, database: Database) {
         authRelations,
         rateLimit,
         session,
+        twoFactor: twoFactorTable,
         user,
         verification,
       },
@@ -86,7 +93,8 @@ export function createAuth(env: AuthConfig, database: Database) {
         await sendEmail(env, verificationEmail(locale, newUser.email, url));
       },
     },
-    plugins: [nextCookies()],
+    // TOTP second factor (AUTH-07); nextCookies must stay last.
+    plugins: [twoFactor({ issuer: APP_NAME }), nextCookies()],
     // On in every environment (Better-Auth defaults to production only) and
     // stored in Postgres so limits survive restarts and span instances.
     // Password-reset and verification emails keep Better-Auth's 3/min rule.

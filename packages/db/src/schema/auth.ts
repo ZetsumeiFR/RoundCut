@@ -16,6 +16,7 @@ export const user = pgTable("user", {
   id: text("id").primaryKey(),
   image: text("image"),
   name: text("name").notNull(),
+  twoFactorEnabled: boolean("two_factor_enabled").default(false),
   updatedAt: timestamp("updated_at")
     .defaultNow()
     .$onUpdate(() => /* @__PURE__ */ new Date())
@@ -89,8 +90,28 @@ export const rateLimit = pgTable("rate_limit", {
   lastRequest: bigint("last_request", { mode: "number" }).notNull(),
 });
 
+// Better-Auth two-factor plugin: encrypted TOTP secret and backup codes.
+export const twoFactor = pgTable(
+  "two_factor",
+  {
+    backupCodes: text("backup_codes").notNull(),
+    failedVerificationCount: integer("failed_verification_count").default(0),
+    id: text("id").primaryKey(),
+    lockedUntil: timestamp("locked_until"),
+    secret: text("secret").notNull(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    verified: boolean("verified").default(true),
+  },
+  (table) => [
+    index("twoFactor_secret_idx").on(table.secret),
+    index("twoFactor_userId_idx").on(table.userId),
+  ]
+);
+
 export const authRelations = defineRelationsPart(
-  { account, session, user, verification },
+  { account, session, twoFactor, user, verification },
   (r) => ({
     account: {
       user: r.one.user({
@@ -104,6 +125,12 @@ export const authRelations = defineRelationsPart(
         to: r.user.id,
       }),
     },
+    twoFactor: {
+      user: r.one.user({
+        from: r.twoFactor.userId,
+        to: r.user.id,
+      }),
+    },
     user: {
       accounts: r.many.account({
         from: r.user.id,
@@ -112,6 +139,10 @@ export const authRelations = defineRelationsPart(
       sessions: r.many.session({
         from: r.user.id,
         to: r.session.userId,
+      }),
+      twoFactors: r.many.twoFactor({
+        from: r.user.id,
+        to: r.twoFactor.userId,
       }),
     },
   })
