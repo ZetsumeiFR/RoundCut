@@ -15,6 +15,11 @@ const en = {
     },
     errors: {
       generic: "Please try again in a moment.",
+      googleAccountNotLinked:
+        "An account already uses this email. Sign in with your password and verify your email first.",
+      googleCancelled: "Google sign-in was cancelled.",
+      googleFailed:
+        "Google sign-in failed. Try again or continue with your email.",
       invalidCredentials: "Invalid email or password.",
       passwordTooShort: "Password must be at least {min} characters.",
       title: "Something went wrong",
@@ -41,6 +46,11 @@ const en = {
       submit: "Send reset link",
       submitting: "Sending…",
       title: "Forgot your password?",
+    },
+    google: {
+      continue: "Continue with Google",
+      redirecting: "Redirecting to Google…",
+      separator: "Or continue with email",
     },
     resetPassword: {
       description:
@@ -105,6 +115,11 @@ const fr: Messages = {
     },
     errors: {
       generic: "Veuillez réessayer dans un instant.",
+      googleAccountNotLinked:
+        "Un compte utilise déjà cet email. Connectez-vous avec votre mot de passe et vérifiez d'abord votre email.",
+      googleCancelled: "La connexion avec Google a été annulée.",
+      googleFailed:
+        "La connexion avec Google a échoué. Réessayez ou continuez avec votre email.",
       invalidCredentials: "Email ou mot de passe incorrect.",
       passwordTooShort:
         "Le mot de passe doit contenir au moins {min} caractères.",
@@ -132,6 +147,11 @@ const fr: Messages = {
       submit: "Envoyer le lien",
       submitting: "Envoi…",
       title: "Mot de passe oublié ?",
+    },
+    google: {
+      continue: "Continuer avec Google",
+      redirecting: "Redirection vers Google…",
+      separator: "Ou continuer avec votre email",
     },
     resetPassword: {
       description:

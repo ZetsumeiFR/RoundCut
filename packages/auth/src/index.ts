@@ -19,10 +19,34 @@ import {
 import { resolveLocale } from "./locale";
 import { MIN_PASSWORD_LENGTH } from "./password-policy";
 
-export type AuthConfig = EmailConfig & {
-  BETTER_AUTH_URL: string;
-  BETTER_AUTH_SECRET: string;
-};
+interface GoogleConfig {
+  GOOGLE_CLIENT_ID?: string;
+  GOOGLE_CLIENT_SECRET?: string;
+}
+
+export type AuthConfig = EmailConfig &
+  GoogleConfig & {
+    BETTER_AUTH_URL: string;
+    BETTER_AUTH_SECRET: string;
+  };
+
+// Google sign-in is offered only once both OAuth credentials are configured.
+export const isGoogleSignInEnabled = (env: GoogleConfig) =>
+  Boolean(env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET);
+
+const googleProvider = ({
+  GOOGLE_CLIENT_ID,
+  GOOGLE_CLIENT_SECRET,
+}: GoogleConfig) =>
+  GOOGLE_CLIENT_ID && GOOGLE_CLIENT_SECRET
+    ? {
+        google: {
+          clientId: GOOGLE_CLIENT_ID,
+          clientSecret: GOOGLE_CLIENT_SECRET,
+          prompt: "select_account" as const,
+        },
+      }
+    : {};
 
 export function createAuth(env: AuthConfig, database: Database) {
   return betterAuth({
@@ -53,6 +77,7 @@ export function createAuth(env: AuthConfig, database: Database) {
     },
     plugins: [nextCookies()],
     secret: env.BETTER_AUTH_SECRET,
+    socialProviders: googleProvider(env),
     trustedOrigins: [env.BETTER_AUTH_URL],
   });
 }

@@ -3,7 +3,7 @@
 import { Button } from "@roundcut/ui/components/button";
 import { FieldGroup } from "@roundcut/ui/components/field";
 import { useRouter } from "next/navigation";
-import { type FormEvent, useCallback, useState } from "react";
+import { type FormEvent, type ReactNode, useCallback, useState } from "react";
 import z from "zod";
 
 import type { Messages } from "@/i18n/messages";
@@ -19,11 +19,13 @@ export function SignInForm({
   onEmailNotVerified,
   onForgotPassword,
   onSwitchToSignUp,
+  social,
 }: {
   messages: Messages["auth"];
   onEmailNotVerified: (email: string) => void;
   onForgotPassword: () => void;
   onSwitchToSignUp: () => void;
+  social?: ReactNode;
 }) {
   const router = useRouter();
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -82,6 +84,7 @@ export function SignInForm({
       }
       title={signIn.title}
     >
+      {social}
       <form className="flex flex-col gap-5" noValidate onSubmit={handleSubmit}>
         {submitError ? (
           <AuthErrorAlert message={submitError} title={messages.errors.title} />

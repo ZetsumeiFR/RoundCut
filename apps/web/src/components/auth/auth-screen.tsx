@@ -8,6 +8,7 @@ import type { Messages } from "@/i18n/messages";
 import type { InitialAuthView } from "./auth-view";
 import { CheckEmail } from "./check-email";
 import { ForgotPasswordForm } from "./forgot-password-form";
+import { GoogleSignIn } from "./google-sign-in";
 import { SignInForm } from "./sign-in-form";
 import { SignUpForm } from "./sign-up-form";
 
@@ -16,9 +17,13 @@ type AuthView =
   | { name: "check-email"; email: string; unverifiedSignIn: boolean };
 
 export function AuthScreen({
+  googleError,
+  googleSignIn,
   messages,
   initialView,
 }: {
+  googleError: string | null;
+  googleSignIn: boolean;
   messages: Messages["auth"];
   initialView: InitialAuthView;
 }) {
@@ -79,6 +84,15 @@ export function AuthScreen({
         onEmailNotVerified={showUnverifiedSignIn}
         onForgotPassword={showForgotPassword}
         onSwitchToSignUp={showSignUp}
+        social={
+          googleSignIn ? (
+            <GoogleSignIn
+              initialError={googleError}
+              messages={messages}
+              view="sign-in"
+            />
+          ) : null
+        }
       />
     );
   }
@@ -88,6 +102,15 @@ export function AuthScreen({
       messages={messages}
       onSignedUp={showCheckEmail}
       onSwitchToSignIn={showSignIn}
+      social={
+        googleSignIn ? (
+          <GoogleSignIn
+            initialError={googleError}
+            messages={messages}
+            view="sign-up"
+          />
+        ) : null
+      }
     />
   );
 }
