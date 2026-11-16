@@ -1,6 +1,39 @@
 import type { Locale } from "@roundcut/auth/locale";
 
 const en = {
+  account: {
+    menu: {
+      label: "My account",
+      sessions: "Active sessions",
+      signIn: "Sign in",
+      signOut: "Sign out",
+    },
+    sessions: {
+      createdAt: "Signed in {date}",
+      current: "This device",
+      description:
+        "Devices currently signed in to your account. Revoke any session you don't recognize.",
+      ipAddress: "IP {ip}",
+      lastActive: "Last active {date}",
+      noOtherDescription:
+        "You're only signed in on this device. Sessions on other browsers or devices will show up here.",
+      noOtherTitle: "No other active sessions",
+      otherTitle: "Other sessions",
+      revoke: "Revoke",
+      revokeOthers: "Sign out of all other devices",
+      revoking: "Revoking…",
+      signInAgain: "Sign in again",
+      signingOut: "Signing out…",
+      signOut: "Sign out",
+      staleDescription:
+        "For your security, sign in again to view and manage your active sessions.",
+      staleTitle: "Confirm it's you",
+      title: "Active sessions",
+      unknownBrowser: "Unknown browser",
+      unknownDevice: "Unknown device",
+      unknownIp: "Unknown IP",
+    },
+  },
   auth: {
     checkEmail: {
       back: "Back to sign in",
@@ -101,6 +134,39 @@ const en = {
 export type Messages = typeof en;
 
 const fr: Messages = {
+  account: {
+    menu: {
+      label: "Mon compte",
+      sessions: "Sessions actives",
+      signIn: "Se connecter",
+      signOut: "Se déconnecter",
+    },
+    sessions: {
+      createdAt: "Connecté le {date}",
+      current: "Cet appareil",
+      description:
+        "Appareils actuellement connectés à votre compte. Révoquez toute session que vous ne reconnaissez pas.",
+      ipAddress: "IP {ip}",
+      lastActive: "Dernière activité le {date}",
+      noOtherDescription:
+        "Vous n'êtes connecté que sur cet appareil. Les sessions ouvertes sur d'autres navigateurs ou appareils apparaîtront ici.",
+      noOtherTitle: "Aucune autre session active",
+      otherTitle: "Autres sessions",
+      revoke: "Révoquer",
+      revokeOthers: "Déconnecter tous les autres appareils",
+      revoking: "Révocation…",
+      signInAgain: "Se reconnecter",
+      signingOut: "Déconnexion…",
+      signOut: "Se déconnecter",
+      staleDescription:
+        "Par sécurité, reconnectez-vous pour consulter et gérer vos sessions actives.",
+      staleTitle: "Confirmez votre identité",
+      title: "Sessions actives",
+      unknownBrowser: "Navigateur inconnu",
+      unknownDevice: "Appareil inconnu",
+      unknownIp: "IP inconnue",
+    },
+  },
   auth: {
     checkEmail: {
       back: "Retour à la connexion",
