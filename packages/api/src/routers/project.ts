@@ -4,6 +4,7 @@ import { client } from "@roundcut/db/schema/client";
 import { deliverable } from "@roundcut/db/schema/deliverable";
 import { project } from "@roundcut/db/schema/project";
 import { and, asc, desc, eq, inArray, isNull } from "drizzle-orm";
+import z from "zod";
 
 import { protectedProcedure } from "../index";
 import { projectSchema, projectStatusSchema } from "../project";
@@ -13,10 +14,24 @@ import { getOrCreateWorkspace } from "./workspace";
 type ProjectRow = typeof project.$inferSelect;
 type Deliverable = ReturnType<typeof toDeliverable>;
 
-const toProject = (
+export interface ReviewActivity {
+  latestVersion: { number: number } | null;
+  openComments: number;
+  roundsUsed: number;
+}
+
+// Versions, rounds and comments don't exist yet (VER-04, ROUND-01, REV-04):
+// until they ship, every deliverable reads as never sent for review.
+const NO_REVIEW_ACTIVITY: ReviewActivity = {
+  latestVersion: null,
+  openComments: 0,
+  roundsUsed: 0,
+};
+
+const toProject = <D extends Deliverable>(
   row: ProjectRow,
   owner: { id: string; name: string },
-  deliverables: Deliverable[]
+  deliverables: D[]
 ) => ({
   client: owner,
   createdAt: row.createdAt,
@@ -94,6 +109,39 @@ export const projectRouter = {
         });
       }
     ),
+  get: protectedProcedure
+    .input(z.object({ id: z.string().min(1) }))
+    .handler(async ({ context, input: { id } }) => {
+      const workspace = await getOrCreateWorkspace(
+        context.db,
+        context.session.user
+      );
+      const [row] = await context.db
+        .select({
+          client: { id: client.id, name: client.name },
+          project,
+        })
+        .from(project)
+        .innerJoin(client, eq(project.clientId, client.id))
+        .where(and(eq(project.id, id), eq(project.workspaceId, workspace.id)));
+      // Other workspaces' projects read as missing so their ids leak nothing.
+      if (!row) {
+        throw new ORPCError("NOT_FOUND", { message: "Project not found" });
+      }
+      const deliverables = await context.db
+        .select()
+        .from(deliverable)
+        .where(eq(deliverable.projectId, row.project.id))
+        .orderBy(asc(deliverable.position));
+      return toProject(
+        row.project,
+        row.client,
+        deliverables.map((item) => ({
+          ...toDeliverable(item),
+          review: NO_REVIEW_ACTIVITY,
+        }))
+      );
+    }),
   list: protectedProcedure.handler(async ({ context }) => {
     const workspace = await getOrCreateWorkspace(
       context.db,

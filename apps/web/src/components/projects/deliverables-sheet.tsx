@@ -60,7 +60,7 @@ function DeliverablesPanel({
           projectId: project.id,
         });
         await queryClient.invalidateQueries({
-          queryKey: orpc.project.list.queryKey(),
+          queryKey: orpc.project.key(),
         });
         toast.success(
           formatMessage(deliverableMessages.saved, { title: created.title })

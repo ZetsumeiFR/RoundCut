@@ -36,7 +36,7 @@ import { toast } from "sonner";
 import z from "zod";
 import {
   addTermsIssues,
-  formatPrice,
+  RevisionTermsList,
   type TermsFormValues,
   type TermsMessages,
   termsFormValuesSchema,
@@ -458,37 +458,6 @@ function PlanTerms({
   workspace: WorkspaceTerms;
 }) {
   const custom = client.revisionTerms !== null;
-  const effective = client.revisionTerms ?? workspace.revisionTerms;
-  const rows = [
-    [terms.includedRounds, String(effective.includedRounds)],
-    [
-      terms.price,
-      `${formatPrice(effective.extraRoundPriceCents, locale)} ${formatMessage(
-        terms.priceSuffix,
-        { currency: workspace.currency }
-      )}`,
-    ],
-    [
-      terms.delay,
-      formatMessage(
-        new Intl.PluralRules(locale).select(effective.extraRoundDelayDays) ===
-          "one"
-          ? messages.delayOne
-          : messages.delayOther,
-        { count: effective.extraRoundDelayDays }
-      ),
-    ],
-    [
-      terms.requirePayment,
-      effective.requirePayment ? messages.yes : messages.no,
-    ],
-    [
-      terms.scope,
-      effective.scope === "project"
-        ? terms.scopeProject
-        : terms.scopeDeliverable,
-    ],
-  ] as const;
 
   return (
     <span className="flex flex-col gap-2">
@@ -499,14 +468,13 @@ function PlanTerms({
       >
         {custom ? messages.customTerms : messages.defaultTerms}
       </Badge>
-      <span className="flex flex-col gap-1">
-        {rows.map(([label, value]) => (
-          <span className="flex justify-between gap-4" key={label}>
-            <span className="text-muted-foreground">{label}</span>
-            <span className="text-right tabular-nums">{value}</span>
-          </span>
-        ))}
-      </span>
+      <RevisionTermsList
+        currency={workspace.currency}
+        labels={messages}
+        locale={locale}
+        messages={terms}
+        terms={client.revisionTerms ?? workspace.revisionTerms}
+      />
     </span>
   );
 }

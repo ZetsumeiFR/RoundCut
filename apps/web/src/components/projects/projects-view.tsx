@@ -94,7 +94,7 @@ const PAGE_SIZES = [DEFAULT_PAGE_SIZE, 25, 50];
 const SKELETON_ROWS = ["first", "second", "third", "fourth", "fifth"];
 const CENTS_PER_UNIT = 100;
 
-const STATUS_BADGES: Record<ProjectStatus, BadgeVariant> = {
+export const STATUS_BADGES: Record<ProjectStatus, BadgeVariant> = {
   approved: "success-light",
   archived: "secondary",
   awaiting_client: "warning-light",
@@ -310,9 +310,12 @@ function buildColumns(
     {
       accessorFn: (project) => project.name.toLocaleLowerCase(),
       cell: ({ row }) => (
-        <span className="block truncate font-medium text-sm">
+        <Link
+          className="block truncate font-medium text-sm underline-offset-4 hover:underline"
+          href={`/projects/${row.original.id}`}
+        >
           {row.original.name}
-        </span>
+        </Link>
       ),
       header: ({ column }) => <SortableHeader column={column} />,
       id: "project",
