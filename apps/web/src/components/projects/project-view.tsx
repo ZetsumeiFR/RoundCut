@@ -60,6 +60,7 @@ import {
   HistoryIcon,
   PlusIcon,
   SearchXIcon,
+  UploadIcon,
 } from "lucide-react";
 import Link from "next/link";
 import { type ReactNode, useCallback, useMemo, useState } from "react";
@@ -76,6 +77,7 @@ import { DeliverablesSheet } from "./deliverables-sheet";
 import { DuplicateProjectDialog } from "./duplicate-project-dialog";
 import { formatTargetDate } from "./project-sheet";
 import { STATUS_BADGES } from "./projects-view";
+import { type UploadTarget, VersionUploadSheet } from "./version-upload-sheet";
 
 type ProjectsMessages = Messages["projects"];
 type ViewMessages = ProjectsMessages["view"];
@@ -172,9 +174,36 @@ function RoundCell({
   );
 }
 
+function UploadCell({
+  deliverable,
+  label,
+  onUpload,
+}: {
+  deliverable: DeliverableRow;
+  label: string;
+  onUpload: (deliverable: UploadTarget) => void;
+}) {
+  const handleClick = useCallback(
+    () => onUpload({ id: deliverable.id, title: deliverable.title }),
+    [deliverable.id, deliverable.title, onUpload]
+  );
+  return (
+    <Button
+      aria-label={formatMessage(label, { title: deliverable.title })}
+      onClick={handleClick}
+      size="icon-sm"
+      type="button"
+      variant="outline"
+    >
+      <UploadIcon aria-hidden="true" />
+    </Button>
+  );
+}
+
 function buildColumns(
   messages: ProjectsMessages,
-  includedRounds: number
+  includedRounds: number,
+  onUpload: (deliverable: UploadTarget) => void
 ): ColumnDef<DataGridFeatures, DeliverableRow>[] {
   const { view } = messages;
   return [
@@ -256,21 +285,36 @@ function buildColumns(
       meta: { headerTitle: view.columns.status },
       size: 130,
     },
+    {
+      cell: ({ row }) => (
+        <UploadCell
+          deliverable={row.original}
+          label={view.upload}
+          onUpload={onUpload}
+        />
+      ),
+      enableSorting: false,
+      header: () => <span className="sr-only">{view.columns.actions}</span>,
+      id: "actions",
+      size: 64,
+    },
   ];
 }
 
 function DeliverablesGrid({
   messages,
+  onUpload,
   project,
 }: {
   messages: ProjectsMessages;
+  onUpload: (deliverable: UploadTarget) => void;
   project: ProjectDetails;
 }) {
   const [sorting, setSorting] = useState<SortingState>([]);
   const { includedRounds } = project.termsSnapshot;
   const columns = useMemo(
-    () => buildColumns(messages, includedRounds),
-    [includedRounds, messages]
+    () => buildColumns(messages, includedRounds, onUpload),
+    [includedRounds, messages, onUpload]
   );
   const i18n = useMemo(
     () => gridI18n(messages.grid, messages.deliverables.emptyTitle),
@@ -326,11 +370,13 @@ function DeliverablesTab({
   locale,
   messages,
   onAdd,
+  onUpload,
   project,
 }: {
   locale: Locale;
   messages: ProjectsMessages;
   onAdd: () => void;
+  onUpload: (deliverable: UploadTarget) => void;
   project: ProjectDetails;
 }) {
   const { deliverables } = messages;
@@ -358,7 +404,11 @@ function DeliverablesTab({
       </FrameHeader>
       <FramePanel className="p-0">
         {project.deliverables.length > 0 ? (
-          <DeliverablesGrid messages={messages} project={project} />
+          <DeliverablesGrid
+            messages={messages}
+            onUpload={onUpload}
+            project={project}
+          />
         ) : (
           <ViewEmpty
             action={
@@ -566,6 +616,12 @@ export function ProjectView({
   const openDeliverables = useCallback(() => setDeliverablesOpen(true), []);
   const [duplicateOpen, setDuplicateOpen] = useState(false);
   const openDuplicate = useCallback(() => setDuplicateOpen(true), []);
+  const [uploadTarget, setUploadTarget] = useState<UploadTarget>();
+  const closeUpload = useCallback((open: boolean) => {
+    if (!open) {
+      setUploadTarget(undefined);
+    }
+  }, []);
   const { view } = messages;
 
   const refetchProject = project.refetch;
@@ -628,6 +684,7 @@ export function ProjectView({
             locale={locale}
             messages={messages}
             onAdd={openDeliverables}
+            onUpload={setUploadTarget}
             project={project.data}
           />
         </TabsContent>
@@ -657,6 +714,12 @@ export function ProjectView({
         messages={messages}
         onOpenChange={setDeliverablesOpen}
         project={deliverablesOpen ? project.data : undefined}
+      />
+      <VersionUploadSheet
+        deliverable={uploadTarget}
+        locale={locale}
+        messages={messages}
+        onOpenChange={closeUpload}
       />
       <DuplicateProjectDialog
         locale={locale}

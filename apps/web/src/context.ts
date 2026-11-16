@@ -1,8 +1,7 @@
 import type { Context as ApiContext } from "@roundcut/api/context";
 import type { NextRequest } from "next/server";
 
-import { db } from "./services";
-import { auth } from "./services";
+import { auth, db, storage } from "./services";
 
 export async function createContext(req: NextRequest): Promise<ApiContext> {
   const session = await auth.api.getSession({
@@ -11,6 +10,7 @@ export async function createContext(req: NextRequest): Promise<ApiContext> {
   return {
     db,
     session,
+    storage,
   };
 }
 

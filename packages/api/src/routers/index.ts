@@ -5,6 +5,8 @@ import { clientRouter } from "./client";
 import { deliverableRouter } from "./deliverable";
 import { projectRouter } from "./project";
 import { teamRouter } from "./team";
+import { uploadRouter } from "./upload";
+import { versionRouter } from "./version";
 import { workspaceRouter } from "./workspace";
 
 export const appRouter = {
@@ -17,6 +19,8 @@ export const appRouter = {
   })),
   project: projectRouter,
   team: teamRouter,
+  upload: uploadRouter,
+  version: versionRouter,
   workspace: workspaceRouter,
 };
 export type AppRouter = typeof appRouter;
