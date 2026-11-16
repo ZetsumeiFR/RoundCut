@@ -5,24 +5,22 @@ const SKELETON_ROWS = ["current", "other"] as const;
 
 export default function SessionsLoading() {
   return (
-    <main className="mx-auto flex w-full max-w-2xl flex-col px-4 py-6 sm:px-8 sm:py-10">
-      <Card aria-busy="true" className="w-full gap-0 p-0">
-        <CardHeader className="gap-2 border-b px-6 py-6">
-          <Skeleton className="h-6 w-40" />
-          <Skeleton className="h-4 w-72 max-w-full" />
-        </CardHeader>
-        <CardContent className="flex flex-col gap-6 px-6 py-6">
-          {SKELETON_ROWS.map((row) => (
-            <div className="flex items-center gap-3" key={row}>
-              <Skeleton className="size-9" />
-              <div className="flex flex-1 flex-col gap-2">
-                <Skeleton className="h-4 w-36" />
-                <Skeleton className="h-3 w-64 max-w-full" />
-              </div>
+    <Card aria-busy="true" className="w-full gap-0 p-0">
+      <CardHeader className="gap-2 border-b px-6 py-6">
+        <Skeleton className="h-6 w-40" />
+        <Skeleton className="h-4 w-72 max-w-full" />
+      </CardHeader>
+      <CardContent className="flex flex-col gap-6 px-6 py-6">
+        {SKELETON_ROWS.map((row) => (
+          <div className="flex items-center gap-3" key={row}>
+            <Skeleton className="size-9" />
+            <div className="flex flex-1 flex-col gap-2">
+              <Skeleton className="h-4 w-36" />
+              <Skeleton className="h-3 w-64 max-w-full" />
             </div>
-          ))}
-        </CardContent>
-      </Card>
-    </main>
+          </div>
+        ))}
+      </CardContent>
+    </Card>
   );
 }
