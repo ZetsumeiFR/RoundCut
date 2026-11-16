@@ -1,7 +1,16 @@
 import { ORPCError } from "@orpc/server";
-import { batchSubmittedEmail, sendEmail } from "@roundcut/auth/email";
+import {
+  batchSubmittedEmail,
+  extraRoundCodeEmail,
+  sendEmail,
+} from "@roundcut/auth/email";
 import { resolveLocale } from "@roundcut/auth/locale";
 import type { Database } from "@roundcut/db";
+import {
+  REVIEWER_CODE_PURPOSES,
+  REVIEWER_CODE_RESEND_SECONDS,
+  REVIEWER_CODE_VALIDITY_MINUTES,
+} from "@roundcut/db/reviewer-code";
 import { canGiftRound } from "@roundcut/db/round";
 import { user } from "@roundcut/db/schema/auth";
 import { client } from "@roundcut/db/schema/client";
@@ -22,9 +31,14 @@ import {
   reviewerProcedure,
 } from "../index";
 import { reviewTokenSchema } from "../review-link";
-import { isAllowedReviewer, reviewerIdentitySchema } from "../reviewer";
+import {
+  isAllowedReviewer,
+  isDeciderEmail,
+  reviewerIdentitySchema,
+} from "../reviewer";
+import { issueReviewerCode } from "../reviewer-code";
 import type { FrameRate } from "../timecode";
-import { findReviewVersion, requireReviewer } from "./comment";
+import { findReviewVersion, requireDecider, requireReviewer } from "./comment";
 import { projectRoundPositions, roundTransition } from "./round";
 import { thumbnailUrl } from "./version";
 import { brandOf } from "./workspace";
@@ -151,8 +165,7 @@ export const reviewRouter = {
           message: "Email not allowed on this review link",
         });
       }
-      const isDecider =
-        email === context.reviewerClient.deciderEmail.toLowerCase();
+      const isDecider = isDeciderEmail(context.reviewerClient, email);
       const [saved] = await context.db
         .insert(reviewer)
         .values({ email, isDecider, name, projectId })
@@ -171,6 +184,48 @@ export const reviewRouter = {
       }
       context.reviewerCookies.set(projectId, saved.id);
       return saved;
+    }),
+
+  // Emails the decider a 6-digit code to type with their agreement
+  // (EXTRA-02), in the workspace language. Asking again within a minute is
+  // refused; a new code replaces the previous one.
+  requestOtp: publicProcedure
+    .input(
+      z.object({
+        purpose: z.enum(REVIEWER_CODE_PURPOSES),
+        token: reviewTokenSchema,
+      })
+    )
+    .use(requireReviewLink)
+    .handler(async ({ context, input: { purpose } }) => {
+      const decider = requireDecider(context.reviewer, context.reviewerClient);
+      const [row] = await context.db
+        .select({
+          locale: workspace.locale,
+          projectName: project.name,
+          studioName: workspace.name,
+        })
+        .from(project)
+        .innerJoin(workspace, eq(project.workspaceId, workspace.id))
+        .where(eq(project.id, context.reviewLink.projectId));
+      if (!row) {
+        throw new ORPCError("NOT_FOUND", { message: "Review link not found" });
+      }
+      const code = await issueReviewerCode(context.db, decider.id, purpose);
+      await sendEmail(
+        context.notifications.email,
+        extraRoundCodeEmail(resolveLocale(row.locale), decider.email, {
+          code,
+          projectName: row.projectName,
+          reviewerName: decider.name,
+          studioName: row.studioName,
+          validityMinutes: REVIEWER_CODE_VALIDITY_MINUTES,
+        })
+      );
+      return {
+        email: decider.email,
+        resendInSeconds: REVIEWER_CODE_RESEND_SECONDS,
+      };
     }),
 
   // What the client sees through the link: the project's deliverables and,

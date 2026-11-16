@@ -16,13 +16,18 @@ export const reviewerIdentitySchema = z.object({
 
 export type ReviewerIdentity = z.infer<typeof reviewerIdentitySchema>;
 
+export const isDeciderEmail = (
+  client: { deciderEmail: string },
+  email: string
+) => email === client.deciderEmail.toLowerCase();
+
 // The decider can always review; the other reviewer emails of the client act
 // as a whitelist only once at least one is set (REV-02).
 export const isAllowedReviewer = (
   client: { deciderEmail: string; reviewerEmails: string[] },
   email: string
 ) =>
-  email === client.deciderEmail.toLowerCase() ||
+  isDeciderEmail(client, email) ||
   client.reviewerEmails.length === 0 ||
   client.reviewerEmails.includes(email);
 
