@@ -7,58 +7,24 @@ import {
   workspaceSettingsSchema,
 } from "@roundcut/api/workspace";
 import { LOCALES, type Locale } from "@roundcut/auth/locale";
-import { Button } from "@roundcut/ui/components/button";
 import { FieldGroup } from "@roundcut/ui/components/field";
-import { Input } from "@roundcut/ui/components/input";
-import {
-  InputGroup,
-  InputGroupAddon,
-  InputGroupInput,
-  InputGroupText,
-} from "@roundcut/ui/components/input-group";
-import {
-  Alert,
-  AlertAction,
-  AlertDescription,
-  AlertTitle,
-} from "@roundcut/ui/components/reui/alert";
-import {
-  Select,
-  SelectContent,
-  SelectGroup,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@roundcut/ui/components/select";
-import {
-  createFormHook,
-  createFormHookContexts,
-  useStore,
-} from "@tanstack/react-form";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { CircleAlertIcon } from "lucide-react";
-import {
-  type ChangeEvent,
-  type FormEvent,
-  useCallback,
-  useMemo,
-  useState,
-} from "react";
+import { useCallback, useMemo, useState } from "react";
 import { toast } from "sonner";
 import z from "zod";
 
 import { formatMessage, type Messages } from "@/i18n/messages";
 import { orpc } from "@/utils/orpc";
-
-import { SettingRow } from "./setting-row";
 import { SettingsCard } from "./settings-card";
-import { WorkspaceSettingsSkeleton } from "./workspace-settings-skeleton";
+import {
+  SettingsAlert,
+  SettingsLoadError,
+  useSettingsForm,
+  useSubmitHandler,
+} from "./settings-form";
+import { SETTING_ROWS, SettingsSkeleton } from "./settings-skeleton";
 
 type WorkspaceMessages = Messages["account"]["workspace"];
-interface Option {
-  label: string;
-  value: string;
-}
 
 interface Workspace {
   currency: string;
@@ -116,149 +82,6 @@ const toFormValues = (workspace: Workspace, locale: Locale): FormValues => ({
   timezone: workspace.timezone,
 });
 
-const { fieldContext, formContext, useFieldContext, useFormContext } =
-  createFormHookContexts();
-
-function TextSettingField({
-  description,
-  inputMode,
-  last,
-  suffix,
-  title,
-}: {
-  description: string;
-  inputMode?: "decimal";
-  last?: boolean;
-  suffix?: string;
-  title: string;
-}) {
-  const field = useFieldContext<string>();
-  const { errors } = field.state.meta;
-  const handleChange = useCallback(
-    (event: ChangeEvent<HTMLInputElement>) =>
-      field.handleChange(event.target.value),
-    [field]
-  );
-  const inputProps = {
-    "aria-invalid": errors.length > 0,
-    id: field.name,
-    inputMode,
-    name: field.name,
-    onBlur: field.handleBlur,
-    onChange: handleChange,
-    value: field.state.value,
-  };
-
-  return (
-    <SettingRow
-      description={description}
-      errors={errors}
-      labelFor={field.name}
-      last={last}
-      title={title}
-    >
-      {suffix ? (
-        <InputGroup className="w-full">
-          <InputGroupInput {...inputProps} />
-          <InputGroupAddon align="inline-end">
-            <InputGroupText>{suffix}</InputGroupText>
-          </InputGroupAddon>
-        </InputGroup>
-      ) : (
-        <Input {...inputProps} />
-      )}
-    </SettingRow>
-  );
-}
-
-function SelectSettingField({
-  description,
-  last,
-  options,
-  title,
-}: {
-  description: string;
-  last?: boolean;
-  options: Option[];
-  title: string;
-}) {
-  const field = useFieldContext<string>();
-  const { errors } = field.state.meta;
-  const { value } = field.state;
-  const handleValueChange = useCallback(
-    (next: string | null) => {
-      if (next !== null) {
-        field.handleChange(next);
-      }
-    },
-    [field]
-  );
-  const selected = options.find((option) => option.value === value);
-
-  return (
-    <SettingRow
-      description={description}
-      errors={errors}
-      labelFor={field.name}
-      last={last}
-      title={title}
-    >
-      <Select onValueChange={handleValueChange} value={value}>
-        <SelectTrigger
-          aria-invalid={errors.length > 0}
-          className="w-full"
-          id={field.name}
-        >
-          <SelectValue>{selected?.label ?? value}</SelectValue>
-        </SelectTrigger>
-        <SelectContent>
-          <SelectGroup>
-            {options.map((option) => (
-              <SelectItem key={option.value} value={option.value}>
-                {option.label}
-              </SelectItem>
-            ))}
-          </SelectGroup>
-        </SelectContent>
-      </Select>
-    </SettingRow>
-  );
-}
-
-const selectFooterState = (state: {
-  isDirty: boolean;
-  isSubmitting: boolean;
-}) => ({ isDirty: state.isDirty, isSubmitting: state.isSubmitting });
-
-function FormFooter({ messages }: { messages: WorkspaceMessages }) {
-  const form = useFormContext();
-  const { isDirty, isSubmitting } = useStore(form.store, selectFooterState);
-  const handleReset = useCallback(() => form.reset(), [form]);
-
-  return (
-    <>
-      <Button
-        disabled={!isDirty || isSubmitting}
-        onClick={handleReset}
-        type="button"
-        variant="outline"
-      >
-        {messages.cancel}
-      </Button>
-      <Button disabled={isSubmitting} type="submit">
-        {isSubmitting ? messages.saving : messages.save}
-      </Button>
-    </>
-  );
-}
-
-const { useAppForm } = createFormHook({
-  fieldComponents: { SelectSettingField, TextSettingField },
-  fieldContext,
-  formComponents: { FormFooter },
-  formContext,
-});
-
 function useWorkspaceOptions(locale: Locale, timezone: string) {
   return useMemo(() => {
     const currencyNames = new Intl.DisplayNames([locale], { type: "currency" });
@@ -303,7 +126,7 @@ function WorkspaceForm({
     })
   );
 
-  const form = useAppForm({
+  const form = useSettingsForm({
     defaultValues: toFormValues(workspace, locale),
     onSubmit: async ({ value }) => {
       setSaveError(false);
@@ -324,22 +147,11 @@ function WorkspaceForm({
     validators: { onSubmit: createFormSchema(messages) },
   });
 
-  const handleSubmit = useCallback(
-    (event: FormEvent<HTMLFormElement>) => {
-      event.preventDefault();
-      form.handleSubmit();
-    },
-    [form]
-  );
+  const handleSubmit = useSubmitHandler(form);
 
   return (
     <form className="flex flex-col gap-4" noValidate onSubmit={handleSubmit}>
-      {saveError ? (
-        <Alert variant="destructive">
-          <CircleAlertIcon aria-hidden="true" />
-          <AlertTitle>{messages.saveError}</AlertTitle>
-        </Alert>
-      ) : null}
+      {saveError ? <SettingsAlert title={messages.saveError} /> : null}
       <form.AppForm>
         <SettingsCard
           description={messages.description}
@@ -419,24 +231,8 @@ export function WorkspaceSettings({
   }
 
   if (isError) {
-    return (
-      <Alert variant="destructive">
-        <CircleAlertIcon aria-hidden="true" />
-        <AlertTitle>{messages.loadErrorTitle}</AlertTitle>
-        <AlertDescription>{messages.loadErrorDescription}</AlertDescription>
-        <AlertAction>
-          <Button
-            onClick={handleRetry}
-            size="xs"
-            type="button"
-            variant="outline"
-          >
-            {messages.retry}
-          </Button>
-        </AlertAction>
-      </Alert>
-    );
+    return <SettingsLoadError messages={messages} onRetry={handleRetry} />;
   }
 
-  return <WorkspaceSettingsSkeleton />;
+  return <SettingsSkeleton rows={SETTING_ROWS.workspace} />;
 }

@@ -8,10 +8,12 @@ const en = {
       sessions: "Active sessions",
       signIn: "Sign in",
       signOut: "Sign out",
+      terms: "Plan terms",
       workspace: "Workspace",
     },
     nav: {
-      description: "Manage your workspace, security and signed-in devices.",
+      description:
+        "Manage your workspace, plan terms, security and signed-in devices.",
       label: "Settings sections",
       title: "Settings",
     },
@@ -73,6 +75,39 @@ const en = {
       unknownBrowser: "Unknown browser",
       unknownDevice: "Unknown device",
       unknownIp: "Unknown IP",
+    },
+    terms: {
+      cancel: "Cancel",
+      delay: "Extra delay",
+      delayDescription: "Days added to the due date for each extra round.",
+      delayInvalid: "Enter a whole number of days between 0 and {max}.",
+      delaySuffix: "days",
+      description:
+        "Defaults applied to your new clients and projects. You can still adjust them per project.",
+      includedRounds: "Included rounds",
+      includedRoundsDescription: "Revision rounds covered by the flat fee.",
+      loadErrorDescription: "Check your connection and try again.",
+      loadErrorTitle: "Couldn't load your plan terms",
+      price: "Extra round price",
+      priceDescription:
+        "Excluding VAT. Enter 0 to offer extra rounds for free.",
+      priceInvalid:
+        "Enter an amount between 0 and {max} with at most two decimals.",
+      priceSuffix: "{currency} excl. VAT",
+      requirePayment: "Payment before opening",
+      requirePaymentDescription:
+        "Your client pays for an extra round before it opens.",
+      retry: "Try again",
+      save: "Save changes",
+      saved: "Plan terms saved.",
+      saveError: "Couldn't save your changes. Try again.",
+      saving: "Saving…",
+      scope: "Round scope",
+      scopeDeliverable: "Per deliverable",
+      scopeDescription:
+        "Count included rounds for each deliverable or across the whole project.",
+      scopeProject: "Per project",
+      title: "Plan terms",
     },
     workspace: {
       cancel: "Cancel",
@@ -231,11 +266,12 @@ const fr: Messages = {
       sessions: "Sessions actives",
       signIn: "Se connecter",
       signOut: "Se déconnecter",
+      terms: "Conditions de forfait",
       workspace: "Espace de travail",
     },
     nav: {
       description:
-        "Gérez votre espace de travail, votre sécurité et vos appareils connectés.",
+        "Gérez votre espace de travail, vos conditions de forfait, votre sécurité et vos appareils connectés.",
       label: "Sections des réglages",
       title: "Réglages",
     },
@@ -298,6 +334,41 @@ const fr: Messages = {
       unknownBrowser: "Navigateur inconnu",
       unknownDevice: "Appareil inconnu",
       unknownIp: "IP inconnue",
+    },
+    terms: {
+      cancel: "Annuler",
+      delay: "Délai additionnel",
+      delayDescription:
+        "Jours ajoutés à l'échéance pour chaque tour supplémentaire.",
+      delayInvalid: "Saisissez un nombre entier de jours entre 0 et {max}.",
+      delaySuffix: "jours",
+      description:
+        "Valeurs appliquées par défaut à vos nouveaux clients et projets. Vous pouvez les ajuster par projet.",
+      includedRounds: "Tours inclus",
+      includedRoundsDescription:
+        "Nombre de tours de révision couverts par le forfait.",
+      loadErrorDescription: "Vérifiez votre connexion et réessayez.",
+      loadErrorTitle: "Impossible de charger vos conditions de forfait",
+      price: "Prix du tour supplémentaire",
+      priceDescription:
+        "Hors taxes. Saisissez 0 pour offrir les tours supplémentaires.",
+      priceInvalid:
+        "Saisissez un montant entre 0 et {max}, avec au plus deux décimales.",
+      priceSuffix: "{currency} HT",
+      requirePayment: "Paiement avant ouverture",
+      requirePaymentDescription:
+        "Le client règle le tour supplémentaire avant son ouverture.",
+      retry: "Réessayer",
+      save: "Enregistrer",
+      saved: "Conditions de forfait enregistrées.",
+      saveError: "Impossible d'enregistrer vos modifications. Réessayez.",
+      saving: "Enregistrement…",
+      scope: "Portée des tours",
+      scopeDeliverable: "Par livrable",
+      scopeDescription:
+        "Les tours inclus sont comptés pour chaque livrable ou sur l'ensemble du projet.",
+      scopeProject: "Par projet",
+      title: "Conditions de forfait",
     },
     workspace: {
       cancel: "Annuler",
