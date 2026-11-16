@@ -422,7 +422,7 @@ export function ReviewView({
   }
 
   const { includedRounds } = project.data.termsSnapshot;
-  const currentRound = deliverable.review.currentRound?.number ?? 0;
+  const currentRound = deliverable.review.currentRound?.position ?? 0;
   const readyVersions = (versions.data ?? []).filter(
     (item) => item.status !== "uploading"
   );

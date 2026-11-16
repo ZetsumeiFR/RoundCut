@@ -1,5 +1,11 @@
-import { ROUND_TRANSITIONS, type RoundEvent } from "@roundcut/db/round";
+import type { Database } from "@roundcut/db";
+import {
+  ROUND_TRANSITIONS,
+  type RoundEvent,
+  roundPositions,
+} from "@roundcut/db/round";
 import { deliverable } from "@roundcut/db/schema/deliverable";
+import { project } from "@roundcut/db/schema/project";
 import { round } from "@roundcut/db/schema/round";
 import { version } from "@roundcut/db/schema/version";
 import { asc, desc, eq, inArray } from "drizzle-orm";
@@ -27,6 +33,24 @@ export function roundTransition(event: RoundEvent, at = new Date()) {
   };
 }
 
+// Where each round of a project stands in the "round n of included" counter
+// (ROUND-02), under the scope of the project's revision terms.
+export async function projectRoundPositions(db: Database, projectId: string) {
+  const [owner] = await db
+    .select({ termsSnapshot: project.termsSnapshot })
+    .from(project)
+    .where(eq(project.id, projectId));
+  if (!owner) {
+    return new Map<string, number>();
+  }
+  const rounds = await db
+    .select({ id: round.id, number: round.number, openedAt: round.openedAt })
+    .from(round)
+    .innerJoin(deliverable, eq(round.deliverableId, deliverable.id))
+    .where(eq(deliverable.projectId, projectId));
+  return roundPositions(rounds, owner.termsSnapshot.scope);
+}
+
 export const roundRouter = {
   // Every round of the project's deliverables with its version and dates,
   // latest first within each deliverable.
@@ -38,7 +62,7 @@ export const roundRouter = {
         context.session.user,
         projectId
       );
-      return await context.db
+      const rounds = await context.db
         .select({
           closedAt: round.closedAt,
           closedReason: round.closedReason,
@@ -56,5 +80,10 @@ export const roundRouter = {
         .innerJoin(version, eq(round.versionId, version.id))
         .where(eq(deliverable.projectId, owned.id))
         .orderBy(asc(deliverable.position), desc(round.number));
+      const positions = await projectRoundPositions(context.db, owned.id);
+      return rounds.map((item) => ({
+        ...item,
+        position: positions.get(item.id) ?? item.number,
+      }));
     }),
 };

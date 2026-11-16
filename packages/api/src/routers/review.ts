@@ -24,7 +24,7 @@ import { reviewTokenSchema } from "../review-link";
 import { isAllowedReviewer, reviewerIdentitySchema } from "../reviewer";
 import type { FrameRate } from "../timecode";
 import { findReviewVersion, requireReviewer } from "./comment";
-import { roundTransition } from "./round";
+import { projectRoundPositions, roundTransition } from "./round";
 import { thumbnailUrl } from "./version";
 import { brandOf } from "./workspace";
 
@@ -264,6 +264,7 @@ export const reviewRouter = {
         .from(project)
         .where(eq(project.id, projectId));
       const current = await findVersionRound(context.db, target.id);
+      const positions = await projectRoundPositions(context.db, projectId);
       return {
         // Final approval (date and decider) is recorded by APPR-01 (#54).
         approval: null as { approvedAt: Date; approverName: string } | null,
@@ -273,6 +274,7 @@ export const reviewRouter = {
           ? {
               ...current,
               batchCount: await batchSize(context.db, current.id),
+              position: positions.get(current.id) ?? current.number,
             }
           : null,
       };
@@ -315,7 +317,9 @@ export const reviewRouter = {
         count: total,
         projectId,
         reviewerName: author.name,
-        roundNumber: saved.number,
+        roundNumber:
+          (await projectRoundPositions(context.db, projectId)).get(saved.id) ??
+          saved.number,
         versionId: target.id,
       });
       return { ...saved, count: total };

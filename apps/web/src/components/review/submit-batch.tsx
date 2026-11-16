@@ -36,7 +36,8 @@ import { client as api, orpc } from "@/utils/orpc";
 type SubmitMessages = Messages["review"]["submit"];
 
 interface BannerRound {
-  number: number;
+  // Place in the counter, per deliverable or per project (ROUND-02).
+  position: number;
   status: RoundStatus;
 }
 
@@ -48,11 +49,11 @@ function bannerLines(
   includedRounds: number,
   messages: SubmitMessages
 ) {
-  const extra = round.number > includedRounds;
-  const lastIncluded = round.number === includedRounds;
+  const extra = round.position > includedRounds;
+  const lastIncluded = round.position === includedRounds;
   const exhausted = extra || (lastIncluded && round.status !== "open");
   const label = formatMessage(extra ? messages.extraRound : messages.round, {
-    current: round.number,
+    current: round.position,
     included: includedRounds,
   });
   const lines: string[] = [];
@@ -67,7 +68,7 @@ function bannerLines(
     lines.push(messages.lastIncluded);
   }
   if (round.status === "closed") {
-    lines.push(formatMessage(messages.roundClosed, { round: round.number }));
+    lines.push(formatMessage(messages.roundClosed, { round: round.position }));
   }
   return { exhausted, lines, title: exhausted ? messages.exhausted : label };
 }
@@ -276,7 +277,7 @@ export function SubmitBatch({
         <Alert variant="info">
           <CircleCheckIcon aria-hidden="true" />
           <AlertTitle className="line-clamp-none">
-            {formatMessage(messages.submittedTitle, { round: round.number })}
+            {formatMessage(messages.submittedTitle, { round: round.position })}
           </AlertTitle>
           <AlertDescription>
             <p>
@@ -327,7 +328,7 @@ export function SubmitBatch({
         onConfirm={handleConfirm}
         onOpenChange={setConfirming}
         open={confirming}
-        roundNumber={round.number}
+        roundNumber={round.position}
         workspaceName={workspaceName}
       />
     </div>
