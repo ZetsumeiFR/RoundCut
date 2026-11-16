@@ -128,19 +128,19 @@ function DeliverableCell({
   );
 }
 function RoundCell({
+  current,
   included,
   messages,
-  used,
 }: {
+  current: number;
   included: number;
   messages: ViewMessages;
-  used: number;
 }) {
-  const ratio = included > 0 ? Math.min(used / included, 1) : 1;
-  const exhausted = used >= included;
+  const ratio = included > 0 ? Math.min(current / included, 1) : 1;
+  const exhausted = current >= included;
   return (
     <div
-      aria-label={formatMessage(messages.roundLabel, { included, used })}
+      aria-label={formatMessage(messages.roundLabel, { current, included })}
       className="flex items-center gap-2"
       role="img"
     >
@@ -153,7 +153,7 @@ function RoundCell({
           r={RING_RADIUS}
           strokeWidth="3"
         />
-        {used > 0 ? (
+        {current > 0 ? (
           <circle
             className={cn(exhausted ? "stroke-warning" : "stroke-primary")}
             cx="12"
@@ -168,7 +168,7 @@ function RoundCell({
         ) : null}
       </svg>
       <span className="text-sm tabular-nums">
-        {formatMessage(messages.round, { current: used, included })}
+        {formatMessage(messages.round, { current, included })}
       </span>
     </div>
   );
@@ -242,12 +242,12 @@ function buildColumns(
       size: 160,
     },
     {
-      accessorFn: (deliverable) => deliverable.review.roundsUsed,
+      accessorFn: (deliverable) => deliverable.review.currentRound?.number ?? 0,
       cell: ({ row }) => (
         <RoundCell
+          current={row.original.review.currentRound?.number ?? 0}
           included={includedRounds}
           messages={view}
-          used={row.original.review.roundsUsed}
         />
       ),
       header: ({ column }) => <SortableHeader column={column} />,

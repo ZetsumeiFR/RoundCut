@@ -1,8 +1,10 @@
 import { ORPCError } from "@orpc/server";
 import { projectStatusSources } from "@roundcut/db/project-status";
+import type { RoundStatus } from "@roundcut/db/round";
 import { client } from "@roundcut/db/schema/client";
 import { deliverable } from "@roundcut/db/schema/deliverable";
 import { project } from "@roundcut/db/schema/project";
+import { round } from "@roundcut/db/schema/round";
 import { version } from "@roundcut/db/schema/version";
 import { and, asc, desc, eq, inArray, isNull, max, ne } from "drizzle-orm";
 import z from "zod";
@@ -20,14 +22,15 @@ type ProjectRow = typeof project.$inferSelect;
 type Deliverable = ReturnType<typeof toDeliverable>;
 
 export interface ReviewActivity {
+  // Latest round, opened when its version was published (VER-04).
+  currentRound: { number: number; status: RoundStatus } | null;
   latestVersion: { number: number } | null;
   openComments: number;
-  roundsUsed: number;
 }
 
-// Rounds and comments don't exist yet (ROUND-01, REV-04): until they ship,
-// every deliverable reads as having no round used and no open feedback.
-const NO_ROUND_ACTIVITY = { openComments: 0, roundsUsed: 0 };
+// Comments don't exist yet (REV-04): until they ship, every deliverable reads
+// as having no open feedback.
+const NO_OPEN_COMMENTS = 0;
 
 export interface DashboardIndicators {
   // Amount still to bill: flat fees and accepted extra rounds (BILL-01).
@@ -239,6 +242,20 @@ export const projectRouter = {
       const latestNumbers = new Map(
         latest.map((item) => [item.deliverableId, item.number])
       );
+      const rounds = await context.db
+        .select({
+          deliverableId: round.deliverableId,
+          number: round.number,
+          status: round.status,
+        })
+        .from(round)
+        .innerJoin(deliverable, eq(round.deliverableId, deliverable.id))
+        .where(eq(deliverable.projectId, row.project.id))
+        .orderBy(asc(round.number));
+      // Ascending order: the last round seen per deliverable is its latest.
+      const currentRounds = new Map(
+        rounds.map(({ deliverableId, ...current }) => [deliverableId, current])
+      );
       return toProject(
         row.project,
         row.client,
@@ -247,8 +264,9 @@ export const projectRouter = {
           return {
             ...toDeliverable(item),
             review: {
-              ...NO_ROUND_ACTIVITY,
+              currentRound: currentRounds.get(item.id) ?? null,
               latestVersion: number ? { number } : null,
+              openComments: NO_OPEN_COMMENTS,
             },
           };
         })
