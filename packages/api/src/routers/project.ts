@@ -7,7 +7,11 @@ import { and, asc, desc, eq, inArray, isNull } from "drizzle-orm";
 import z from "zod";
 
 import { protectedProcedure } from "../index";
-import { projectSchema, projectStatusSchema } from "../project";
+import {
+  projectDuplicateSchema,
+  projectSchema,
+  projectStatusSchema,
+} from "../project";
 import { toDeliverable } from "./deliverable";
 import { getOrCreateWorkspace } from "./workspace";
 
@@ -127,6 +131,75 @@ export const projectRouter = {
         });
       }
     ),
+  duplicate: protectedProcedure
+    .input(projectDuplicateSchema)
+    .handler(async ({ context, input: { copyDeliverables, id, name } }) => {
+      const workspace = await getOrCreateWorkspace(
+        context.db,
+        context.session.user
+      );
+      const [source] = await context.db
+        .select({
+          client: {
+            archivedAt: client.archivedAt,
+            id: client.id,
+            name: client.name,
+          },
+          project,
+        })
+        .from(project)
+        .innerJoin(client, eq(project.clientId, client.id))
+        .where(and(eq(project.id, id), eq(project.workspaceId, workspace.id)));
+      // Other workspaces' projects read as missing so their ids leak nothing.
+      if (!source) {
+        throw new ORPCError("NOT_FOUND", { message: "Project not found" });
+      }
+      // Like creation, new projects only go to active clients.
+      if (source.client.archivedAt) {
+        throw new ORPCError("CONFLICT", { message: "Client is archived" });
+      }
+      const owner = { id: source.client.id, name: source.client.name };
+      return await context.db.transaction(async (tx) => {
+        // The copy starts over: draft status, no target date, and the plan
+        // terms agreed on the source rather than the client's current ones.
+        const [row] = await tx
+          .insert(project)
+          .values({
+            clientId: owner.id,
+            flatFeeCents: source.project.flatFeeCents,
+            name,
+            termsSnapshot: source.project.termsSnapshot,
+            workspaceId: workspace.id,
+          })
+          .returning();
+        if (!row) {
+          throw new Error("Project insert returned no row");
+        }
+        const items = copyDeliverables
+          ? await tx
+              .select({
+                aspect: deliverable.aspect,
+                position: deliverable.position,
+                targetDurationSeconds: deliverable.targetDurationSeconds,
+                title: deliverable.title,
+              })
+              .from(deliverable)
+              .where(eq(deliverable.projectId, source.project.id))
+          : [];
+        const created =
+          items.length > 0
+            ? await tx
+                .insert(deliverable)
+                .values(items.map((item) => ({ ...item, projectId: row.id })))
+                .returning()
+            : [];
+        return toProject(
+          row,
+          owner,
+          created.sort((a, b) => a.position - b.position).map(toDeliverable)
+        );
+      });
+    }),
   get: protectedProcedure
     .input(z.object({ id: z.string().min(1) }))
     .handler(async ({ context, input: { id } }) => {
