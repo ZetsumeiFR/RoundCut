@@ -9,7 +9,7 @@ import {
   uniqueIndex,
 } from "drizzle-orm/pg-core";
 
-import type { VersionStatus } from "../version";
+import type { ClientDownloadPolicy, VersionStatus } from "../version";
 import { user } from "./auth";
 import { deliverable } from "./deliverable";
 
@@ -20,6 +20,10 @@ import { deliverable } from "./deliverable";
 export const version = pgTable(
   "version",
   {
+    clientDownload: text("client_download")
+      .$type<ClientDownloadPolicy>()
+      .default("off")
+      .notNull(),
     contentType: text("content_type").notNull(),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     deliverableId: text("deliverable_id")

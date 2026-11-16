@@ -2,6 +2,10 @@
 
 import { ORPCError } from "@orpc/client";
 import type { Locale } from "@roundcut/auth/locale";
+import {
+  CLIENT_DOWNLOAD_POLICIES,
+  type ClientDownloadPolicy,
+} from "@roundcut/db/version";
 import { Button } from "@roundcut/ui/components/button";
 import {
   Empty,
@@ -28,10 +32,11 @@ import {
 } from "@roundcut/ui/components/select";
 import { Separator } from "@roundcut/ui/components/separator";
 import { Skeleton } from "@roundcut/ui/components/skeleton";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   CircleAlertIcon,
   CloudUploadIcon,
+  DownloadIcon,
   MessageSquareIcon,
   SearchXIcon,
   UploadIcon,
@@ -40,6 +45,7 @@ import {
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { type ReactNode, useCallback, useState } from "react";
+import { toast } from "sonner";
 
 import {
   type UploadTarget,
@@ -118,6 +124,105 @@ function FeedbackPanel({ messages }: { messages: ProjectsMessages["player"] }) {
         </Empty>
       </FramePanel>
     </Frame>
+  );
+}
+
+const isClientDownloadPolicy = (
+  value: unknown
+): value is ClientDownloadPolicy =>
+  CLIENT_DOWNLOAD_POLICIES.some((policy) => policy === value);
+
+// The editor downloads the original file and decides, per version, whether
+// the client may download it too (VER-07).
+function DownloadControls({
+  clientCanDownload,
+  clientDownload,
+  messages,
+  versionId,
+}: {
+  clientCanDownload: boolean;
+  clientDownload: ClientDownloadPolicy;
+  messages: ProjectsMessages["player"]["download"];
+  versionId: string;
+}) {
+  const queryClient = useQueryClient();
+  const [saving, setSaving] = useState(false);
+  const [downloading, setDownloading] = useState(false);
+
+  const handlePolicyChange = useCallback(
+    async (value: unknown) => {
+      if (!isClientDownloadPolicy(value) || value === clientDownload) {
+        return;
+      }
+      setSaving(true);
+      try {
+        await client.version.updateClientDownload({
+          clientDownload: value,
+          id: versionId,
+        });
+        toast.success(messages.saved);
+      } catch {
+        toast.error(messages.saveError);
+      } finally {
+        await queryClient.invalidateQueries({
+          queryKey: orpc.version.key(),
+        });
+        setSaving(false);
+      }
+    },
+    [clientDownload, messages, queryClient, versionId]
+  );
+
+  const handleDownload = useCallback(async () => {
+    setDownloading(true);
+    try {
+      const { url } = await client.version.downloadUrl({ id: versionId });
+      // The signed URL answers as an attachment: the page stays put.
+      window.location.assign(url);
+    } catch {
+      toast.error(messages.error);
+    } finally {
+      setDownloading(false);
+    }
+  }, [messages.error, versionId]);
+
+  return (
+    <>
+      <Select
+        disabled={saving}
+        onValueChange={handlePolicyChange}
+        value={clientDownload}
+      >
+        <SelectTrigger
+          aria-label={messages.clientLabel}
+          className="w-auto"
+          size="sm"
+          title={clientCanDownload ? messages.available : messages.unavailable}
+        >
+          <SelectValue>{messages.policies[clientDownload]}</SelectValue>
+        </SelectTrigger>
+        <SelectContent>
+          <SelectGroup>
+            {CLIENT_DOWNLOAD_POLICIES.map((policy) => (
+              <SelectItem key={policy} value={policy}>
+                {messages.policies[policy]}
+              </SelectItem>
+            ))}
+          </SelectGroup>
+        </SelectContent>
+      </Select>
+      <Button
+        aria-label={messages.action}
+        disabled={downloading}
+        onClick={handleDownload}
+        size="icon-sm"
+        title={messages.action}
+        type="button"
+        variant="outline"
+      >
+        <DownloadIcon aria-hidden="true" />
+      </Button>
+    </>
   );
 }
 
@@ -276,7 +381,7 @@ export function ReviewView({
             </p>
           </div>
         </div>
-        <div className="flex shrink-0 flex-wrap items-center gap-2">
+        <div className="flex min-w-0 flex-wrap items-center gap-2">
           {currentRound > 0 ? (
             <Badge
               size="lg"
@@ -310,6 +415,14 @@ export function ReviewView({
               </SelectGroup>
             </SelectContent>
           </Select>
+          {playable ? (
+            <DownloadControls
+              clientCanDownload={version.data.clientCanDownload}
+              clientDownload={version.data.clientDownload}
+              messages={player.download}
+              versionId={versionId}
+            />
+          ) : null}
           <Button onClick={openUpload} size="sm" type="button">
             <UploadIcon aria-hidden="true" data-icon="inline-start" />
             {player.newVersion}

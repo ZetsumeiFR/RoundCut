@@ -3,6 +3,10 @@ import type { Database } from "@roundcut/db";
 import { deliverable } from "@roundcut/db/schema/deliverable";
 import { project } from "@roundcut/db/schema/project";
 import { version } from "@roundcut/db/schema/version";
+import {
+  CLIENT_DOWNLOAD_POLICIES,
+  clientCanDownload,
+} from "@roundcut/db/version";
 import { and, desc, eq } from "drizzle-orm";
 import z from "zod";
 
@@ -14,6 +18,8 @@ import { getOrCreateWorkspace } from "./workspace";
 type VersionRow = typeof version.$inferSelect;
 
 export const toVersion = (row: VersionRow) => ({
+  clientCanDownload: clientCanDownload(row.clientDownload, row.status),
+  clientDownload: row.clientDownload,
   contentType: row.contentType,
   createdAt: row.createdAt,
   deliverableId: row.deliverableId,
@@ -80,7 +86,28 @@ export async function findOwnedVersion(
   return row.version;
 }
 
+const assertPublished = (row: VersionRow) => {
+  if (row.status === "uploading") {
+    throw new ORPCError("CONFLICT", {
+      message: "Version is still uploading",
+    });
+  }
+};
+
 export const versionRouter = {
+  // The editor can always download the original file; the client's access
+  // follows clientDownload (VER-07) once the review link exists (REV-01).
+  downloadUrl: protectedProcedure
+    .input(z.object({ id: z.string().min(1) }))
+    .handler(async ({ context, input: { id } }) => {
+      const workspace = await getOrCreateWorkspace(
+        context.db,
+        context.session.user
+      );
+      const row = await findOwnedVersion(context.db, workspace.id, id);
+      assertPublished(row);
+      return { url: await context.storage.signGet(row.r2Key, row.fileName) };
+    }),
   get: protectedProcedure
     .input(z.object({ id: z.string().min(1) }))
     .handler(async ({ context, input: { id } }) => {
@@ -123,11 +150,31 @@ export const versionRouter = {
         context.session.user
       );
       const row = await findOwnedVersion(context.db, workspace.id, id);
-      if (row.status === "uploading") {
-        throw new ORPCError("CONFLICT", {
-          message: "Version is still uploading",
-        });
-      }
+      assertPublished(row);
       return { url: await context.storage.signGet(row.r2Key) };
+    }),
+  updateClientDownload: protectedProcedure
+    .input(
+      z.object({
+        clientDownload: z.enum(CLIENT_DOWNLOAD_POLICIES),
+        id: z.string().min(1),
+      })
+    )
+    .handler(async ({ context, input: { clientDownload, id } }) => {
+      const workspace = await getOrCreateWorkspace(
+        context.db,
+        context.session.user
+      );
+      const row = await findOwnedVersion(context.db, workspace.id, id);
+      assertPublished(row);
+      const [updated] = await context.db
+        .update(version)
+        .set({ clientDownload })
+        .where(eq(version.id, row.id))
+        .returning();
+      if (!updated) {
+        throw new ORPCError("NOT_FOUND", { message: "Version not found" });
+      }
+      return await withThumbnail(context.storage, updated);
     }),
 };

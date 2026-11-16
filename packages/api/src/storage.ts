@@ -26,6 +26,12 @@ export interface StorageConfig {
 // Presigned URLs stay short-lived (§9: at most one hour).
 const URL_TTL_SECONDS = 60 * 60;
 
+const NON_ASCII_OR_QUOTE = /[^\x20-\x7e]|["\\]/g;
+
+// RFC 6266: an ASCII fallback for old clients plus the UTF-8 file name.
+const contentDisposition = (fileName: string) =>
+  `attachment; filename="${fileName.replace(NON_ASCII_OR_QUOTE, "_")}"; filename*=UTF-8''${encodeURIComponent(fileName)}`;
+
 export function createStorage(config: StorageConfig) {
   const bucket = config.R2_BUCKET;
   const s3 = new S3Client({
@@ -150,10 +156,18 @@ export function createStorage(config: StorageConfig) {
       return await object.Body.transformToByteArray();
     },
 
-    signGet(key: string) {
+    // With a file name, the URL downloads the object under that name instead
+    // of playing it inline.
+    signGet(key: string, downloadAs?: string) {
       return getSignedUrl(
         s3,
-        new GetObjectCommand({ Bucket: bucket, Key: key }),
+        new GetObjectCommand({
+          Bucket: bucket,
+          Key: key,
+          ResponseContentDisposition: downloadAs
+            ? contentDisposition(downloadAs)
+            : undefined,
+        }),
         {
           expiresIn: URL_TTL_SECONDS,
         }
