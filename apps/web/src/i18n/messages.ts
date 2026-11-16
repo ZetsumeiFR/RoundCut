@@ -624,6 +624,21 @@ const en = {
     },
     description:
       "Each project belongs to a client and keeps the plan terms agreed when it was created.",
+    duplicate: {
+      action: "Duplicate",
+      copyDeliverables: "Copy the deliverables list",
+      copyDeliverablesDescription:
+        "Recreates {count} as new drafts, without versions or feedback.",
+      defaultName: "{name} (copy)",
+      description:
+        "The copy keeps the client, plan terms and flat fee of {name}. It starts as a draft, without a target date or review history.",
+      error: "Couldn't duplicate this project. Try again.",
+      name: "New project name",
+      saved: "{name} created from {source}",
+      submit: "Duplicate",
+      submitting: "Duplicating…",
+      title: "Duplicate this project",
+    },
     empty: {
       action: "Create your first project",
       description:
@@ -1402,6 +1417,21 @@ const fr: Messages = {
     },
     description:
       "Chaque projet appartient à un client et garde les conditions de forfait convenues à sa création.",
+    duplicate: {
+      action: "Dupliquer",
+      copyDeliverables: "Copier la liste des livrables",
+      copyDeliverablesDescription:
+        "Recrée {count} en brouillon, sans versions ni retours.",
+      defaultName: "{name} (copie)",
+      description:
+        "La copie reprend le client, les conditions de forfait et le montant du forfait de {name}. Elle démarre en brouillon, sans date cible ni historique de revue.",
+      error: "Impossible de dupliquer ce projet. Réessayez.",
+      name: "Nom du nouveau projet",
+      saved: "{name} créé à partir de {source}",
+      submit: "Dupliquer",
+      submitting: "Duplication…",
+      title: "Dupliquer ce projet",
+    },
     empty: {
       action: "Créer votre premier projet",
       description:

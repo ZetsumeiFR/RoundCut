@@ -55,6 +55,7 @@ import {
 import {
   CircleAlertIcon,
   ClapperboardIcon,
+  CopyIcon,
   FolderIcon,
   HistoryIcon,
   PlusIcon,
@@ -72,6 +73,7 @@ import { formatMessage, type Messages } from "@/i18n/messages";
 import { orpc } from "@/utils/orpc";
 import { deliverableCountLabel, formatDuration } from "./deliverable-form";
 import { DeliverablesSheet } from "./deliverables-sheet";
+import { DuplicateProjectDialog } from "./duplicate-project-dialog";
 import { formatTargetDate } from "./project-sheet";
 import { STATUS_BADGES } from "./projects-view";
 
@@ -461,10 +463,12 @@ function SettingsTab({
 function ProjectHeader({
   locale,
   messages,
+  onDuplicate,
   project,
 }: {
   locale: Locale;
   messages: ProjectsMessages;
+  onDuplicate: () => void;
   project: ProjectDetails;
 }) {
   return (
@@ -493,6 +497,15 @@ function ProjectHeader({
         <Badge size="lg" variant={STATUS_BADGES[project.status]}>
           {messages.status[project.status]}
         </Badge>
+        <Button
+          className="ms-auto"
+          onClick={onDuplicate}
+          type="button"
+          variant="outline"
+        >
+          <CopyIcon aria-hidden="true" data-icon="inline-start" />
+          {messages.duplicate.action}
+        </Button>
       </div>
       <p className="text-muted-foreground text-sm">
         {project.client.name}
@@ -551,6 +564,8 @@ export function ProjectView({
   const workspace = useQuery(orpc.workspace.get.queryOptions());
   const [deliverablesOpen, setDeliverablesOpen] = useState(false);
   const openDeliverables = useCallback(() => setDeliverablesOpen(true), []);
+  const [duplicateOpen, setDuplicateOpen] = useState(false);
+  const openDuplicate = useCallback(() => setDuplicateOpen(true), []);
   const { view } = messages;
 
   const refetchProject = project.refetch;
@@ -597,6 +612,7 @@ export function ProjectView({
       <ProjectHeader
         locale={locale}
         messages={messages}
+        onDuplicate={openDuplicate}
         project={project.data}
       />
       <Tabs defaultValue="deliverables">
@@ -641,6 +657,13 @@ export function ProjectView({
         messages={messages}
         onOpenChange={setDeliverablesOpen}
         project={deliverablesOpen ? project.data : undefined}
+      />
+      <DuplicateProjectDialog
+        locale={locale}
+        messages={messages}
+        onOpenChange={setDuplicateOpen}
+        open={duplicateOpen}
+        source={project.data}
       />
     </>
   );

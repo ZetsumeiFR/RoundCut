@@ -25,6 +25,14 @@ export const projectSchema = z.object({
 
 export type ProjectInput = z.input<typeof projectSchema>;
 
+// A copy keeps the client, plan terms and flat fee of its source (PRJ-06);
+// its deliverables are new drafts, recreated from the source's list on demand.
+export const projectDuplicateSchema = z.object({
+  copyDeliverables: z.boolean().default(false),
+  id: z.string().min(1),
+  name: z.string().trim().min(1).max(PROJECT_NAME_MAX_LENGTH),
+});
+
 export const projectStatusSchema = z.object({
   id: z.string().min(1),
   status: z.enum(PROJECT_STATUSES),
