@@ -464,13 +464,14 @@ const en = {
       countOther: "{count} projects",
       due: "Due {when}",
       empty: {
-        action: "Create a project",
         description:
-          "Create a project for a client: it starts with your default plan terms, which you can adjust per project.",
+          "Pick a plan template to prefill its terms, or start from your default terms. You can still adjust them per project.",
+        editDefaults: "Edit your default terms",
         noClientAction: "Add a client",
-        templatesTitle: "Your default plan",
-        templateTerms: "{price} per extra round",
-        title: "No projects yet",
+        noClientHint: "Add a client first: every project belongs to one.",
+        templatesTitle: "Start from a plan template",
+        templateTerms: "{rounds} · {price} per extra round",
+        title: "Create your first project",
       },
       filteredEmpty: {
         action: "Clear filters",
@@ -679,6 +680,8 @@ const en = {
       targetDateInTwoWeeks: "In two weeks",
       targetDateNone: "No target date",
       targetDatePick: "Confirm",
+      templateApplied:
+        "Prefilled from the “{template}” template. When off, the project uses the inherited terms.",
     },
     grid: {
       empty: "No projects",
@@ -718,6 +721,24 @@ const en = {
       changed: "{name}: {status}",
       error: "Couldn't change this project's status. Try again.",
       moveTo: "Mark as “{status}”",
+    },
+    templates: {
+      brand: {
+        description: "Brand films and commercials, rounds counted per project",
+        name: "Brand film",
+      },
+      corporate: {
+        description: "Interviews, events and company videos",
+        name: "Corporate video",
+      },
+      default: {
+        description: "Your workspace terms, or the client's own",
+        name: "Your default terms",
+      },
+      social: {
+        description: "Reels, shorts and stories delivered in batches",
+        name: "Social media",
+      },
     },
     title: "Projects",
     view: {
@@ -1256,13 +1277,15 @@ const fr: Messages = {
       countOther: "{count} projets",
       due: "Échéance {when}",
       empty: {
-        action: "Créer un projet",
         description:
-          "Créez un projet pour un client : il reprend vos conditions de forfait par défaut, ajustables projet par projet.",
+          "Choisissez un modèle de forfait pour préremplir ses conditions, ou partez de vos conditions par défaut. Elles restent ajustables projet par projet.",
+        editDefaults: "Modifier vos conditions par défaut",
         noClientAction: "Ajouter un client",
-        templatesTitle: "Votre forfait par défaut",
-        templateTerms: "{price} le tour supplémentaire",
-        title: "Aucun projet pour l'instant",
+        noClientHint:
+          "Ajoutez d'abord un client : chaque projet appartient à un client.",
+        templatesTitle: "Partir d'un modèle de forfait",
+        templateTerms: "{rounds} · {price} le tour supplémentaire",
+        title: "Créez votre premier projet",
       },
       filteredEmpty: {
         action: "Effacer les filtres",
@@ -1473,6 +1496,8 @@ const fr: Messages = {
       targetDateInTwoWeeks: "Dans deux semaines",
       targetDateNone: "Pas de date cible",
       targetDatePick: "Valider",
+      templateApplied:
+        "Prérempli avec le modèle « {template} ». Désactivé, le projet reprend les conditions héritées.",
     },
     grid: {
       empty: "Aucun projet",
@@ -1513,6 +1538,24 @@ const fr: Messages = {
       changed: "{name} : {status}",
       error: "Impossible de changer le statut de ce projet. Réessayez.",
       moveTo: "Passer en « {status} »",
+    },
+    templates: {
+      brand: {
+        description: "Films de marque et publicités, tours comptés par projet",
+        name: "Film de marque",
+      },
+      corporate: {
+        description: "Interviews, événements et vidéos d'entreprise",
+        name: "Vidéo corporate",
+      },
+      default: {
+        description: "Celles de votre espace, ou propres au client",
+        name: "Vos conditions par défaut",
+      },
+      social: {
+        description: "Reels, shorts et stories livrés par lots",
+        name: "Réseaux sociaux",
+      },
     },
     title: "Projets",
     view: {

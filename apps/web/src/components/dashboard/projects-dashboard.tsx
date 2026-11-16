@@ -5,6 +5,7 @@ import {
   PROJECT_STATUSES,
   type ProjectStatus,
 } from "@roundcut/db/project-status";
+import type { RevisionTerms } from "@roundcut/db/revision-terms";
 import { Button } from "@roundcut/ui/components/button";
 import {
   Empty,
@@ -42,6 +43,7 @@ import {
 import { Skeleton } from "@roundcut/ui/components/skeleton";
 import { useQuery } from "@tanstack/react-query";
 import {
+  BriefcaseIcon,
   ChevronRightIcon,
   CircleAlertIcon,
   ClapperboardIcon,
@@ -51,11 +53,19 @@ import {
   PlusIcon,
   RefreshCwIcon,
   SlidersHorizontalIcon,
+  SmartphoneIcon,
+  SparklesIcon,
 } from "lucide-react";
 import Link from "next/link";
-import { type ReactNode, useCallback, useMemo, useState } from "react";
+import { type ReactNode, useCallback, useId, useMemo, useState } from "react";
 
 import { deliverableCountLabel } from "@/components/projects/deliverable-form";
+import {
+  isPresetPlanTemplate,
+  PLAN_TEMPLATE_IDS,
+  type PlanTemplateId,
+  PRESET_PLAN_TEMPLATES,
+} from "@/components/projects/plan-templates";
 import type { Project } from "@/components/projects/project-sheet";
 import { STATUS_BADGES } from "@/components/projects/projects-view";
 import { formatMessage, type Messages } from "@/i18n/messages";
@@ -78,6 +88,12 @@ const INDICATOR_KEYS = [
 ] as const;
 // Late projects that are already approved or archived aren't overdue.
 const DONE_STATUSES: readonly ProjectStatus[] = ["approved", "archived"];
+const TEMPLATE_ICONS: Record<PlanTemplateId, ReactNode> = {
+  brand: <SparklesIcon aria-hidden="true" className="size-3.5" />,
+  corporate: <BriefcaseIcon aria-hidden="true" className="size-3.5" />,
+  default: <SlidersHorizontalIcon aria-hidden="true" className="size-3.5" />,
+  social: <SmartphoneIcon aria-hidden="true" className="size-3.5" />,
+};
 
 const plural = (locale: Locale, count: number, one: string, other: string) =>
   formatMessage(
@@ -344,25 +360,72 @@ function CardsSkeleton({ label }: { label: string }) {
   );
 }
 
-// Empty state adapted from ReUI empty-state-3: the quick start is the plan
-// new projects will follow.
+// Template card of the guided empty state: links to the creation sheet
+// prefilled with the template, inert until a client exists.
+function PlanTemplateItem({
+  enabled,
+  icon,
+  name,
+  description,
+  summary,
+  templateId,
+}: {
+  description: string;
+  enabled: boolean;
+  icon: ReactNode;
+  name: string;
+  summary: string;
+  templateId: PlanTemplateId;
+}) {
+  return (
+    <Item
+      className={
+        enabled
+          ? "min-w-0 flex-1 hover:bg-muted/30"
+          : "min-w-0 flex-1 opacity-60"
+      }
+      render={
+        enabled ? <Link href={`/projects?template=${templateId}`} /> : undefined
+      }
+      variant="outline"
+    >
+      <ItemMedia className="text-muted-foreground">{icon}</ItemMedia>
+      <ItemContent className="min-w-0">
+        <ItemTitle>{name}</ItemTitle>
+        <ItemDescription>{description}</ItemDescription>
+        <p className="text-foreground text-xs tabular-nums">{summary}</p>
+      </ItemContent>
+      {enabled ? (
+        <ItemActions className="ml-auto text-muted-foreground">
+          <ChevronRightIcon aria-hidden="true" className="size-4" />
+        </ItemActions>
+      ) : null}
+    </Item>
+  );
+}
+
+// Guided empty state adapted from ReUI empty-state-3 (PRJ-07): the first
+// project starts from a plan template.
 function DashboardEmpty({
   currency,
   hasClients,
   locale,
   messages,
+  templates,
   terms,
 }: {
   currency: string;
   hasClients: boolean;
   locale: Locale;
   messages: DashboardMessages;
-  terms: { extraRoundPriceCents: number; includedRounds: number };
+  templates: ProjectsMessages["templates"];
+  terms: RevisionTerms;
 }) {
+  const headingId = useId();
   const price = new Intl.NumberFormat(locale, {
     currency,
     style: "currency",
-  }).format(terms.extraRoundPriceCents / CENTS_PER_UNIT);
+  });
   const { empty } = messages;
   return (
     <FramePanel className="flex flex-col items-center gap-10 py-12">
@@ -376,48 +439,67 @@ function DashboardEmpty({
           </EmptyTitle>
           <EmptyDescription>{empty.description}</EmptyDescription>
         </EmptyHeader>
-        <EmptyContent>
-          {hasClients ? (
-            <Button nativeButton={false} render={<Link href="/projects" />}>
-              <PlusIcon aria-hidden="true" data-icon="inline-start" />
-              {empty.action}
-            </Button>
-          ) : (
+        {hasClients ? null : (
+          <EmptyContent>
             <Button nativeButton={false} render={<Link href="/clients" />}>
               <PlusIcon aria-hidden="true" data-icon="inline-start" />
               {empty.noClientAction}
             </Button>
-          )}
-        </EmptyContent>
+            <p className="text-muted-foreground text-xs">
+              {empty.noClientHint}
+            </p>
+          </EmptyContent>
+        )}
       </Empty>
-      <div className="flex w-full max-w-sm flex-col items-center gap-3">
-        <p className="text-muted-foreground text-sm">{empty.templatesTitle}</p>
-        <Item
-          className="min-w-0 hover:bg-muted/30"
-          render={<Link href="/account/terms" />}
-          variant="outline"
+      <section
+        aria-labelledby={headingId}
+        className="flex w-full max-w-2xl flex-col gap-3"
+      >
+        <h3
+          className="text-center text-muted-foreground text-sm"
+          id={headingId}
         >
-          <ItemMedia className="text-muted-foreground">
-            <SlidersHorizontalIcon aria-hidden="true" className="size-3.5" />
-          </ItemMedia>
-          <ItemContent className="min-w-0">
-            <ItemTitle>
-              {plural(
-                locale,
-                terms.includedRounds,
-                messages.includedRoundsOne,
-                messages.includedRoundsOther
-              )}
-            </ItemTitle>
-            <ItemDescription>
-              {formatMessage(empty.templateTerms, { price })}
-            </ItemDescription>
-          </ItemContent>
-          <ItemActions className="ml-auto text-muted-foreground">
-            <ChevronRightIcon aria-hidden="true" className="size-4" />
-          </ItemActions>
-        </Item>
-      </div>
+          {empty.templatesTitle}
+        </h3>
+        <ul className="grid gap-2 sm:grid-cols-2">
+          {PLAN_TEMPLATE_IDS.map((id) => {
+            const templateTerms = isPresetPlanTemplate(id)
+              ? PRESET_PLAN_TEMPLATES[id]
+              : terms;
+            return (
+              <li className="flex min-w-0" key={id}>
+                <PlanTemplateItem
+                  description={templates[id].description}
+                  enabled={hasClients}
+                  icon={TEMPLATE_ICONS[id]}
+                  name={templates[id].name}
+                  summary={formatMessage(empty.templateTerms, {
+                    price: price.format(
+                      templateTerms.extraRoundPriceCents / CENTS_PER_UNIT
+                    ),
+                    rounds: plural(
+                      locale,
+                      templateTerms.includedRounds,
+                      messages.includedRoundsOne,
+                      messages.includedRoundsOther
+                    ),
+                  })}
+                  templateId={id}
+                />
+              </li>
+            );
+          })}
+        </ul>
+        <Button
+          className="self-center"
+          nativeButton={false}
+          render={<Link href="/account/terms" />}
+          size="sm"
+          variant="link"
+        >
+          {empty.editDefaults}
+        </Button>
+      </section>
     </FramePanel>
   );
 }
@@ -547,6 +629,7 @@ export function ProjectsDashboard({
         hasClients={clients.data.length > 0}
         locale={locale}
         messages={messages}
+        templates={projectsMessages.templates}
         terms={workspace.data.revisionTerms}
       />
     );
