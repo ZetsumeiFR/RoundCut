@@ -7,6 +7,7 @@ import { deliverableRouter } from "./deliverable";
 import { projectRouter } from "./project";
 import { reviewRouter } from "./review";
 import { reviewLinkRouter } from "./review-link";
+import { roundRouter } from "./round";
 import { teamRouter } from "./team";
 import { uploadRouter } from "./upload";
 import { versionRouter } from "./version";
@@ -24,6 +25,7 @@ export const appRouter = {
   project: projectRouter,
   review: reviewRouter,
   reviewLink: reviewLinkRouter,
+  round: roundRouter,
   team: teamRouter,
   upload: uploadRouter,
   version: versionRouter,

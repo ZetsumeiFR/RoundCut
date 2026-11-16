@@ -28,7 +28,7 @@ const projectInput = z.object({ projectId: z.string().min(1) });
 const activeLinkOf = (projectId: string) =>
   and(eq(reviewLink.projectId, projectId), isNull(reviewLink.revokedAt));
 
-async function findOwnedProject(
+export async function findOwnedProject(
   db: Database,
   user: { id: string; name: string },
   projectId: string

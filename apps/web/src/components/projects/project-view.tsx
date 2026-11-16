@@ -4,6 +4,7 @@ import { ORPCError } from "@orpc/client";
 import type { AppRouterClient } from "@roundcut/api/routers/index";
 import type { Locale } from "@roundcut/auth/locale";
 import type { DeliverableStatus } from "@roundcut/db/deliverable";
+import type { RoundStatus } from "@roundcut/db/round";
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -88,6 +89,9 @@ type ViewMessages = ProjectsMessages["view"];
 type ProjectDetails = Awaited<ReturnType<AppRouterClient["project"]["get"]>>;
 type DeliverableRow = ProjectDetails["deliverables"][number];
 type DeliverableColumn = Column<DataGridFeatures, DeliverableRow, unknown>;
+type ProjectRound = Awaited<
+  ReturnType<AppRouterClient["round"]["list"]>
+>[number];
 
 const MAX_RETRIES = 3;
 const CENTS_PER_UNIT = 100;
@@ -102,6 +106,15 @@ const DELIVERABLE_BADGES: Record<
   approved: "success-light",
   draft: "outline",
   in_review: "info-light",
+};
+
+const ROUND_BADGES: Record<
+  RoundStatus,
+  "outline" | "info-light" | "warning-light"
+> = {
+  closed: "outline",
+  open: "info-light",
+  submitted: "warning-light",
 };
 
 const isNotFound = (error: unknown) =>
@@ -454,6 +467,196 @@ function DeliverablesTab({
   );
 }
 
+function RoundItem({
+  dateFormat,
+  messages,
+  projectId,
+  round,
+}: {
+  dateFormat: Intl.DateTimeFormat;
+  messages: ViewMessages;
+  projectId: string;
+  round: ProjectRound;
+}) {
+  const { rounds } = messages;
+  const dates = [
+    formatMessage(rounds.openedOn, {
+      date: dateFormat.format(new Date(round.openedAt)),
+    }),
+  ];
+  if (round.submittedAt) {
+    dates.push(
+      formatMessage(rounds.submittedOn, {
+        date: dateFormat.format(new Date(round.submittedAt)),
+      })
+    );
+  }
+  if (round.closedAt) {
+    const closed = formatMessage(rounds.closedOn, {
+      date: dateFormat.format(new Date(round.closedAt)),
+    });
+    dates.push(
+      round.closedReason
+        ? `${closed} (${rounds.closedReasons[round.closedReason]})`
+        : closed
+    );
+  }
+  return (
+    <li className="flex flex-col gap-1 px-4 py-3">
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="font-medium text-sm tabular-nums">
+          {formatMessage(rounds.round, { number: round.number })}
+        </span>
+        {round.kind === "included" ? null : (
+          <Badge variant="outline">{rounds.kinds[round.kind]}</Badge>
+        )}
+        <Link
+          className="text-muted-foreground text-sm tabular-nums underline-offset-4 transition-colors hover:text-primary hover:underline"
+          href={`/projects/${projectId}/versions/${round.version.id}`}
+        >
+          {formatMessage(messages.version, { number: round.version.number })}
+        </Link>
+        <Badge className="ms-auto" variant={ROUND_BADGES[round.status]}>
+          {rounds.statuses[round.status]}
+        </Badge>
+      </div>
+      <p className="text-muted-foreground text-xs tabular-nums">
+        {dates.join(" · ")}
+      </p>
+    </li>
+  );
+}
+
+// The rounds of every deliverable (ROUND-01), grouped by deliverable in the
+// order the API returns them.
+function RoundsTab({
+  locale,
+  messages,
+  projectId,
+}: {
+  locale: Locale;
+  messages: ProjectsMessages;
+  projectId: string;
+}) {
+  const { rounds: roundsMessages } = messages.view;
+  const rounds = useQuery(
+    orpc.round.list.queryOptions({
+      input: { projectId },
+      meta: { inlineError: true },
+    })
+  );
+  const dateFormat = useMemo(
+    () =>
+      new Intl.DateTimeFormat(locale, {
+        dateStyle: "medium",
+        timeStyle: "short",
+      }),
+    [locale]
+  );
+  const groups = useMemo(() => {
+    const byDeliverable = new Map<
+      string,
+      { id: string; items: ProjectRound[]; title: string }
+    >();
+    for (const item of rounds.data ?? []) {
+      const group = byDeliverable.get(item.deliverable.id);
+      if (group) {
+        group.items.push(item);
+      } else {
+        byDeliverable.set(item.deliverable.id, {
+          ...item.deliverable,
+          items: [item],
+        });
+      }
+    }
+    return [...byDeliverable.values()];
+  }, [rounds.data]);
+  const { refetch } = rounds;
+  const handleRetry = useCallback(() => refetch(), [refetch]);
+
+  let content: ReactNode;
+  if (rounds.isError) {
+    content = (
+      <ViewEmpty
+        action={
+          <Button onClick={handleRetry} type="button" variant="outline">
+            {messages.retry}
+          </Button>
+        }
+        description={messages.loadErrorDescription}
+        icon={<CircleAlertIcon aria-hidden="true" />}
+        title={roundsMessages.loadError}
+      />
+    );
+  } else if (!rounds.data) {
+    content = (
+      <div
+        aria-label={roundsMessages.loading}
+        className="flex flex-col"
+        role="status"
+      >
+        {SKELETON_ROWS.map((row) => (
+          <div
+            className="flex flex-col gap-2 border-b px-4 py-3 last:border-b-0"
+            key={row}
+          >
+            <Skeleton className="h-3.5 w-32" />
+            <Skeleton className="h-3 w-56 max-w-full" />
+          </div>
+        ))}
+      </div>
+    );
+  } else if (groups.length === 0) {
+    content = (
+      <ViewEmpty
+        description={roundsMessages.emptyDescription}
+        icon={<HistoryIcon aria-hidden="true" />}
+        title={roundsMessages.emptyTitle}
+      />
+    );
+  } else {
+    content = groups.map((group) => (
+      <section
+        aria-labelledby={`rounds-${group.id}`}
+        className="border-b last:border-b-0"
+        key={group.id}
+      >
+        <h3
+          className="truncate bg-muted/40 px-4 py-2 font-medium text-muted-foreground text-xs"
+          id={`rounds-${group.id}`}
+        >
+          {group.title}
+        </h3>
+        <ol className="divide-y">
+          {group.items.map((item) => (
+            <RoundItem
+              dateFormat={dateFormat}
+              key={item.id}
+              messages={messages.view}
+              projectId={projectId}
+              round={item}
+            />
+          ))}
+        </ol>
+      </section>
+    ));
+  }
+
+  return (
+    <Frame className="w-full" dense spacing="default" variant="default">
+      <FrameHeader>
+        <FrameTitle>
+          <h2 className="font-semibold text-sm">{roundsMessages.title}</h2>
+        </FrameTitle>
+        <FrameDescription className="text-xs">
+          {roundsMessages.description}
+        </FrameDescription>
+      </FrameHeader>
+      <FramePanel className="p-0">{content}</FramePanel>
+    </Frame>
+  );
+}
+
 function DetailRow({ label, value }: { label: string; value: ReactNode }) {
   return (
     <div className="flex justify-between gap-4">
@@ -722,15 +925,11 @@ export function ProjectView({
           />
         </TabsContent>
         <TabsContent className="pt-3" value="history">
-          <Frame className="w-full" dense spacing="default" variant="default">
-            <FramePanel className="p-0">
-              <ViewEmpty
-                description={view.history.description}
-                icon={<HistoryIcon aria-hidden="true" />}
-                title={view.history.title}
-              />
-            </FramePanel>
-          </Frame>
+          <RoundsTab
+            locale={locale}
+            messages={messages}
+            projectId={project.data.id}
+          />
         </TabsContent>
         <TabsContent className="pt-3" value="settings">
           <SettingsTab

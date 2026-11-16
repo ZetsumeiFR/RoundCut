@@ -1038,11 +1038,6 @@ const en = {
         draft: "Draft",
         in_review: "In review",
       },
-      history: {
-        description:
-          "Uploads, rounds, submissions and approvals on this project will appear here.",
-        title: "No activity yet",
-      },
       loadErrorTitle: "Couldn't load this project",
       loading: "Loading the project…",
       notFound: {
@@ -1057,6 +1052,27 @@ const en = {
       round: "Round {current}/{included}",
       roundLabel: "Round {current} of {included} included",
       roundSubmitted: "Round {current} submitted",
+      rounds: {
+        closedOn: "Closed on {date}",
+        closedReasons: {
+          approved: "version approved",
+          manual: "closed manually",
+          next_version: "next version published",
+        },
+        description:
+          "Each round keeps its version and its opening, submission and closing dates.",
+        emptyDescription:
+          "A round opens when you publish a version of a deliverable.",
+        emptyTitle: "No rounds yet",
+        kinds: { extra: "Extra", gift: "Gift" },
+        loadError: "Couldn't load the rounds.",
+        loading: "Loading rounds…",
+        openedOn: "Opened on {date}",
+        round: "Round {number}",
+        statuses: { closed: "Closed", open: "Open", submitted: "Submitted" },
+        submittedOn: "Submitted on {date}",
+        title: "Revision rounds",
+      },
       settings: {
         client: "Client",
         createdAt: "Created on",
@@ -2279,11 +2295,6 @@ const fr: Messages = {
         draft: "Brouillon",
         in_review: "En revue",
       },
-      history: {
-        description:
-          "Les uploads, tours, soumissions et validations de ce projet apparaîtront ici.",
-        title: "Aucune activité pour l'instant",
-      },
       loadErrorTitle: "Impossible de charger ce projet",
       loading: "Chargement du projet…",
       notFound: {
@@ -2298,6 +2309,27 @@ const fr: Messages = {
       round: "Tour {current}/{included}",
       roundLabel: "Tour {current} sur {included} inclus",
       roundSubmitted: "Tour {current} soumis",
+      rounds: {
+        closedOn: "Clos le {date}",
+        closedReasons: {
+          approved: "version validée",
+          manual: "clos manuellement",
+          next_version: "version suivante publiée",
+        },
+        description:
+          "Chaque tour garde sa version et ses dates d'ouverture, de soumission et de clôture.",
+        emptyDescription:
+          "Un tour s'ouvre quand vous publiez une version d'un livrable.",
+        emptyTitle: "Aucun tour pour l'instant",
+        kinds: { extra: "Supplémentaire", gift: "Offert" },
+        loadError: "Impossible de charger les tours.",
+        loading: "Chargement des tours…",
+        openedOn: "Ouvert le {date}",
+        round: "Tour {number}",
+        statuses: { closed: "Clos", open: "Ouvert", submitted: "Soumis" },
+        submittedOn: "Soumis le {date}",
+        title: "Tours de révision",
+      },
       settings: {
         client: "Client",
         createdAt: "Créé le",

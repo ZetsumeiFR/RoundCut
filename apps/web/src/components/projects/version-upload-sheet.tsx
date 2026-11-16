@@ -886,6 +886,7 @@ function VersionUploadPanel({
       Promise.all([
         queryClient.invalidateQueries({ queryKey: orpc.version.key() }),
         queryClient.invalidateQueries({ queryKey: orpc.project.key() }),
+        queryClient.invalidateQueries({ queryKey: orpc.round.key() }),
       ]),
     [queryClient]
   );
