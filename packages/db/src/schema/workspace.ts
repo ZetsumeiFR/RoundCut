@@ -1,5 +1,6 @@
 import { integer, jsonb, pgTable, text, timestamp } from "drizzle-orm/pg-core";
 
+import { DEFAULT_PLAN, type Plan } from "../plan";
 import { DEFAULT_REVISION_TERMS, type RevisionTerms } from "../revision-terms";
 import { user } from "./auth";
 
@@ -20,6 +21,8 @@ export const workspace = pgTable("workspace", {
     .notNull()
     .unique()
     .references(() => user.id, { onDelete: "cascade" }),
+  // Subscription plan (SUB-01); sets the upload limits (VER-02).
+  plan: text("plan").$type<Plan>().default(DEFAULT_PLAN).notNull(),
   revisionTerms: jsonb("revision_terms")
     .$type<RevisionTerms>()
     .default(DEFAULT_REVISION_TERMS)

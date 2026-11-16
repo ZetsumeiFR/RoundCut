@@ -742,10 +742,13 @@ const en = {
     },
     title: "Projects",
     versions: {
+      accepted:
+        "RoundCut accepts MP4 files (H.264 video, AAC audio) and MOV files (H.264 video).",
       cancel: "Cancel upload of {name}",
       cancelError: "Couldn't cancel this upload. Try again.",
       cancelled: "Upload cancelled",
       close: "Close",
+      codec: "{name} is encoded in {codecs}",
       conflict:
         "Another upload is already in progress for this deliverable. Resume or cancel it first.",
       description:
@@ -753,20 +756,27 @@ const en = {
       drop: "Drag and drop a video here",
       emptyDescription: "The first file you upload becomes V1.",
       emptyTitle: "No version yet",
-      formats: "MP4 or MOV video, up to {max}",
+      format: "{name} isn't an MP4 or MOV video",
+      formats: "MP4 (H.264, AAC) or MOV (H.264), up to {max}",
+      formatsLoading: "MP4 (H.264, AAC) or MOV (H.264)",
       interrupted:
         "This upload was interrupted. Select the same file to resume it, or cancel it.",
       list: "Versions",
       loadError: "Couldn't load the versions.",
       loading: "Loading versions…",
       mismatch: "That's not the file being uploaded. Select {name} ({size}).",
-      notVideo: {
-        description:
-          "Export a proxy from your editing software (MP4, H.264 and AAC, 1080p is plenty), then upload it.",
-        title: "{name} isn't a video file",
-      },
       or: "or",
       progress: "{percent} · {loaded} of {total}",
+      proxy: {
+        finalCut:
+          "Final Cut Pro: File > Share > Export File, video codec H.264.",
+        premiere:
+          "Premiere Pro: File > Export > Media, format H.264 (MP4, AAC audio).",
+        resolve:
+          "DaVinci Resolve: Deliver page, format MP4, codec H.264, audio AAC.",
+        tip: "1080p at 8 to 10 Mb/s is plenty for review. Then upload the proxy here.",
+        title: "Export a proxy from your editing software:",
+      },
       resume: "Resume upload of {name}",
       retry: "Retry",
       select: "Choose a file",
@@ -780,8 +790,7 @@ const en = {
       },
       title: "New version · {title}",
       tooLarge: {
-        description:
-          "Files are limited to {max}. Export a lighter proxy (MP4, H.264, 1080p), then upload it.",
+        description: "Your plan accepts files up to {max}.",
         title: "{name} is too large",
       },
       uploadError:
@@ -1611,10 +1620,13 @@ const fr: Messages = {
     },
     title: "Projets",
     versions: {
+      accepted:
+        "RoundCut accepte les fichiers MP4 (vidéo H.264, audio AAC) et MOV (vidéo H.264).",
       cancel: "Annuler l'upload de {name}",
       cancelError: "Impossible d'annuler cet upload. Réessayez.",
       cancelled: "Upload annulé",
       close: "Fermer",
+      codec: "{name} est encodé en {codecs}",
       conflict:
         "Un autre upload est déjà en cours pour ce livrable. Reprenez-le ou annulez-le d'abord.",
       description:
@@ -1622,7 +1634,9 @@ const fr: Messages = {
       drop: "Glissez-déposez une vidéo ici",
       emptyDescription: "Le premier fichier uploadé devient la V1.",
       emptyTitle: "Aucune version pour l'instant",
-      formats: "Vidéo MP4 ou MOV, jusqu'à {max}",
+      format: "{name} n'est pas une vidéo MP4 ou MOV",
+      formats: "MP4 (H.264, AAC) ou MOV (H.264), jusqu'à {max}",
+      formatsLoading: "MP4 (H.264, AAC) ou MOV (H.264)",
       interrupted:
         "Cet upload a été interrompu. Sélectionnez le même fichier pour le reprendre, ou annulez-le.",
       list: "Versions",
@@ -1630,13 +1644,18 @@ const fr: Messages = {
       loading: "Chargement des versions…",
       mismatch:
         "Ce n'est pas le fichier en cours d'upload. Sélectionnez {name} ({size}).",
-      notVideo: {
-        description:
-          "Exportez un proxy depuis votre logiciel de montage (MP4, H.264 et AAC, 1080p suffit), puis uploadez-le.",
-        title: "{name} n'est pas un fichier vidéo",
-      },
       or: "ou",
       progress: "{percent} · {loaded} sur {total}",
+      proxy: {
+        finalCut:
+          "Final Cut Pro : Fichier > Partager > Exporter le fichier, codec vidéo H.264.",
+        premiere:
+          "Premiere Pro : Fichier > Exporter > Médias, format H.264 (MP4, audio AAC).",
+        resolve:
+          "DaVinci Resolve : page Exportation, format MP4, codec H.264, audio AAC.",
+        tip: "Du 1080p à 8-10 Mb/s suffit pour la relecture. Uploadez ensuite le proxy ici.",
+        title: "Exportez un proxy depuis votre logiciel de montage :",
+      },
       resume: "Reprendre l'upload de {name}",
       retry: "Réessayer",
       select: "Choisir un fichier",
@@ -1650,8 +1669,7 @@ const fr: Messages = {
       },
       title: "Nouvelle version · {title}",
       tooLarge: {
-        description:
-          "Les fichiers sont limités à {max}. Exportez un proxy plus léger (MP4, H.264, 1080p), puis uploadez-le.",
+        description: "Votre plan accepte les fichiers jusqu'à {max}.",
         title: "{name} est trop volumineux",
       },
       uploadError:

@@ -1,8 +1,13 @@
 "use client";
 
 import { ORPCError } from "@orpc/client";
+import {
+  isSupportedMedia,
+  type MediaTracks,
+  readMediaTracks,
+} from "@roundcut/api/media";
 import type { AppRouterClient } from "@roundcut/api/routers/index";
-import { isVideoType, MAX_UPLOAD_BYTES } from "@roundcut/api/upload";
+import { UPLOAD_ACCEPT, uploadFormat } from "@roundcut/api/upload";
 import type { Locale } from "@roundcut/auth/locale";
 import {
   Attachment,
@@ -79,9 +84,85 @@ type Upload =
   | { phase: "done"; version: Version };
 
 type Problem =
-  | { kind: "notVideo" | "tooLarge"; name: string }
+  | { kind: "format"; name: string }
+  | { codecs: string; kind: "codec"; name: string }
+  | { kind: "tooLarge"; max: number; name: string }
   | { kind: "conflict" | "startError" | "cancelError" }
   | { kind: "mismatch"; name: string; size: number };
+
+const CODEC_NAMES: Record<string, string> = {
+  aac: "AAC",
+  ap4h: "Apple ProRes 4444",
+  ap4x: "Apple ProRes 4444 XQ",
+  apch: "Apple ProRes 422 HQ",
+  apcn: "Apple ProRes 422",
+  apco: "Apple ProRes 422 Proxy",
+  apcs: "Apple ProRes 422 LT",
+  av01: "AV1",
+  h264: "H.264",
+  hev1: "HEVC (H.265)",
+  hvc1: "HEVC (H.265)",
+  mp4a: "MP3",
+  vp09: "VP9",
+};
+
+// Names the codecs that keep a file out, e.g. "HEVC (H.265)". MOV files
+// accept any audio; a file without a video track is just not a video.
+function codecProblem(name: string, tracks: MediaTracks): Problem {
+  const refused = [
+    ...tracks.video.filter((codec) => codec !== "h264"),
+    ...(uploadFormat(name) === "mov"
+      ? []
+      : tracks.audio.filter((codec) => codec !== "aac")),
+  ];
+  if (tracks.video.length === 0 || refused.length === 0) {
+    return { kind: "format", name };
+  }
+  const names = refused.map((codec) => CODEC_NAMES[codec] ?? codec);
+  return { codecs: [...new Set(names)].join(", "), kind: "codec", name };
+}
+
+const readFile = (file: File) => async (offset: number, length: number) =>
+  new Uint8Array(await file.slice(offset, offset + length).arrayBuffer());
+
+// Checks the format and codecs before anything is sent (VER-02).
+async function inspectFile(
+  file: File,
+  maxBytes: number
+): Promise<Problem | undefined> {
+  const format = uploadFormat(file.name);
+  if (!format) {
+    return { kind: "format", name: file.name };
+  }
+  if (file.size > maxBytes) {
+    return { kind: "tooLarge", max: maxBytes, name: file.name };
+  }
+  const tracks = await readMediaTracks(readFile(file), file.size);
+  if (!tracks) {
+    return { kind: "format", name: file.name };
+  }
+  if (!isSupportedMedia(format, tracks)) {
+    return codecProblem(file.name, tracks);
+  }
+}
+
+const errorCode = (error: unknown) =>
+  error instanceof ORPCError ? String(error.code) : undefined;
+
+// Refusals reported by the API when a file got past the browser's checks.
+function refusalOf(error: unknown, name: string): Problem | undefined {
+  if (!(error instanceof ORPCError)) {
+    return;
+  }
+  if (error.code === "PAYLOAD_TOO_LARGE") {
+    const { maxBytes } = error.data as { maxBytes: number };
+    return { kind: "tooLarge", max: maxBytes, name };
+  }
+  if (error.code === "UNSUPPORTED_MEDIA_TYPE") {
+    const { tracks } = error.data as { tracks: MediaTracks | null };
+    return tracks ? codecProblem(name, tracks) : { kind: "format", name };
+  }
+}
 
 const SKELETON_ROWS = ["first", "second"];
 const PERCENT = 100;
@@ -103,25 +184,33 @@ export function formatBytes(bytes: number, locale: Locale) {
   }).format(bytes / size);
 }
 
-const isConflict = (error: unknown) =>
-  error instanceof ORPCError && error.code === "CONFLICT";
-
 function describeProblem(
   problem: Problem,
   messages: VersionMessages,
   locale: Locale
-): { description?: string; title: string } {
+): { description?: string; proxyHelp?: boolean; title: string } {
   switch (problem.kind) {
-    case "notVideo":
+    case "format":
       return {
-        description: messages.notVideo.description,
-        title: formatMessage(messages.notVideo.title, { name: problem.name }),
+        description: messages.accepted,
+        proxyHelp: true,
+        title: formatMessage(messages.format, { name: problem.name }),
+      };
+    case "codec":
+      return {
+        description: messages.accepted,
+        proxyHelp: true,
+        title: formatMessage(messages.codec, {
+          codecs: problem.codecs,
+          name: problem.name,
+        }),
       };
     case "tooLarge":
       return {
         description: formatMessage(messages.tooLarge.description, {
-          max: formatBytes(MAX_UPLOAD_BYTES, locale),
+          max: formatBytes(problem.max, locale),
         }),
+        proxyHelp: true,
         title: formatMessage(messages.tooLarge.title, { name: problem.name }),
       };
     case "mismatch":
@@ -145,24 +234,51 @@ function ProblemAlert({
   messages: VersionMessages;
   problem: Problem;
 }) {
-  const { description, title } = describeProblem(problem, messages, locale);
+  const { description, proxyHelp, title } = describeProblem(
+    problem,
+    messages,
+    locale
+  );
   return (
     <Alert role="alert" variant="destructive">
       <CircleAlertIcon aria-hidden="true" />
-      <AlertTitle>{title}</AlertTitle>
-      {description ? <AlertDescription>{description}</AlertDescription> : null}
+      <AlertTitle className="line-clamp-none break-words">{title}</AlertTitle>
+      {description || proxyHelp ? (
+        <AlertDescription className="flex flex-col gap-2">
+          {description ? <p>{description}</p> : null}
+          {proxyHelp ? <ProxyHelp messages={messages.proxy} /> : null}
+        </AlertDescription>
+      ) : null}
     </Alert>
+  );
+}
+
+const PROXY_STEPS = ["premiere", "resolve", "finalCut"] as const;
+
+function ProxyHelp({ messages }: { messages: VersionMessages["proxy"] }) {
+  return (
+    <div className="flex flex-col gap-1">
+      <p className="font-medium">{messages.title}</p>
+      <ul className="flex list-disc flex-col gap-1 pl-4">
+        {PROXY_STEPS.map((step) => (
+          <li key={step}>{messages[step]}</li>
+        ))}
+      </ul>
+      <p>{messages.tip}</p>
+    </div>
   );
 }
 
 function Dropzone({
   disabled,
   locale,
+  maxBytes,
   messages,
   onFile,
 }: {
   disabled: boolean;
   locale: Locale;
+  maxBytes: number | undefined;
   messages: VersionMessages;
   onFile: (file: File) => void;
 }) {
@@ -204,7 +320,7 @@ function Dropzone({
   return (
     <>
       <input
-        accept="video/*"
+        accept={UPLOAD_ACCEPT}
         className="sr-only"
         disabled={disabled}
         onChange={handleChange}
@@ -244,9 +360,11 @@ function Dropzone({
           {messages.select}
         </span>
         <span className="text-muted-foreground text-xs" id={hintId}>
-          {formatMessage(messages.formats, {
-            max: formatBytes(MAX_UPLOAD_BYTES, locale),
-          })}
+          {maxBytes === undefined
+            ? messages.formatsLoading
+            : formatMessage(messages.formats, {
+                max: formatBytes(maxBytes, locale),
+              })}
         </span>
       </button>
     </>
@@ -377,7 +495,7 @@ function InterruptedRow({
       </Attachment>
       <p className="text-muted-foreground text-xs">{messages.interrupted}</p>
       <input
-        accept="video/*"
+        accept={UPLOAD_ACCEPT}
         className="sr-only"
         onChange={handleChange}
         ref={inputRef}
@@ -510,6 +628,8 @@ function VersionUploadPanel({
 }) {
   const queryClient = useQueryClient();
   const versions = useVersions(deliverable.id);
+  const workspace = useQuery(orpc.workspace.get.queryOptions());
+  const maxBytes = workspace.data?.maxUploadBytes;
   const [upload, setUpload] = useState<Upload | undefined>();
   const [problem, setProblem] = useState<Problem | undefined>();
   const [starting, setStarting] = useState(false);
@@ -572,8 +692,16 @@ function VersionUploadPanel({
           })
         );
         await refresh();
-      } catch {
+      } catch (error) {
         if (abort.signal.aborted) {
+          return;
+        }
+        // The API removed a file it refused: there's nothing left to resume.
+        const refusal = refusalOf(error, file.name);
+        if (refusal) {
+          setUpload(undefined);
+          setProblem(refusal);
+          await refresh();
           return;
         }
         setUpload((current) =>
@@ -606,19 +734,19 @@ function VersionUploadPanel({
 
   const start = useCallback(
     async (file: File) => {
+      if (maxBytes === undefined) {
+        return;
+      }
       setProblem(undefined);
-      if (!isVideoType(file.type)) {
-        setProblem({ kind: "notVideo", name: file.name });
-        return;
-      }
-      if (file.size > MAX_UPLOAD_BYTES) {
-        setProblem({ kind: "tooLarge", name: file.name });
-        return;
-      }
       setStarting(true);
       try {
+        const refused = await inspectFile(file, maxBytes);
+        if (refused) {
+          setStarting(false);
+          setProblem(refused);
+          return;
+        }
         const created = await api.upload.createUpload({
-          contentType: file.type,
           deliverableId: deliverable.id,
           fileName: file.name,
           sizeBytes: file.size,
@@ -627,11 +755,15 @@ function VersionUploadPanel({
         await run(file, created.version, created.upload, []);
       } catch (error) {
         setStarting(false);
-        setProblem({ kind: isConflict(error) ? "conflict" : "startError" });
+        setProblem(
+          refusalOf(error, file.name) ?? {
+            kind: errorCode(error) === "CONFLICT" ? "conflict" : "startError",
+          }
+        );
         await refresh();
       }
     },
-    [deliverable.id, refresh, run]
+    [deliverable.id, maxBytes, refresh, run]
   );
 
   const cancel = useCallback(
@@ -720,8 +852,9 @@ function VersionUploadPanel({
       ) : null}
       {inFlight || interrupted ? null : (
         <Dropzone
-          disabled={starting || !versions.data}
+          disabled={starting || !versions.data || maxBytes === undefined}
           locale={locale}
+          maxBytes={maxBytes}
           messages={messages}
           onFile={start}
         />
