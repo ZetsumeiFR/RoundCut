@@ -27,7 +27,12 @@ import {
   EmptyMedia,
   EmptyTitle,
 } from "@roundcut/ui/components/empty";
-import { Badge } from "@roundcut/ui/components/reui/badge";
+import {
+  InputGroup,
+  InputGroupAddon,
+  InputGroupButton,
+  InputGroupInput,
+} from "@roundcut/ui/components/input-group";
 import {
   DataGrid,
   type DataGridFeatures,
@@ -61,8 +66,17 @@ import {
   CircleAlertIcon,
   EllipsisIcon,
   PlusIcon,
+  SearchIcon,
+  XIcon,
 } from "lucide-react";
-import { createContext, use, useCallback, useMemo, useState } from "react";
+import {
+  type ChangeEvent,
+  createContext,
+  use,
+  useCallback,
+  useMemo,
+  useState,
+} from "react";
 import { toast } from "sonner";
 
 import { formatMessage, type Messages } from "@/i18n/messages";
@@ -81,6 +95,23 @@ const DEFAULT_PAGE_SIZE = 10;
 const PAGE_SIZES = [DEFAULT_PAGE_SIZE, 25, 50];
 const SKELETON_ROWS = ["first", "second", "third", "fourth", "fifth"];
 const DEFAULT_SORTING: SortingState = [{ desc: false, id: "client" }];
+const CENTS_PER_UNIT = 100;
+const DIACRITICS = /\p{Diacritic}/gu;
+
+// Case- and accent-insensitive, so "lea" finds "Léa".
+const normalizeSearch = (value: string) =>
+  value.normalize("NFD").replace(DIACRITICS, "").toLocaleLowerCase().trim();
+
+const searchableText = (client: Client) =>
+  normalizeSearch(
+    [
+      client.name,
+      client.deciderName,
+      client.deciderEmail,
+      client.siren ?? "",
+      ...client.reviewerEmails,
+    ].join(" ")
+  );
 
 interface ClientActions {
   messages: ClientsMessages;
@@ -145,25 +176,8 @@ function DeciderCell({ client }: { client: Client }) {
   );
 }
 
-function ReviewersCell({ client }: { client: Client }) {
-  const { messages } = useClientActions();
-  const [first, ...others] = client.reviewerEmails;
-
-  if (!first) {
-    return (
-      <span className="text-muted-foreground text-xs">{messages.none}</span>
-    );
-  }
-  return (
-    <div className="flex min-w-0 items-center gap-2">
-      <span className="truncate text-sm">{first}</span>
-      {others.length > 0 ? (
-        <Badge size="sm" variant="secondary">
-          +{others.length}
-        </Badge>
-      ) : null}
-    </div>
-  );
+function CounterCell({ value }: { value: string | number }) {
+  return <span className="text-sm tabular-nums">{value}</span>;
 }
 
 function ActionsCell({ client }: { client: Client }) {
@@ -201,9 +215,15 @@ function ActionsCell({ client }: { client: Client }) {
   );
 }
 
+const numericMeta = (headerTitle: string) => ({
+  cellClassName: "text-end",
+  headerClassName: "text-end [&>div]:w-full [&>div]:justify-end",
+  headerTitle,
+});
+
 function buildColumns(
   messages: ClientsMessages,
-  formatDate: (date: Date) => string
+  formatAmount: (cents: number) => string
 ): ColumnDef<DataGridFeatures, Client>[] {
   const { columns } = messages;
   return [
@@ -225,23 +245,33 @@ function buildColumns(
       size: 240,
     },
     {
-      accessorFn: (client) => client.reviewerEmails.length,
-      cell: ({ row }) => <ReviewersCell client={row.original} />,
+      accessorFn: (client) => client.activeProjects,
+      cell: ({ row }) => <CounterCell value={row.original.activeProjects} />,
       header: ({ column }) => <SortableHeader column={column} />,
-      id: "reviewers",
-      meta: { headerTitle: columns.reviewers },
-      size: 240,
+      id: "activeProjects",
+      meta: numericMeta(columns.activeProjects),
+      size: 150,
     },
     {
-      accessorFn: (client) => client.createdAt.getTime(),
+      accessorFn: (client) => client.acceptedExtraRounds,
       cell: ({ row }) => (
-        <span className="text-muted-foreground text-sm tabular-nums">
-          {formatDate(row.original.createdAt)}
-        </span>
+        <CounterCell value={row.original.acceptedExtraRounds} />
       ),
       header: ({ column }) => <SortableHeader column={column} />,
-      id: "added",
-      meta: { headerTitle: columns.added },
+      id: "extraRounds",
+      meta: numericMeta(columns.extraRounds),
+      size: 170,
+    },
+    {
+      accessorFn: (client) => client.acceptedExtraRoundsAmountCents,
+      cell: ({ row }) => (
+        <CounterCell
+          value={formatAmount(row.original.acceptedExtraRoundsAmountCents)}
+        />
+      ),
+      header: ({ column }) => <SortableHeader column={column} />,
+      id: "amount",
+      meta: numericMeta(columns.amount),
       size: 140,
     },
     {
@@ -255,10 +285,13 @@ function buildColumns(
   ];
 }
 
-function gridI18n(grid: ClientsMessages["grid"]): DataGridI18nOverrides {
+function gridI18n(
+  grid: ClientsMessages["grid"],
+  empty: string
+): DataGridI18nOverrides {
   return {
     labels: {
-      empty: grid.empty,
+      empty,
       goToPage: (page) => formatMessage(grid.goToPage, { page }),
       loading: grid.loading,
       nextPage: grid.nextPage,
@@ -379,33 +412,107 @@ function ArchiveDialog({
   );
 }
 
+function ClientsSearch({
+  messages,
+  onChange,
+  value,
+}: {
+  messages: ClientsMessages["search"];
+  onChange: (value: string) => void;
+  value: string;
+}) {
+  const handleChange = useCallback(
+    (event: ChangeEvent<HTMLInputElement>) => onChange(event.target.value),
+    [onChange]
+  );
+  const handleClear = useCallback(() => onChange(""), [onChange]);
+
+  return (
+    <InputGroup className="sm:max-w-xs">
+      <InputGroupAddon>
+        <SearchIcon aria-hidden="true" />
+      </InputGroupAddon>
+      <InputGroupInput
+        aria-label={messages.label}
+        className="[&::-webkit-search-cancel-button]:appearance-none"
+        onChange={handleChange}
+        placeholder={messages.placeholder}
+        type="search"
+        value={value}
+      />
+      {value ? (
+        <InputGroupAddon align="inline-end">
+          <InputGroupButton
+            aria-label={messages.clear}
+            onClick={handleClear}
+            size="icon-xs"
+          >
+            <XIcon aria-hidden="true" />
+          </InputGroupButton>
+        </InputGroupAddon>
+      ) : null}
+    </InputGroup>
+  );
+}
+
 function ClientsGrid({
   clients,
+  currency,
   locale,
   messages,
 }: {
   clients: Client[];
+  currency: string;
   locale: Locale;
   messages: ClientsMessages;
 }) {
+  const [search, setSearch] = useState("");
   const [sorting, setSorting] = useState<SortingState>(DEFAULT_SORTING);
   const [pagination, setPagination] = useState<PaginationState>({
     pageIndex: 0,
     pageSize: DEFAULT_PAGE_SIZE,
   });
-  const columns = useMemo(
-    () =>
-      buildColumns(
-        messages,
-        new Intl.DateTimeFormat(locale, { dateStyle: "medium" }).format
-      ),
-    [locale, messages]
+  const columns = useMemo(() => {
+    const amount = new Intl.NumberFormat(locale, {
+      currency,
+      style: "currency",
+    });
+    return buildColumns(messages, (cents) =>
+      amount.format(cents / CENTS_PER_UNIT)
+    );
+  }, [currency, locale, messages]);
+
+  const indexed = useMemo(
+    () => clients.map((client) => ({ client, text: searchableText(client) })),
+    [clients]
   );
-  const i18n = useMemo(() => gridI18n(messages.grid), [messages.grid]);
+  const query = normalizeSearch(search);
+  const visibleClients = useMemo(
+    () =>
+      query
+        ? indexed
+            .filter(({ text }) => text.includes(query))
+            .map(({ client }) => client)
+        : clients,
+    [clients, indexed, query]
+  );
+
+  const handleSearch = useCallback((value: string) => {
+    setSearch(value);
+    setPagination((current) => ({ ...current, pageIndex: 0 }));
+  }, []);
+
+  const empty = query
+    ? formatMessage(messages.search.noResults, { query: search.trim() })
+    : messages.grid.empty;
+  const i18n = useMemo(
+    () => gridI18n(messages.grid, empty),
+    [empty, messages.grid]
+  );
 
   const pageCount = Math.max(
     1,
-    Math.ceil(clients.length / pagination.pageSize)
+    Math.ceil(visibleClients.length / pagination.pageSize)
   );
   // Archiving the last client of the last page would strand the page index.
   const safePagination =
@@ -416,7 +523,7 @@ function ClientsGrid({
   const table = useTable({
     autoResetPageIndex: false,
     columns,
-    data: clients,
+    data: visibleClients,
     features: dataGridFeatures,
     getRowId: (row) => row.id,
     onPaginationChange: setPagination,
@@ -428,10 +535,17 @@ function ClientsGrid({
   return (
     <DataGrid
       i18n={i18n}
-      recordCount={clients.length}
+      recordCount={visibleClients.length}
       table={table}
       tableLayout={{ headerSticky: false }}
     >
+      <div className="border-b p-3">
+        <ClientsSearch
+          messages={messages.search}
+          onChange={handleSearch}
+          value={search}
+        />
+      </div>
       <DataGridScrollArea orientation="horizontal">
         <DataGridTable />
       </DataGridScrollArea>
@@ -452,6 +566,7 @@ export function ClientsView({
 }) {
   const queryClient = useQueryClient();
   const { data, isError, refetch } = useQuery(orpc.client.list.queryOptions());
+  const workspace = useQuery(orpc.workspace.get.queryOptions());
   const [sheetOpen, setSheetOpen] = useState(false);
   const [sheetState, setSheetState] = useState<ClientSheetState | null>(null);
   const [archiving, setArchiving] = useState<Client | null>(null);
@@ -511,7 +626,12 @@ export function ClientsView({
     }
   }, [archiving, messages, queryClient, sheetState]);
 
-  const handleRetry = useCallback(() => refetch(), [refetch]);
+  const refetchWorkspace = workspace.refetch;
+  const handleRetry = useCallback(
+    () => Promise.all([refetch(), refetchWorkspace()]),
+    [refetch, refetchWorkspace]
+  );
+  const currency = workspace.data?.currency;
 
   let summary = messages.description;
   if (data) {
@@ -519,11 +639,18 @@ export function ClientsView({
   }
 
   let body = <ClientsSkeleton label={messages.grid.loading} />;
-  if (data && data.length > 0) {
-    body = <ClientsGrid clients={data} locale={locale} messages={messages} />;
-  } else if (data) {
+  if (data && data.length === 0) {
     body = <EmptyClients messages={messages} onAdd={openCreate} />;
-  } else if (isError) {
+  } else if (data && currency) {
+    body = (
+      <ClientsGrid
+        clients={data}
+        currency={currency}
+        locale={locale}
+        messages={messages}
+      />
+    );
+  } else if (isError || workspace.isError) {
     body = <ClientsLoadError messages={messages} onRetry={handleRetry} />;
   }
 
