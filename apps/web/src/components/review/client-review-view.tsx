@@ -15,14 +15,16 @@ import {
   LinkIcon,
   PlayIcon,
 } from "lucide-react";
-import { useCallback, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 
 import { VersionThumbnail } from "@/components/projects/version-thumbnail";
 import { formatMessage, type Messages } from "@/i18n/messages";
 import { client as api, orpc } from "@/utils/orpc";
+import { CommentComposer } from "./comment-composer";
+import { CommentThread, toMarkers } from "./comment-thread";
 import { ReviewState } from "./review-view";
 import { ReviewerIdentityForm } from "./reviewer-identity-form";
-import { type PlayerMarker, VideoPlayer } from "./video-player";
+import { type PlayerHandle, VideoPlayer } from "./video-player";
 
 type ReviewMessages = Messages["review"];
 type PlayerMessages = Messages["projects"]["player"];
@@ -33,8 +35,6 @@ type ReviewerProject = Extract<LinkedProject, { deliverables: unknown }>;
 type LinkedDeliverable = ReviewerProject["deliverables"][number];
 
 const MAX_RETRIES = 3;
-// Feedback comments arrive with REV-03; until then no version has markers.
-const NO_MARKERS: PlayerMarker[] = [];
 
 // Unknown, revoked and malformed tokens all read as an invalid link.
 const isInvalidLink = (error: unknown) =>
@@ -170,18 +170,42 @@ function LinkedReview({
   onSourceError,
   player,
   project,
+  token,
 }: {
   locale: Locale;
   messages: ReviewMessages;
   onSourceError: () => void;
   player: PlayerMessages;
   project: ReviewerProject;
+  token: string;
 }) {
   const playable = project.deliverables.filter((item) => item.latestVersion);
   const [selectedId, setSelectedId] = useState(playable[0]?.id);
   const selected =
     playable.find((item) => item.id === selectedId) ?? playable[0];
   const version = selected?.latestVersion;
+  const playerRef = useRef<PlayerHandle | null>(null);
+  const comments = useQuery(
+    orpc.comment.listForReview.queryOptions({
+      enabled: Boolean(version),
+      input: { token, versionId: version?.id ?? "" },
+      meta: { inlineError: true },
+      retry: retryTransient,
+    })
+  );
+  const markers = useMemo(
+    () => toMarkers(comments.data ?? []),
+    [comments.data]
+  );
+  const refetchComments = comments.refetch;
+  const handleRetryComments = useCallback(
+    () => refetchComments(),
+    [refetchComments]
+  );
+  const handleSeek = useCallback(
+    (ms: number) => playerRef.current?.seekToMs(ms),
+    []
+  );
 
   return (
     <>
@@ -204,11 +228,39 @@ function LinkedReview({
               frameRate={version.frameRate}
               key={version.id}
               locale={locale}
-              markers={NO_MARKERS}
+              markers={markers}
               messages={player}
               onSourceError={onSourceError}
               poster={version.thumbnailUrl}
+              ref={playerRef}
               src={version.playbackUrl}
+            />
+          </div>
+          <CommentComposer
+            durationMs={version.durationMs}
+            frameRate={version.frameRate}
+            key={version.id}
+            locale={locale}
+            messages={messages.comments}
+            playerRef={playerRef}
+            token={token}
+            versionId={version.id}
+          />
+          <h2 className="pt-2 font-medium text-sm">
+            {messages.comments.thread}
+          </h2>
+          <div className="border">
+            <CommentThread
+              comments={comments.data}
+              emptyDescription={messages.comments.emptyDescription}
+              emptyTitle={messages.comments.emptyTitle}
+              frameRate={version.frameRate}
+              isError={comments.isError}
+              locale={locale}
+              messages={player.feedback}
+              onRetry={handleRetryComments}
+              onSeek={handleSeek}
+              retryLabel={messages.retry}
             />
           </div>
         </section>
@@ -328,6 +380,7 @@ export function ClientReviewView({
           onSourceError={handleRetry}
           player={player}
           project={project.data}
+          token={token}
         />
       )}
     </>

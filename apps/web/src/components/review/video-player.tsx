@@ -42,11 +42,13 @@ import {
 import {
   createContext,
   type ReactNode,
+  type Ref,
   type RefObject,
   type SyntheticEvent,
   use,
   useCallback,
   useEffect,
+  useImperativeHandle,
   useMemo,
   useRef,
   useState,
@@ -61,11 +63,19 @@ const PortalContainer = createContext<
   RefObject<HTMLDivElement | null> | undefined
 >(undefined);
 
-// A timestamped point on the timeline: a feedback comment once REV-03 ships.
+// A timestamped point on the timeline: a feedback comment (REV-03).
 export interface PlayerMarker {
   id: string;
   label: string;
   timeMs: number;
+}
+
+// Lets the feedback form read the position to comment on and the thread
+// jump to a comment.
+export interface PlayerHandle {
+  currentTimeMs: () => number;
+  pause: () => void;
+  seekToMs: (ms: number) => void;
 }
 
 export const PLAYBACK_RATES = [0.5, 1, 1.5, 2] as const;
@@ -419,6 +429,7 @@ export function VideoPlayer({
   messages,
   onSourceError,
   poster,
+  ref,
   src,
 }: {
   durationMs: number | null;
@@ -430,6 +441,7 @@ export function VideoPlayer({
   onSourceError: () => void;
   // The version's thumbnail (VER-06), shown until playback starts.
   poster: string | null;
+  ref?: Ref<PlayerHandle>;
   src: string;
 }) {
   const frameRate = declaredFrameRate ?? FALLBACK_FRAME_RATE;
@@ -600,6 +612,20 @@ export function VideoPlayer({
   );
 
   const openShortcuts = useCallback(() => setShortcutsOpen(true), []);
+
+  useImperativeHandle(
+    ref,
+    () => ({
+      currentTimeMs: () =>
+        Math.floor((videoRef.current?.currentTime ?? 0) * MS_PER_SECOND),
+      pause: () => videoRef.current?.pause(),
+      seekToMs: (ms: number) => {
+        videoRef.current?.pause();
+        seekTo(ms / MS_PER_SECOND);
+      },
+    }),
+    [seekTo]
+  );
 
   const actions = useRef<PlayerActions>(null);
   actions.current = {
