@@ -92,6 +92,10 @@ import { sendFile, type UploadPlan } from "./version-upload";
 type ProjectsMessages = Messages["projects"];
 type VersionMessages = ProjectsMessages["versions"];
 type Version = Awaited<ReturnType<AppRouterClient["version"]["list"]>>[number];
+// A finished upload is published: it carries the round it opened (VER-04).
+type Published = Awaited<
+  ReturnType<AppRouterClient["upload"]["completeUpload"]>
+>;
 
 export interface UploadTarget {
   id: string;
@@ -108,7 +112,7 @@ interface Picked {
 type Upload =
   | { file: File; phase: "uploading"; progress: number; version: Version }
   | { file: File; phase: "failed"; progress: number; version: Version }
-  | { phase: "done"; version: Version };
+  | { phase: "done"; version: Published };
 
 type Problem =
   | { kind: "format"; name: string }
@@ -884,6 +888,7 @@ function VersionUploadPanel({
         toast.success(
           formatMessage(messages.uploadedToast, {
             number: ready.number,
+            round: ready.round.number,
             title: deliverable.title,
           })
         );
@@ -1100,6 +1105,7 @@ function VersionUploadPanel({
           <AlertTitle>
             {formatMessage(messages.uploaded, {
               number: upload.version.number,
+              round: upload.version.round.number,
             })}
           </AlertTitle>
         </Alert>

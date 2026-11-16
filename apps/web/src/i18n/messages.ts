@@ -807,8 +807,8 @@ const en = {
       },
       uploadError:
         "The upload stopped. Parts already sent are kept: resume it when your connection is back.",
-      uploaded: "V{number} uploaded",
-      uploadedToast: "{title}: V{number} uploaded",
+      uploaded: "V{number} published · round {round} opened",
+      uploadedToast: "{title}: V{number} published · round {round} opened",
       uploading: "Keep this panel open until the upload finishes.",
       version: "V{number}",
     },
@@ -842,7 +842,7 @@ const en = {
       noVersion: "No version yet",
       openCommentsLabel: "Open feedback: {count}",
       round: "Round {current}/{included}",
-      roundLabel: "Rounds used: {used} of {included} included",
+      roundLabel: "Round {current} of {included} included",
       settings: {
         client: "Client",
         createdAt: "Created on",
@@ -1700,8 +1700,8 @@ const fr: Messages = {
       },
       uploadError:
         "L'upload s'est arrêté. Les morceaux déjà envoyés sont conservés : reprenez-le quand la connexion revient.",
-      uploaded: "V{number} uploadée",
-      uploadedToast: "{title} : V{number} uploadée",
+      uploaded: "V{number} publiée · tour {round} ouvert",
+      uploadedToast: "{title} : V{number} publiée · tour {round} ouvert",
       uploading: "Gardez ce panneau ouvert jusqu'à la fin de l'upload.",
       version: "V{number}",
     },
@@ -1735,7 +1735,7 @@ const fr: Messages = {
       noVersion: "Aucune version",
       openCommentsLabel: "Retours ouverts : {count}",
       round: "Tour {current}/{included}",
-      roundLabel: "Tours utilisés : {used} sur {included} inclus",
+      roundLabel: "Tour {current} sur {included} inclus",
       settings: {
         client: "Client",
         createdAt: "Créé le",

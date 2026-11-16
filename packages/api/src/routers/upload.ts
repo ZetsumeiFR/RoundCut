@@ -1,7 +1,8 @@
 import { ORPCError } from "@orpc/server";
 import { PLAN_MAX_FILE_BYTES } from "@roundcut/db/plan";
+import { round } from "@roundcut/db/schema/round";
 import { version } from "@roundcut/db/schema/version";
-import { and, eq, max } from "drizzle-orm";
+import { and, eq, max, ne } from "drizzle-orm";
 import z from "zod";
 
 import { protectedProcedure } from "../index";
@@ -108,25 +109,58 @@ export const uploadRouter = {
             "Only H.264 MP4 (AAC audio) and H.264 MOV files are accepted",
         });
       }
-      const [ready] = await context.db
-        .update(version)
-        // The stored file's own header is the record, whatever the browser
-        // displayed; only the frame rate is the editor's declaration.
-        .set({
-          durationMs: media.video.durationMs,
-          height: media.video.height,
-          status: "ready",
-          uploadId: null,
-          width: media.video.width,
-        })
-        .where(and(eq(version.id, row.id), eq(version.status, "uploading")))
-        .returning();
-      if (!ready) {
-        throw new ORPCError("CONFLICT", {
-          message: "Upload already completed",
-        });
-      }
-      return toVersion(ready);
+      const { video } = media;
+      // Publishing the version opens the next round and closes the running
+      // one (§7.2): all or nothing, so a version never lacks its round.
+      return await context.db.transaction(async (tx) => {
+        const [ready] = await tx
+          .update(version)
+          // The stored file's own header is the record, whatever the browser
+          // displayed; only the frame rate is the editor's declaration.
+          .set({
+            durationMs: video.durationMs,
+            height: video.height,
+            status: "ready",
+            uploadId: null,
+            width: video.width,
+          })
+          .where(and(eq(version.id, row.id), eq(version.status, "uploading")))
+          .returning();
+        if (!ready) {
+          throw new ORPCError("CONFLICT", {
+            message: "Upload already completed",
+          });
+        }
+        await tx
+          .update(round)
+          .set({
+            closedAt: new Date(),
+            closedReason: "next_version",
+            status: "closed",
+          })
+          .where(
+            and(
+              eq(round.deliverableId, ready.deliverableId),
+              ne(round.status, "closed")
+            )
+          );
+        const [last] = await tx
+          .select({ number: max(round.number) })
+          .from(round)
+          .where(eq(round.deliverableId, ready.deliverableId));
+        const [opened] = await tx
+          .insert(round)
+          .values({
+            deliverableId: ready.deliverableId,
+            number: (last?.number ?? 0) + 1,
+            versionId: ready.id,
+          })
+          .returning({ number: round.number });
+        if (!opened) {
+          throw new Error("Round insert returned no row");
+        }
+        return { ...toVersion(ready), round: opened };
+      });
     }),
   createUpload: protectedProcedure
     .input(createUploadSchema)
