@@ -21,7 +21,7 @@ import { VersionThumbnail } from "@/components/projects/version-thumbnail";
 import { formatMessage, type Messages } from "@/i18n/messages";
 import { client as api, orpc } from "@/utils/orpc";
 import { CommentComposer } from "./comment-composer";
-import { CommentThread, toMarkers } from "./comment-thread";
+import { CommentThread, type ReplyHandler, toMarkers } from "./comment-thread";
 import { ReviewState } from "./review-view";
 import { ReviewerIdentityForm } from "./reviewer-identity-form";
 import { type PlayerHandle, VideoPlayer } from "./video-player";
@@ -206,6 +206,16 @@ function LinkedReview({
     (ms: number) => playerRef.current?.seekToMs(ms),
     []
   );
+  const queryClient = useQueryClient();
+  const handleReply = useCallback<ReplyHandler>(
+    async (parentId, body) => {
+      await api.comment.replyForReview({ body, parentId, token });
+      await queryClient.invalidateQueries({
+        queryKey: orpc.comment.listForReview.key(),
+      });
+    },
+    [queryClient, token]
+  );
 
   return (
     <>
@@ -258,6 +268,7 @@ function LinkedReview({
               isError={comments.isError}
               locale={locale}
               messages={player.feedback}
+              onReply={handleReply}
               onRetry={handleRetryComments}
               onSeek={handleSeek}
               retryLabel={messages.retry}
