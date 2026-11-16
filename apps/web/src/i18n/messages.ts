@@ -531,6 +531,7 @@ const en = {
     close: "Close",
     columns: {
       client: "Client",
+      deliverables: "Deliverables",
       flatFee: "Flat fee",
       includedRounds: "Included rounds",
       project: "Project",
@@ -539,6 +540,42 @@ const en = {
     },
     countOne: "{count} project",
     countOther: "{count} projects",
+    deliverables: {
+      add: "Add deliverable",
+      adding: "Adding…",
+      aspect: "Format",
+      aspects: {
+        "1:1": "1:1 · Square",
+        "9:16": "9:16 · Vertical",
+        "16:9": "16:9 · Landscape",
+      },
+      countOne: "{count} deliverable",
+      countOther: "{count} deliverables",
+      createDescription:
+        "Add the videos this project will deliver. You can add more later from the project list.",
+      description:
+        "Videos expected in this project, in the order you added them.",
+      duration: "Target duration (optional)",
+      durationPlaceholder: "0:30",
+      emptyDescription: "Add the videos this project must deliver.",
+      emptyTitle: "No deliverables yet",
+      errors: {
+        durationInvalid:
+          "Enter a duration like 0:30 or 90 seconds, up to {max}.",
+        limit: "A project can have up to {max} deliverables.",
+        titleRequired: "Enter the deliverable title.",
+        tooLong: "Keep it under {max} characters.",
+      },
+      formTitle: "New deliverable",
+      legend: "Deliverables",
+      noDuration: "No target duration",
+      open: "Deliverables · {name}",
+      remove: "Remove {title}",
+      saved: "{title} added",
+      saveError: "Couldn't add this deliverable. Try again.",
+      title: "Title",
+      titlePlaceholder: "Reel #3",
+    },
     description:
       "Each project belongs to a client and keeps the plan terms agreed when it was created.",
     empty: {
@@ -1163,6 +1200,7 @@ const fr: Messages = {
     close: "Fermer",
     columns: {
       client: "Client",
+      deliverables: "Livrables",
       flatFee: "Forfait",
       includedRounds: "Tours inclus",
       project: "Projet",
@@ -1171,6 +1209,41 @@ const fr: Messages = {
     },
     countOne: "{count} projet",
     countOther: "{count} projets",
+    deliverables: {
+      add: "Ajouter le livrable",
+      adding: "Ajout…",
+      aspect: "Format",
+      aspects: {
+        "1:1": "1:1 · Carré",
+        "9:16": "9:16 · Vertical",
+        "16:9": "16:9 · Paysage",
+      },
+      countOne: "{count} livrable",
+      countOther: "{count} livrables",
+      createDescription:
+        "Ajoutez les vidéos que ce projet doit livrer. Vous pourrez en ajouter d'autres depuis la liste des projets.",
+      description: "Vidéos attendues dans ce projet, dans leur ordre d'ajout.",
+      duration: "Durée cible (facultative)",
+      durationPlaceholder: "0:30",
+      emptyDescription: "Ajoutez les vidéos que ce projet doit livrer.",
+      emptyTitle: "Aucun livrable pour l'instant",
+      errors: {
+        durationInvalid:
+          "Saisissez une durée comme 0:30 ou 90 secondes, jusqu'à {max}.",
+        limit: "Un projet peut compter jusqu'à {max} livrables.",
+        titleRequired: "Saisissez le titre du livrable.",
+        tooLong: "Limitez-vous à {max} caractères.",
+      },
+      formTitle: "Nouveau livrable",
+      legend: "Livrables",
+      noDuration: "Pas de durée cible",
+      open: "Livrables · {name}",
+      remove: "Retirer {title}",
+      saved: "{title} ajouté",
+      saveError: "Impossible d'ajouter ce livrable. Réessayez.",
+      title: "Titre",
+      titlePlaceholder: "Reel n°3",
+    },
     description:
       "Chaque projet appartient à un client et garde les conditions de forfait convenues à sa création.",
     empty: {

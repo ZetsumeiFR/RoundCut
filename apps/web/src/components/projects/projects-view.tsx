@@ -42,6 +42,7 @@ import {
 import {
   BuildingIcon,
   CircleAlertIcon,
+  ClapperboardIcon,
   FolderKanbanIcon,
   PlusIcon,
 } from "lucide-react";
@@ -52,6 +53,8 @@ import type { TermsMessages } from "@/components/account/revision-terms-settings
 import { gridI18n } from "@/components/clients/clients-view";
 import { formatMessage, type Messages } from "@/i18n/messages";
 import { orpc } from "@/utils/orpc";
+import { deliverableCountLabel } from "./deliverable-form";
+import { DeliverablesSheet } from "./deliverables-sheet";
 import { formatTargetDate, type Project, ProjectSheet } from "./project-sheet";
 
 type ProjectsMessages = Messages["projects"];
@@ -102,6 +105,40 @@ function TextCell({ muted, value }: { muted?: boolean; value: string }) {
   );
 }
 
+function DeliverablesCell({
+  locale,
+  messages,
+  onOpen,
+  project,
+}: {
+  locale: Locale;
+  messages: ProjectsMessages;
+  onOpen: (projectId: string) => void;
+  project: Project;
+}) {
+  const handleClick = useCallback(() => onOpen(project.id), [onOpen, project]);
+  const count = deliverableCountLabel(
+    messages.deliverables,
+    locale,
+    project.deliverables.length
+  );
+  return (
+    <Button
+      aria-label={`${count}, ${formatMessage(messages.deliverables.open, {
+        name: project.name,
+      })}`}
+      className="-ms-2 font-normal"
+      onClick={handleClick}
+      size="sm"
+      type="button"
+      variant="ghost"
+    >
+      <ClapperboardIcon aria-hidden="true" data-icon="inline-start" />
+      {count}
+    </Button>
+  );
+}
+
 const numericMeta = (headerTitle: string) => ({
   cellClassName: "text-end",
   headerClassName: "text-end [&>div]:w-full [&>div]:justify-end",
@@ -111,7 +148,8 @@ const numericMeta = (headerTitle: string) => ({
 function buildColumns(
   messages: ProjectsMessages,
   locale: Locale,
-  formatAmount: (cents: number) => string
+  formatAmount: (cents: number) => string,
+  onOpenDeliverables: (projectId: string) => void
 ): ColumnDef<DataGridFeatures, Project>[] {
   const { columns } = messages;
   return [
@@ -135,6 +173,21 @@ function buildColumns(
       id: "client",
       meta: { headerTitle: columns.client },
       size: 200,
+    },
+    {
+      accessorFn: (project) => project.deliverables.length,
+      cell: ({ row }) => (
+        <DeliverablesCell
+          locale={locale}
+          messages={messages}
+          onOpen={onOpenDeliverables}
+          project={row.original}
+        />
+      ),
+      header: ({ column }) => <SortableHeader column={column} />,
+      id: "deliverables",
+      meta: { headerTitle: columns.deliverables },
+      size: 150,
     },
     {
       accessorFn: (project) => project.targetDate ?? "",
@@ -240,11 +293,13 @@ function ProjectsGrid({
   currency,
   locale,
   messages,
+  onOpenDeliverables,
   projects,
 }: {
   currency: string;
   locale: Locale;
   messages: ProjectsMessages;
+  onOpenDeliverables: (projectId: string) => void;
   projects: Project[];
 }) {
   const [sorting, setSorting] = useState<SortingState>([]);
@@ -257,10 +312,13 @@ function ProjectsGrid({
       currency,
       style: "currency",
     });
-    return buildColumns(messages, locale, (cents) =>
-      amount.format(cents / CENTS_PER_UNIT)
+    return buildColumns(
+      messages,
+      locale,
+      (cents) => amount.format(cents / CENTS_PER_UNIT),
+      onOpenDeliverables
     );
-  }, [currency, locale, messages]);
+  }, [currency, locale, messages, onOpenDeliverables]);
   const i18n = useMemo(
     () => gridI18n(messages.grid, messages.grid.empty),
     [messages.grid]
@@ -308,6 +366,17 @@ export function ProjectsView({
   const workspace = useQuery(orpc.workspace.get.queryOptions());
   const [sheetOpen, setSheetOpen] = useState(false);
   const openCreate = useCallback(() => setSheetOpen(true), []);
+  const [deliverablesProjectId, setDeliverablesProjectId] = useState<
+    string | null
+  >(null);
+  const deliverablesProject = projects.data?.find(
+    (project) => project.id === deliverablesProjectId
+  );
+  const handleDeliverablesOpenChange = useCallback((open: boolean) => {
+    if (!open) {
+      setDeliverablesProjectId(null);
+    }
+  }, []);
 
   const queries = [projects, clients, workspace];
   const isError = queries.some((query) => query.isError);
@@ -343,6 +412,7 @@ export function ProjectsView({
         currency={workspace.data.currency}
         locale={locale}
         messages={messages}
+        onOpenDeliverables={setDeliverablesProjectId}
         projects={projects.data}
       />
     );
@@ -415,6 +485,12 @@ export function ProjectsView({
           workspace={workspace.data}
         />
       ) : null}
+      <DeliverablesSheet
+        locale={locale}
+        messages={messages}
+        onOpenChange={handleDeliverablesOpenChange}
+        project={deliverablesProject}
+      />
     </>
   );
 }
