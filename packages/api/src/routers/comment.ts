@@ -6,14 +6,16 @@ import { deliverable } from "@roundcut/db/schema/deliverable";
 import { reviewer } from "@roundcut/db/schema/reviewer";
 import { round } from "@roundcut/db/schema/round";
 import { version } from "@roundcut/db/schema/version";
-import { and, asc, eq, ne } from "drizzle-orm";
+import { and, asc, eq, isNull, ne } from "drizzle-orm";
 import z from "zod";
 
 import {
   COMMENT_ATTACHMENT_MAX_BYTES,
   COMMENT_ATTACHMENT_TYPES,
   commentAttachmentSchema,
+  commentReplySchema,
   commentSchema,
+  commentStatusSchema,
   IMAGE_SIGNATURE_BYTES,
   sniffImageType,
 } from "../comment";
@@ -83,6 +85,8 @@ const commentColumns = {
   editorName: user.name,
   endTimecodeMs: comment.endTimecodeMs,
   id: comment.id,
+  parentId: comment.parentId,
+  rejectReason: comment.rejectReason,
   reviewerName: reviewer.name,
   status: comment.status,
   timecodeMs: comment.timecodeMs,
@@ -96,6 +100,8 @@ type CommentRow = Pick<
   | "createdAt"
   | "endTimecodeMs"
   | "id"
+  | "parentId"
+  | "rejectReason"
   | "status"
   | "timecodeMs"
 > & { editorName: string | null; reviewerName: string | null };
@@ -110,10 +116,16 @@ const toComment = async (storage: Storage, row: CommentRow) => ({
   createdAt: row.createdAt,
   endTimecodeMs: row.endTimecodeMs,
   id: row.id,
+  parentId: row.parentId,
+  rejectReason: row.rejectReason,
   status: row.status,
   timecodeMs: row.timecodeMs,
 });
 
+type ThreadComment = Awaited<ReturnType<typeof toComment>>;
+
+// Top-level comments by timecode, each with its replies (REV-04) in the order
+// they were written: replies share their parent's timecode.
 async function listComments(db: Database, storage: Storage, versionId: string) {
   const rows = await db
     .select(commentColumns)
@@ -122,7 +134,62 @@ async function listComments(db: Database, storage: Storage, versionId: string) {
     .leftJoin(user, eq(comment.authorUserId, user.id))
     .where(eq(comment.versionId, versionId))
     .orderBy(asc(comment.timecodeMs), asc(comment.createdAt));
-  return await Promise.all(rows.map((row) => toComment(storage, row)));
+  const items = await Promise.all(rows.map((row) => toComment(storage, row)));
+  const replies = new Map<string, ThreadComment[]>();
+  for (const item of items) {
+    if (item.parentId) {
+      const thread = replies.get(item.parentId);
+      if (thread) {
+        thread.push(item);
+      } else {
+        replies.set(item.parentId, [item]);
+      }
+    }
+  }
+  return items
+    .filter((item) => item.parentId === null)
+    .map((item) => ({ ...item, replies: replies.get(item.id) ?? [] }));
+}
+
+// A comment with the project it belongs to, so each side can check access.
+async function findThreadComment(db: Database, id: string) {
+  const [row] = await db
+    .select({ comment, projectId: deliverable.projectId })
+    .from(comment)
+    .innerJoin(version, eq(comment.versionId, version.id))
+    .innerJoin(deliverable, eq(version.deliverableId, deliverable.id))
+    .where(eq(comment.id, id));
+  if (!row) {
+    throw new ORPCError("NOT_FOUND", { message: "Comment not found" });
+  }
+  return row;
+}
+
+// Threads stay one level deep: answering a reply answers its thread. A reply
+// takes its thread's timecode, version and round.
+async function insertReply(
+  db: Database,
+  target: typeof comment.$inferSelect,
+  author:
+    | { authorType: "editor"; authorUserId: string }
+    | { authorType: "reviewer"; reviewerId: string },
+  body: string
+) {
+  const [saved] = await db
+    .insert(comment)
+    .values({
+      ...author,
+      body,
+      parentId: target.parentId ?? target.id,
+      roundId: target.roundId,
+      timecodeMs: target.timecodeMs,
+      versionId: target.versionId,
+    })
+    .returning();
+  if (!saved) {
+    throw new ORPCError("INTERNAL_SERVER_ERROR");
+  }
+  return saved;
 }
 
 // The browser uploads the image through a presigned URL, so only a stored
@@ -234,6 +301,58 @@ export const commentRouter = {
       return await listComments(context.db, context.storage, target.id);
     }),
 
+  // The editor answers a thread from their review page (REV-04).
+  reply: protectedProcedure
+    .input(commentReplySchema)
+    .handler(async ({ context, input }) => {
+      const workspace = await getOrCreateWorkspace(
+        context.db,
+        context.session.user
+      );
+      const target = await findThreadComment(context.db, input.parentId);
+      await findOwnedVersion(
+        context.db,
+        workspace.id,
+        target.comment.versionId
+      );
+      const saved = await insertReply(
+        context.db,
+        target.comment,
+        { authorType: "editor", authorUserId: context.session.user.id },
+        input.body
+      );
+      return await toComment(context.storage, {
+        ...saved,
+        editorName: context.session.user.name,
+        reviewerName: null,
+      });
+    }),
+
+  // An identified reviewer answers a thread of the linked project.
+  replyForReview: publicProcedure
+    .input(commentReplySchema.extend({ token: reviewTokenSchema }))
+    .use(requireReviewLink)
+    .handler(async ({ context, input }) => {
+      const author = requireReviewer(context.reviewer);
+      const { projectId } = context.reviewLink;
+      const target = await findThreadComment(context.db, input.parentId);
+      if (target.projectId !== projectId) {
+        throw new ORPCError("NOT_FOUND", { message: "Comment not found" });
+      }
+      await findReviewVersion(context.db, projectId, target.comment.versionId);
+      const saved = await insertReply(
+        context.db,
+        target.comment,
+        { authorType: "reviewer", reviewerId: author.id },
+        input.body
+      );
+      return await toComment(context.storage, {
+        ...saved,
+        editorName: null,
+        reviewerName: author.name,
+      });
+    }),
+
   // Where the reviewer's browser uploads an image before creating the
   // comment that references it.
   signAttachment: publicProcedure
@@ -245,5 +364,39 @@ export const commentRouter = {
       await findReviewVersion(context.db, projectId, versionId);
       const key = `${attachmentPrefix(projectId)}${crypto.randomUUID()}.${COMMENT_ATTACHMENT_TYPES[contentType]}`;
       return { key, url: await context.storage.signPut(key, contentType) };
+    }),
+
+  // The editor processes the feedback: done, refused with a reason, or open
+  // again (REV-04). Replies follow their thread and have no status.
+  updateStatus: protectedProcedure
+    .input(commentStatusSchema)
+    .handler(async ({ context, input }) => {
+      const workspace = await getOrCreateWorkspace(
+        context.db,
+        context.session.user
+      );
+      const target = await findThreadComment(context.db, input.id);
+      await findOwnedVersion(
+        context.db,
+        workspace.id,
+        target.comment.versionId
+      );
+      const rejectReason =
+        input.status === "rejected" ? input.rejectReason : null;
+      const [saved] = await context.db
+        .update(comment)
+        .set({ rejectReason, status: input.status })
+        .where(and(eq(comment.id, input.id), isNull(comment.parentId)))
+        .returning({
+          id: comment.id,
+          rejectReason: comment.rejectReason,
+          status: comment.status,
+        });
+      if (!saved) {
+        throw new ORPCError("BAD_REQUEST", {
+          message: "Only top-level comments have a status",
+        });
+      }
+      return saved;
     }),
 };

@@ -57,6 +57,8 @@ import { client, orpc } from "@/utils/orpc";
 import {
   CommentThread,
   type FeedbackComment,
+  type ReplyHandler,
+  type StatusHandler,
   toMarkers,
 } from "./comment-thread";
 import { type PlayerHandle, VideoPlayer } from "./video-player";
@@ -106,24 +108,28 @@ export function ReviewViewSkeleton({ label }: { label?: string }) {
   );
 }
 
-// The client's timestamped feedback on this version, read-only until replies
-// and statuses arrive (REV-04).
+// The client's timestamped feedback on this version: the editor answers it
+// and marks it done or refused (REV-04).
 function FeedbackPanel({
   comments,
   frameRate,
   isError,
   locale,
   messages,
+  onReply,
   onRetry,
   onSeek,
+  onStatusChange,
 }: {
   comments: FeedbackComment[] | undefined;
   frameRate: FrameRate | null;
   isError: boolean;
   locale: Locale;
   messages: ProjectsMessages;
+  onReply: ReplyHandler;
   onRetry: () => void;
   onSeek: (ms: number) => void;
+  onStatusChange: StatusHandler;
 }) {
   const { feedback } = messages.player;
   return (
@@ -145,8 +151,10 @@ function FeedbackPanel({
           isError={isError}
           locale={locale}
           messages={feedback}
+          onReply={onReply}
           onRetry={onRetry}
           onSeek={onSeek}
+          onStatusChange={onStatusChange}
           retryLabel={messages.retry}
         />
       </FramePanel>
@@ -319,6 +327,27 @@ export function ReviewView({
   const handleRetryComments = useCallback(
     () => refetchComments(),
     [refetchComments]
+  );
+  const queryClient = useQueryClient();
+  const handleReply = useCallback<ReplyHandler>(
+    async (parentId, body) => {
+      await client.comment.reply({ body, parentId });
+      await queryClient.invalidateQueries({
+        queryKey: orpc.comment.list.key(),
+      });
+    },
+    [queryClient]
+  );
+  // The project's open feedback counter follows the statuses.
+  const handleStatusChange = useCallback<StatusHandler>(
+    async (input) => {
+      await client.comment.updateStatus(input);
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: orpc.comment.list.key() }),
+        queryClient.invalidateQueries({ queryKey: orpc.project.get.key() }),
+      ]);
+    },
+    [queryClient]
   );
   const [uploadTarget, setUploadTarget] = useState<UploadTarget>();
   const closeUpload = useCallback((open: boolean) => {
@@ -527,8 +556,10 @@ export function ReviewView({
           isError={comments.isError}
           locale={locale}
           messages={messages}
+          onReply={handleReply}
           onRetry={handleRetryComments}
           onSeek={handleSeek}
+          onStatusChange={handleStatusChange}
         />
       </div>
       <VersionUploadSheet

@@ -1,8 +1,10 @@
 import z from "zod";
 
-// Timestamped feedback shared by the API and the review pages (REV-03).
-// Client-safe: no node or drizzle import.
+// Timestamped feedback shared by the API and the review pages (REV-03,
+// REV-04). Client-safe: no node or drizzle import.
 export const COMMENT_BODY_MAX_LENGTH = 2000;
+
+export const COMMENT_REJECT_REASON_MAX_LENGTH = 500;
 
 // Screenshots and annotated stills: the formats every browser displays.
 export const COMMENT_ATTACHMENT_TYPES = {
@@ -40,6 +42,31 @@ export const commentSchema = z
   );
 
 export type CommentInput = z.input<typeof commentSchema>;
+
+// A reply joins the thread of a top-level comment (REV-04).
+export const commentReplySchema = z.object({
+  body: z.string().trim().min(1).max(COMMENT_BODY_MAX_LENGTH),
+  parentId: z.string().min(1),
+});
+
+// Only a refusal carries a reason, and it can't be left out.
+export const commentStatusSchema = z.discriminatedUnion("status", [
+  z.object({
+    id: z.string().min(1),
+    status: z.enum(["open", "done"]),
+  }),
+  z.object({
+    id: z.string().min(1),
+    rejectReason: z
+      .string()
+      .trim()
+      .min(1)
+      .max(COMMENT_REJECT_REASON_MAX_LENGTH),
+    status: z.literal("rejected"),
+  }),
+]);
+
+export type CommentStatusInput = z.input<typeof commentStatusSchema>;
 
 export const commentAttachmentSchema = z.object({
   contentType: z.enum(

@@ -2,11 +2,12 @@ import { ORPCError } from "@orpc/server";
 import { projectStatusSources } from "@roundcut/db/project-status";
 import type { RoundStatus } from "@roundcut/db/round";
 import { client } from "@roundcut/db/schema/client";
+import { comment } from "@roundcut/db/schema/comment";
 import { deliverable } from "@roundcut/db/schema/deliverable";
 import { project } from "@roundcut/db/schema/project";
 import { round } from "@roundcut/db/schema/round";
 import { version } from "@roundcut/db/schema/version";
-import { and, asc, desc, eq, inArray, isNull, ne } from "drizzle-orm";
+import { and, asc, count, desc, eq, inArray, isNull, ne } from "drizzle-orm";
 import z from "zod";
 
 import { protectedProcedure } from "../index";
@@ -30,12 +31,9 @@ export interface ReviewActivity {
     number: number;
     thumbnailUrl: string | null;
   } | null;
+  // Top-level comments of the latest version still to process (REV-04).
   openComments: number;
 }
-
-// Comments don't exist yet (REV-04): until they ship, every deliverable reads
-// as having no open feedback.
-const NO_OPEN_COMMENTS = 0;
 
 export interface DashboardIndicators {
   // Amount still to bill: flat fees and accepted extra rounds (BILL-01).
@@ -267,6 +265,24 @@ export const projectRouter = {
           )
         )
       );
+      const latestIds = [...latest.values()].map((item) => item.id);
+      const openComments =
+        latestIds.length > 0
+          ? await context.db
+              .select({ count: count(), versionId: comment.versionId })
+              .from(comment)
+              .where(
+                and(
+                  inArray(comment.versionId, latestIds),
+                  isNull(comment.parentId),
+                  eq(comment.status, "open")
+                )
+              )
+              .groupBy(comment.versionId)
+          : [];
+      const openCounts = new Map(
+        openComments.map((item) => [item.versionId, item.count])
+      );
       const rounds = await context.db
         .select({
           deliverableId: round.deliverableId,
@@ -289,7 +305,8 @@ export const projectRouter = {
           review: {
             currentRound: currentRounds.get(item.id) ?? null,
             latestVersion: latestVersions.get(item.id) ?? null,
-            openComments: NO_OPEN_COMMENTS,
+            openComments:
+              openCounts.get(latestVersions.get(item.id)?.id ?? "") ?? 0,
           },
         }))
       );
