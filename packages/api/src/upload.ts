@@ -1,6 +1,8 @@
 import { PLAN_MAX_FILE_BYTES } from "@roundcut/db/plan";
 import z from "zod";
 
+import { FRAME_RATES } from "./timecode";
+
 // Upload plan shared by the API and the browser (VER-01). Files up to the
 // threshold go in one presigned PUT; larger ones in fixed-size parts that can
 // be resumed. Accepted formats and per-plan size limits are VER-02.
@@ -35,6 +37,8 @@ export function uploadFormat(fileName: string): UploadFormat | undefined {
 export const createUploadSchema = z.object({
   deliverableId: z.string().min(1),
   fileName: z.string().trim().min(1).max(UPLOAD_FILE_NAME_MAX_LENGTH),
+  // Declared by the editor (VER-03), prefilled from the detected rate.
+  frameRate: z.literal(FRAME_RATES),
   sizeBytes: z.int().min(1).max(MAX_UPLOAD_BYTES),
 });
 

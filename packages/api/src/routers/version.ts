@@ -7,6 +7,7 @@ import { and, desc, eq } from "drizzle-orm";
 import z from "zod";
 
 import { protectedProcedure } from "../index";
+import type { FrameRate } from "../timecode";
 import { getOrCreateWorkspace } from "./workspace";
 
 type VersionRow = typeof version.$inferSelect;
@@ -15,12 +16,16 @@ export const toVersion = (row: VersionRow) => ({
   contentType: row.contentType,
   createdAt: row.createdAt,
   deliverableId: row.deliverableId,
+  durationMs: row.durationMs,
   fileName: row.fileName,
+  frameRate: row.fps as FrameRate | null,
+  height: row.height,
   id: row.id,
   multipart: row.uploadId !== null,
   number: row.number,
   sizeBytes: row.sizeBytes,
   status: row.status,
+  width: row.width,
 });
 
 // Deliverables and versions of other workspaces read as missing so their ids

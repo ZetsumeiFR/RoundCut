@@ -5,7 +5,7 @@ import { and, eq, max } from "drizzle-orm";
 import z from "zod";
 
 import { protectedProcedure } from "../index";
-import { isSupportedMedia, readMediaTracks } from "../media";
+import { isSupportedMedia, readMedia } from "../media";
 import {
   createUploadSchema,
   MULTIPART_THRESHOLD_BYTES,
@@ -94,23 +94,31 @@ export const uploadRouter = {
       // The browser checks codecs before sending; this catches files that
       // bypassed it. A refused file is removed with its version.
       const format = uploadFormat(row.fileName);
-      const tracks = await readMediaTracks(
+      const media = await readMedia(
         (offset, length) =>
           context.storage.readRange(row.r2Key, offset, length),
         size
       );
-      if (!(format && tracks && isSupportedMedia(format, tracks))) {
+      if (!(format && media?.video && isSupportedMedia(format, media.tracks))) {
         await context.storage.deleteObject(row.r2Key);
         await context.db.delete(version).where(eq(version.id, row.id));
         throw new ORPCError("UNSUPPORTED_MEDIA_TYPE", {
-          data: { tracks },
+          data: { tracks: media?.tracks ?? null },
           message:
             "Only H.264 MP4 (AAC audio) and H.264 MOV files are accepted",
         });
       }
       const [ready] = await context.db
         .update(version)
-        .set({ status: "ready", uploadId: null })
+        // The stored file's own header is the record, whatever the browser
+        // displayed; only the frame rate is the editor's declaration.
+        .set({
+          durationMs: media.video.durationMs,
+          height: media.video.height,
+          status: "ready",
+          uploadId: null,
+          width: media.video.width,
+        })
         .where(and(eq(version.id, row.id), eq(version.status, "uploading")))
         .returning();
       if (!ready) {
@@ -160,6 +168,7 @@ export const uploadRouter = {
             contentType,
             deliverableId: owned.id,
             fileName: input.fileName,
+            fps: input.frameRate,
             id,
             number: (last?.number ?? 0) + 1,
             r2Key: `${workspace.id}/${owned.id}/${id}.${format}`,
