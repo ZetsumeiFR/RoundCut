@@ -37,3 +37,7 @@ export const revisionTermsSchema = z.object({
   requirePayment: z.boolean(),
   scope: z.enum(REVISION_SCOPES),
 });
+
+export const onboardingSchema = workspaceSettingsSchema.extend({
+  revisionTerms: revisionTermsSchema,
+});

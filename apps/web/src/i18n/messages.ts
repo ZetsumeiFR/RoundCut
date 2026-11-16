@@ -249,10 +249,73 @@ const en = {
       passwordRequired: "Enter your password.",
     },
   },
+  dashboard: {
+    checklist: {
+      description:
+        "Follow these steps until you send your first review link to a client.",
+      done: "Done",
+      firstClient: "Add your first client",
+      firstClientDescription: "Keep their contact and plan terms in one place.",
+      firstLink: "Send your first review link",
+      firstLinkDescription:
+        "Your client comments on the video without creating an account.",
+      firstProject: "Create your first project",
+      firstProjectDescription: "Upload V1 of a deliverable to review.",
+      progress: "{done} of {total} done",
+      setup: "Set up your workspace",
+      setupAction: "Finish setup",
+      setupDescription:
+        "Business name, currency and VAT, default plan terms and language.",
+      soon: "Coming soon",
+      title: "Get started",
+    },
+  },
   onboarding: {
-    continue: "Go to dashboard",
-    description: "Your email is verified. Let's set up your workspace.",
-    title: "Welcome to RoundCut",
+    back: "Back",
+    continue: "Continue",
+    finish: "Finish setup",
+    finishing: "Saving…",
+    includedRoundsInvalid: "Enter a number of rounds between 0 and {max}.",
+    loadErrorDescription: "Check your connection and try again.",
+    loadErrorTitle: "Couldn't load your workspace",
+    progress: "Step {step} of {total}",
+    progressLabel: "Onboarding progress",
+    retry: "Try again",
+    saveError: "Couldn't save your setup. Try again.",
+    skip: "Skip for now",
+    steps: {
+      activity: {
+        description: "The name your clients will see on review links.",
+        label: "Business",
+        summary: "Name your business.",
+        title: "What's your business called?",
+      },
+      billing: {
+        description: "Used for extra round prices and billable lines.",
+        label: "Currency and VAT",
+        summary: "How you bill.",
+        title: "Set your currency and VAT",
+      },
+      language: {
+        description: "For what you send to your clients and your reminders.",
+        label: "Language",
+        summary: "Language and time zone.",
+        title: "Choose your language",
+      },
+      terms: {
+        description:
+          "Applied to your new projects. You can adjust them per project.",
+        label: "Plan terms",
+        summary: "Rounds, price and delay.",
+        title: "Set your default plan terms",
+      },
+    },
+    success: {
+      cta: "Go to dashboard",
+      description:
+        "Your workspace is ready. Add a client and a project to send your first review link.",
+      title: "{name} is ready",
+    },
   },
 };
 
@@ -518,10 +581,75 @@ const fr: Messages = {
       passwordRequired: "Saisissez votre mot de passe.",
     },
   },
+  dashboard: {
+    checklist: {
+      description:
+        "Suivez ces étapes jusqu'à l'envoi de votre premier lien de revue à un client.",
+      done: "Terminé",
+      firstClient: "Ajouter votre premier client",
+      firstClientDescription:
+        "Centralisez ses coordonnées et ses conditions de forfait.",
+      firstLink: "Envoyer votre premier lien de revue",
+      firstLinkDescription:
+        "Votre client commente la vidéo sans créer de compte.",
+      firstProject: "Créer votre premier projet",
+      firstProjectDescription: "Déposez la V1 d'un livrable à faire relire.",
+      progress: "{done} sur {total} terminées",
+      setup: "Configurer votre espace",
+      setupAction: "Terminer la configuration",
+      setupDescription:
+        "Nom de l'activité, devise et TVA, conditions par défaut et langue.",
+      soon: "Bientôt disponible",
+      title: "Bien démarrer",
+    },
+  },
   onboarding: {
-    continue: "Accéder au tableau de bord",
-    description: "Votre email est vérifié. Configurons votre espace.",
-    title: "Bienvenue sur RoundCut",
+    back: "Retour",
+    continue: "Continuer",
+    finish: "Terminer la configuration",
+    finishing: "Enregistrement…",
+    includedRoundsInvalid: "Saisissez un nombre de tours entre 0 et {max}.",
+    loadErrorDescription: "Vérifiez votre connexion et réessayez.",
+    loadErrorTitle: "Impossible de charger votre espace",
+    progress: "Étape {step} sur {total}",
+    progressLabel: "Progression de la configuration",
+    retry: "Réessayer",
+    saveError: "Impossible d'enregistrer votre configuration. Réessayez.",
+    skip: "Passer pour l'instant",
+    steps: {
+      activity: {
+        description: "Le nom que verront vos clients sur les liens de revue.",
+        label: "Activité",
+        summary: "Nommez votre activité.",
+        title: "Comment s'appelle votre activité ?",
+      },
+      billing: {
+        description:
+          "Utilisées pour le prix des tours supplémentaires et les lignes facturables.",
+        label: "Devise et TVA",
+        summary: "Votre facturation.",
+        title: "Choisissez votre devise et votre TVA",
+      },
+      language: {
+        description: "Pour ce que vous envoyez à vos clients et les relances.",
+        label: "Langue",
+        summary: "Langue et fuseau horaire.",
+        title: "Choisissez votre langue",
+      },
+      terms: {
+        description:
+          "Appliquées à vos nouveaux projets. Vous pourrez les ajuster par projet.",
+        label: "Conditions par défaut",
+        summary: "Tours, prix et délai.",
+        title: "Fixez vos conditions de forfait",
+      },
+    },
+    success: {
+      cta: "Accéder au tableau de bord",
+      description:
+        "Votre espace est prêt. Ajoutez un client et un projet pour envoyer votre premier lien de revue.",
+      title: "{name} est prêt",
+    },
   },
 };
 

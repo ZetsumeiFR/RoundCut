@@ -38,11 +38,15 @@ interface FormValues {
 const CENTS_PER_UNIT = 100;
 const PRICE_PATTERN = /^\d{1,6}(?:[.,]\d{1,2})?$/;
 const DAYS_PATTERN = /^\d{1,2}$/;
-const PRICE_MAX = EXTRA_ROUND_PRICE_MAX_CENTS / CENTS_PER_UNIT;
+export const PRICE_MAX = EXTRA_ROUND_PRICE_MAX_CENTS / CENTS_PER_UNIT;
 
-const parsePrice = (value: string) => Number(value.trim().replace(",", "."));
+export const parsePrice = (value: string) =>
+  Number(value.trim().replace(",", "."));
 
-const isPrice = (value: string) =>
+export const toPriceCents = (value: string) =>
+  Math.round(parsePrice(value) * CENTS_PER_UNIT);
+
+export const isPrice = (value: string) =>
   PRICE_PATTERN.test(value.trim()) && parsePrice(value) <= PRICE_MAX;
 
 const isDelay = (value: string) =>
@@ -68,12 +72,15 @@ const createFormSchema = (messages: TermsMessages, locale: Locale) =>
     scope: z.string(),
   });
 
+export const formatPrice = (cents: number, locale: Locale) =>
+  new Intl.NumberFormat(locale, {
+    minimumFractionDigits: cents % CENTS_PER_UNIT ? 2 : 0,
+    useGrouping: false,
+  }).format(cents / CENTS_PER_UNIT);
+
 const toFormValues = (terms: RevisionTerms, locale: Locale): FormValues => ({
   extraRoundDelayDays: String(terms.extraRoundDelayDays),
-  extraRoundPrice: new Intl.NumberFormat(locale, {
-    minimumFractionDigits: terms.extraRoundPriceCents % CENTS_PER_UNIT ? 2 : 0,
-    useGrouping: false,
-  }).format(terms.extraRoundPriceCents / CENTS_PER_UNIT),
+  extraRoundPrice: formatPrice(terms.extraRoundPriceCents, locale),
   includedRounds: String(terms.includedRounds),
   requirePayment: terms.requirePayment,
   scope: terms.scope,
@@ -82,9 +89,7 @@ const toFormValues = (terms: RevisionTerms, locale: Locale): FormValues => ({
 const toRevisionTerms = (value: FormValues) =>
   revisionTermsSchema.parse({
     extraRoundDelayDays: Number(value.extraRoundDelayDays.trim()),
-    extraRoundPriceCents: Math.round(
-      parsePrice(value.extraRoundPrice) * CENTS_PER_UNIT
-    ),
+    extraRoundPriceCents: toPriceCents(value.extraRoundPrice),
     includedRounds: Number(value.includedRounds),
     requirePayment: value.requirePayment,
     scope: value.scope,

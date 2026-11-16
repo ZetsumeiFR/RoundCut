@@ -50,9 +50,10 @@ const LANGUAGE_NAMES: Record<Locale, string> = {
 const VAT_RATE_PATTERN = /^\d{1,3}(?:[.,]\d{1,2})?$/;
 const MAX_VAT_RATE = 100;
 
-const parseVatRate = (value: string) => Number(value.trim().replace(",", "."));
+export const parseVatRate = (value: string) =>
+  Number(value.trim().replace(",", "."));
 
-const isVatRate = (value: string) =>
+export const isVatRate = (value: string) =>
   VAT_RATE_PATTERN.test(value.trim()) && parseVatRate(value) <= MAX_VAT_RATE;
 
 const createFormSchema = (messages: WorkspaceMessages) =>
@@ -71,18 +72,21 @@ const createFormSchema = (messages: WorkspaceMessages) =>
     timezone: z.string().refine(isTimeZone),
   });
 
-const toFormValues = (workspace: Workspace, locale: Locale): FormValues => ({
-  currency: workspace.currency,
-  defaultVatRate: new Intl.NumberFormat(locale, {
+export const formatVatRate = (rate: number, locale: Locale) =>
+  new Intl.NumberFormat(locale, {
     maximumFractionDigits: 2,
     useGrouping: false,
-  }).format(workspace.defaultVatRate),
+  }).format(rate);
+
+const toFormValues = (workspace: Workspace, locale: Locale): FormValues => ({
+  currency: workspace.currency,
+  defaultVatRate: formatVatRate(workspace.defaultVatRate, locale),
   locale: workspace.locale,
   name: workspace.name,
   timezone: workspace.timezone,
 });
 
-function useWorkspaceOptions(locale: Locale, timezone: string) {
+export function useWorkspaceOptions(locale: Locale, timezone: string) {
   return useMemo(() => {
     const currencyNames = new Intl.DisplayNames([locale], { type: "currency" });
     const timezones = Intl.supportedValuesOf("timeZone");

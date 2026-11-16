@@ -14,6 +14,8 @@ export const workspace = pgTable("workspace", {
     .$defaultFn(() => crypto.randomUUID()),
   locale: text("locale").default("fr").notNull(),
   name: text("name").notNull(),
+  // Set when the owner finishes the onboarding (WS-03); null while skipped.
+  onboardingCompletedAt: timestamp("onboarding_completed_at"),
   ownerUserId: text("owner_user_id")
     .notNull()
     .unique()

@@ -1,7 +1,11 @@
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 
-import { auth } from "../../services";
+import { SetupChecklist } from "@/components/dashboard/setup-checklist";
+import { getLocale } from "@/i18n/get-locale";
+import { getMessages } from "@/i18n/messages";
+import { createServerApi } from "@/lib/server-api";
+import { auth } from "@/services";
 import Dashboard from "./dashboard";
 
 export default async function DashboardPage() {
@@ -16,11 +20,24 @@ export default async function DashboardPage() {
     redirect("/onboarding");
   }
 
+  const [locale, workspace] = await Promise.all([
+    getLocale(),
+    createServerApi(session).workspace.get(),
+  ]);
+
   return (
-    <div>
-      <h1>Dashboard</h1>
-      <p>Welcome {session.user.name}</p>
-      <Dashboard session={session} />
-    </div>
+    <main className="flex w-full min-w-0 flex-col gap-6 px-4 py-6 sm:px-8">
+      <div className="w-full max-w-3xl">
+        <SetupChecklist
+          messages={getMessages(locale).dashboard.checklist}
+          setupDone={workspace.onboardingCompletedAt !== null}
+        />
+      </div>
+      <div>
+        <h1>Dashboard</h1>
+        <p>Welcome {session.user.name}</p>
+        <Dashboard session={session} />
+      </div>
+    </main>
   );
 }
