@@ -33,7 +33,7 @@ export function ForgotPasswordForm({
         redirectTo: `${window.location.origin}/reset-password`,
       });
       if (error) {
-        setSubmitError(authErrorMessage(error.code, messages.errors));
+        setSubmitError(authErrorMessage(error, messages.errors));
         return;
       }
       setSentTo(value.email);

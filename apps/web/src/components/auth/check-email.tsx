@@ -36,7 +36,7 @@ export function CheckEmail({
       email,
     });
     if (error) {
-      setErrorMessage(authErrorMessage(error.code, messages.errors));
+      setErrorMessage(authErrorMessage(error, messages.errors));
       setState("error");
       return;
     }

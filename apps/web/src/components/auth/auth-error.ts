@@ -5,10 +5,16 @@ const USER_EXISTS_CODES = new Set([
   "USER_ALREADY_EXISTS_USE_ANOTHER_EMAIL",
 ]);
 
+// Better-Auth's rate limiter answers 429 without an error code.
+const TOO_MANY_REQUESTS = 429;
+
 export function authErrorMessage(
-  code: string | undefined,
+  { code, status }: { code?: string; status: number },
   errors: Messages["auth"]["errors"]
 ) {
+  if (status === TOO_MANY_REQUESTS) {
+    return errors.tooManyRequests;
+  }
   if (code && USER_EXISTS_CODES.has(code)) {
     return errors.userExists;
   }

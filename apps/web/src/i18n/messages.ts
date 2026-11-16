@@ -56,6 +56,7 @@ const en = {
       invalidCredentials: "Invalid email or password.",
       passwordTooShort: "Password must be at least {min} characters.",
       title: "Something went wrong",
+      tooManyRequests: "Too many attempts. Wait a minute before trying again.",
       userExists: "An account already exists with this email.",
     },
     fields: {
@@ -190,6 +191,8 @@ const fr: Messages = {
       passwordTooShort:
         "Le mot de passe doit contenir au moins {min} caractères.",
       title: "Une erreur est survenue",
+      tooManyRequests:
+        "Trop de tentatives. Patientez une minute avant de réessayer.",
       userExists: "Un compte existe déjà avec cet email.",
     },
     fields: {

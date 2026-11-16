@@ -39,7 +39,7 @@ export function SignUpForm({
         password: value.password,
       });
       if (error) {
-        setSubmitError(authErrorMessage(error.code, messages.errors));
+        setSubmitError(authErrorMessage(error, messages.errors));
         return;
       }
       onSignedUp(value.email);

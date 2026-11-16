@@ -46,7 +46,7 @@ export function SignInForm({
         return;
       }
       if (error) {
-        setSubmitError(authErrorMessage(error.code, messages.errors));
+        setSubmitError(authErrorMessage(error, messages.errors));
         return;
       }
       router.push("/dashboard");

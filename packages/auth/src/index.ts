@@ -3,6 +3,7 @@ import type { Database } from "@roundcut/db";
 import {
   account,
   authRelations,
+  rateLimit,
   session,
   user,
   verification,
@@ -34,6 +35,9 @@ export type AuthConfig = EmailConfig &
 export const isGoogleSignInEnabled = (env: GoogleConfig) =>
   Boolean(env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET);
 
+// Brute-force guard for credential endpoints: attempts per client IP and path.
+const CREDENTIAL_ATTEMPTS = { max: 5, window: 60 };
+
 const googleProvider = ({
   GOOGLE_CLIENT_ID,
   GOOGLE_CLIENT_SECRET,
@@ -53,7 +57,14 @@ export function createAuth(env: AuthConfig, database: Database) {
     baseURL: env.BETTER_AUTH_URL,
     database: drizzleAdapter(database, {
       provider: "pg",
-      schema: { account, authRelations, session, user, verification },
+      schema: {
+        account,
+        authRelations,
+        rateLimit,
+        session,
+        user,
+        verification,
+      },
     }),
     emailAndPassword: {
       enabled: true,
@@ -76,6 +87,17 @@ export function createAuth(env: AuthConfig, database: Database) {
       },
     },
     plugins: [nextCookies()],
+    // On in every environment (Better-Auth defaults to production only) and
+    // stored in Postgres so limits survive restarts and span instances.
+    // Password-reset and verification emails keep Better-Auth's 3/min rule.
+    rateLimit: {
+      customRules: {
+        "/sign-in/*": CREDENTIAL_ATTEMPTS,
+        "/sign-up/*": CREDENTIAL_ATTEMPTS,
+      },
+      enabled: true,
+      storage: "database",
+    },
     secret: env.BETTER_AUTH_SECRET,
     socialProviders: googleProvider(env),
     trustedOrigins: [env.BETTER_AUTH_URL],
