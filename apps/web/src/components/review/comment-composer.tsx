@@ -387,6 +387,9 @@ export function CommentComposer({
             queryKey: orpc.comment.listForReview.key(),
           }),
           queryClient.invalidateQueries({ queryKey: orpc.review.round.key() }),
+          queryClient.invalidateQueries({
+            queryKey: orpc.extraRound.getOffer.key(),
+          }),
         ]);
         toast.success(messages.saved);
         positionChosen.current = false;

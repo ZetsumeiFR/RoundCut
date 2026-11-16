@@ -247,6 +247,7 @@ function LinkedReview({
           <SubmitBatch
             locale={locale}
             messages={messages.submit}
+            offerMessages={messages.extraRound}
             token={token}
             versionId={version.id}
             workspaceName={project.workspaceName}

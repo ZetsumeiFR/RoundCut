@@ -1230,6 +1230,29 @@ const en = {
       title: "This link has expired",
     },
     expiresAt: "Link valid until {date}",
+    extraRound: {
+      agreement:
+        "By accepting, you order extra round {round} for {net} excl. VAT ({gross} incl. VAT). {workspace} delivers the next version within {delay} of receiving your feedback.",
+      badge: "Agreement needed",
+      delay: "Delivery delay",
+      delayOne: "{count} day",
+      delayOther: "{count} days",
+      description:
+        "Your included rounds are used up. For {workspace} to handle this new batch of feedback, an extra round is offered:",
+      hint: "Add your feedback: an extra round offer will show up here.",
+      kept: "Your comments are kept while the offer waits for the decider's agreement.",
+      loadError: "Couldn't load the extra round offer.",
+      loading: "Loading the extra round offer…",
+      net: "Price excl. VAT",
+      paymentNotRequired:
+        "The round opens as soon as it is agreed; {workspace} will invoice it.",
+      paymentRequired: "Online payment is requested before the round opens.",
+      retry: "Try again",
+      title: "Extra round {round}",
+      total: "Total incl. VAT",
+      validUntil: "Offer valid until {date}",
+      vat: "VAT ({rate})",
+    },
     identity: {
       decider: "Decider",
       description:
@@ -2568,6 +2591,30 @@ const fr: Messages = {
       title: "Ce lien a expiré",
     },
     expiresAt: "Lien valable jusqu'au {date}",
+    extraRound: {
+      agreement:
+        "En acceptant, vous commandez le tour supplémentaire {round} pour {net} HT ({gross} TTC). {workspace} livre la version suivante sous {delay} après réception de vos retours.",
+      badge: "Accord requis",
+      delay: "Délai de livraison",
+      delayOne: "{count} jour",
+      delayOther: "{count} jours",
+      description:
+        "Vos tours inclus sont épuisés. Pour que {workspace} traite ce nouveau lot de retours, un tour supplémentaire vous est proposé :",
+      hint: "Ajoutez vos retours : une proposition de tour supplémentaire s'affichera ici.",
+      kept: "Vos retours sont conservés en attendant l'accord du décideur.",
+      loadError: "Impossible de charger la proposition de tour supplémentaire.",
+      loading: "Chargement de la proposition de tour supplémentaire…",
+      net: "Prix HT",
+      paymentNotRequired:
+        "Le tour s'ouvre dès votre accord ; {workspace} le facturera.",
+      paymentRequired:
+        "Le paiement en ligne est demandé avant l'ouverture du tour.",
+      retry: "Réessayer",
+      title: "Tour supplémentaire {round}",
+      total: "Total TTC",
+      validUntil: "Proposition valable jusqu'au {date}",
+      vat: "TVA ({rate})",
+    },
     identity: {
       decider: "Décideur",
       description:
