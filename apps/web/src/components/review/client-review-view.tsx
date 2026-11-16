@@ -234,7 +234,6 @@ function LinkedReview({
             </Badge>
           </div>
           <SubmitBatch
-            comments={comments.data ?? []}
             locale={locale}
             messages={messages.submit}
             token={token}

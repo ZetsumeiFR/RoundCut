@@ -404,6 +404,9 @@ function CommentItem({
           <Badge variant={STATUS_BADGES[comment.status]}>
             {messages.statuses[comment.status]}
           </Badge>
+          {comment.roundId === null ? (
+            <Badge variant="primary-light">{messages.pending}</Badge>
+          ) : null}
           <div className="ms-auto flex flex-wrap justify-end gap-2">
             {onStatusChange && mode === "idle" ? (
               <StatusActions
