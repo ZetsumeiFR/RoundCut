@@ -26,6 +26,7 @@ import {
   requireReviewLink,
 } from "../index";
 import { reviewTokenSchema } from "../review-link";
+import { isDeciderEmail } from "../reviewer";
 import type { Storage } from "../storage";
 import { findOwnedVersion } from "./version";
 import { getOrCreateWorkspace } from "./workspace";
@@ -53,6 +54,21 @@ export const requireReviewer = <T>(reviewerOf: T | null) => {
     });
   }
   return reviewerOf;
+};
+
+// Agreements (EXTRA-02) belong to the client's current decider alone, checked
+// against the client's decider email rather than the identification snapshot.
+export const requireDecider = <T extends { email: string }>(
+  reviewerOf: T | null,
+  client: { deciderEmail: string }
+) => {
+  const identified = requireReviewer(reviewerOf);
+  if (!isDeciderEmail(client, identified.email)) {
+    throw new ORPCError("FORBIDDEN", {
+      message: "Only the decider can do this",
+    });
+  }
+  return identified;
 };
 
 // A published version of the linked project; anything else reads as missing.

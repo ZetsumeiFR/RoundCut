@@ -20,6 +20,8 @@ import { useCallback } from "react";
 import { formatMessage, type Messages } from "@/i18n/messages";
 import { orpc } from "@/utils/orpc";
 
+import { ExtraRoundAgreement } from "./extra-round-agreement";
+
 type OfferMessages = Messages["review"]["extraRound"];
 
 const CENTS_PER_UNIT = 100;
@@ -46,7 +48,7 @@ function AmountRow({
 
 // The extra round offer shown to the client once the included rounds are used
 // up and a new batch has started (EXTRA-01, E12): price excluding VAT, VAT,
-// total, delay and the agreement text. Accepting it comes with EXTRA-02.
+// total, delay and the agreement text, then the decider's answer (EXTRA-02).
 export function ExtraRoundOffer({
   locale,
   messages,
@@ -125,7 +127,11 @@ export function ExtraRoundOffer({
       <Frame className="w-full" dense spacing="default" variant="default">
         <FrameHeader className="flex-row flex-wrap items-center justify-between gap-2">
           <FrameTitle className="font-medium text-sm">{title}</FrameTitle>
-          <Badge variant="warning-light">{messages.badge}</Badge>
+          {current.status === "accepted" ? (
+            <Badge variant="success-light">{messages.acceptedBadge}</Badge>
+          ) : (
+            <Badge variant="warning-light">{messages.badge}</Badge>
+          )}
         </FrameHeader>
         <FramePanel className="flex flex-col gap-3">
           <p className="text-sm">
@@ -158,7 +164,7 @@ export function ExtraRoundOffer({
                   workspace: workspaceName,
                 })}
           </p>
-          <p>{messages.kept}</p>
+          {current.status === "proposed" ? <p>{messages.kept}</p> : null}
           <p>
             {formatMessage(messages.validUntil, {
               date: new Intl.DateTimeFormat(locale, {
@@ -167,6 +173,16 @@ export function ExtraRoundOffer({
             })}
           </p>
         </FrameFooter>
+        <FramePanel>
+          <ExtraRoundAgreement
+            key={current.id}
+            locale={locale}
+            messages={messages.answer}
+            offer={current}
+            token={token}
+            versionId={versionId}
+          />
+        </FramePanel>
       </Frame>
     </section>
   );

@@ -202,6 +202,71 @@ export function awaitingFeedbackEmail(
   return { to, ...awaitingFeedbackEmails[locale](details) };
 }
 
+export interface ReviewerCodeDetails {
+  code: string;
+  projectName: string;
+  reviewerName: string;
+  studioName: string;
+  validityMinutes: number;
+}
+
+const extraRoundCodeEmails = {
+  en: (details: ReviewerCodeDetails) => ({
+    subject: `${details.code} is your code to accept the extra round`,
+    text: `Hello ${details.reviewerName},\n\nYour code to accept the extra round offered by ${details.studioName} on ${details.projectName}:\n\n${details.code}\n\nIt is valid for ${details.validityMinutes} minutes. If you didn't ask for it, ignore this email: nothing is accepted without the code.`,
+  }),
+  fr: (details: ReviewerCodeDetails) => ({
+    subject: `${details.code} est votre code pour accepter le tour supplémentaire`,
+    text: `Bonjour ${details.reviewerName},\n\nVotre code pour accepter le tour supplémentaire proposé par ${details.studioName} sur ${details.projectName} :\n\n${details.code}\n\nIl est valable ${details.validityMinutes} minutes. Si vous n'êtes pas à l'origine de cette demande, ignorez cet email : rien n'est accepté sans le code.`,
+  }),
+} satisfies Record<
+  Locale,
+  (details: ReviewerCodeDetails) => Omit<EmailMessage, "to">
+>;
+
+// The code the decider types to accept an extra round (EXTRA-02).
+export function extraRoundCodeEmail(
+  locale: Locale,
+  to: string,
+  details: ReviewerCodeDetails
+): EmailMessage {
+  return { to, ...extraRoundCodeEmails[locale](details) };
+}
+
+export interface ExtraRoundForwardDetails {
+  deciderName: string;
+  deliverableTitle: string;
+  projectName: string;
+  reviewerName: string;
+  roundNumber: number;
+  studioName: string;
+  url: string;
+}
+
+const extraRoundForwardEmails = {
+  en: (details: ExtraRoundForwardDetails) => ({
+    subject: `${details.projectName}: extra round ${details.roundNumber} waits for your agreement`,
+    text: `Hello ${details.deciderName},\n\n${details.reviewerName} started a new batch of feedback on ${details.deliverableTitle} (${details.projectName}), beyond the rounds included with ${details.studioName}. Only you can accept extra round ${details.roundNumber}: the feedback is kept until you answer.\n\nReview the offer and accept it:\n${details.url}`,
+  }),
+  fr: (details: ExtraRoundForwardDetails) => ({
+    subject: `${details.projectName} : le tour supplémentaire ${details.roundNumber} attend votre accord`,
+    text: `Bonjour ${details.deciderName},\n\n${details.reviewerName} a commencé un nouveau lot de retours sur ${details.deliverableTitle} (${details.projectName}), au-delà des tours inclus avec ${details.studioName}. Le tour supplémentaire ${details.roundNumber} ne peut être accepté que par vous : les retours sont conservés en attendant votre réponse.\n\nConsultez la proposition et acceptez-la :\n${details.url}`,
+  }),
+} satisfies Record<
+  Locale,
+  (details: ExtraRoundForwardDetails) => Omit<EmailMessage, "to">
+>;
+
+// A reviewer who can't accept forwards the extra round offer to the decider
+// (EXTRA-02).
+export function extraRoundForwardEmail(
+  locale: Locale,
+  to: string,
+  details: ExtraRoundForwardDetails
+): EmailMessage {
+  return { to, ...extraRoundForwardEmails[locale](details) };
+}
+
 export function resetPasswordEmail(
   locale: Locale,
   to: string,

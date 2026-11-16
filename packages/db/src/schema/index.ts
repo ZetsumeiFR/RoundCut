@@ -6,6 +6,7 @@ export * from "./extra-round-offer";
 export * from "./project";
 export * from "./review-link";
 export * from "./reviewer";
+export * from "./reviewer-code";
 export * from "./round";
 export * from "./version";
 export * from "./workspace";
