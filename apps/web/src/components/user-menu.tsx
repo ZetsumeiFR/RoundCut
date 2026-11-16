@@ -56,6 +56,9 @@ export default function UserMenu({
           <DropdownMenuLabel>{messages.label}</DropdownMenuLabel>
           <DropdownMenuSeparator />
           <DropdownMenuItem>{session.user.email}</DropdownMenuItem>
+          <DropdownMenuItem render={<Link href="/account/security" />}>
+            {messages.security}
+          </DropdownMenuItem>
           <DropdownMenuItem render={<Link href="/account/sessions" />}>
             {messages.sessions}
           </DropdownMenuItem>

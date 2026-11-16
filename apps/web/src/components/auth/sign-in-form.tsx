@@ -19,12 +19,14 @@ export function SignInForm({
   onEmailNotVerified,
   onForgotPassword,
   onSwitchToSignUp,
+  onTwoFactorRequired,
   social,
 }: {
   messages: Messages["auth"];
   onEmailNotVerified: (email: string) => void;
   onForgotPassword: () => void;
   onSwitchToSignUp: () => void;
+  onTwoFactorRequired: () => void;
   social?: ReactNode;
 }) {
   const router = useRouter();
@@ -35,7 +37,7 @@ export function SignInForm({
     defaultValues: { email: "", password: "" },
     onSubmit: async ({ value }) => {
       setSubmitError(null);
-      const { error } = await authClient.signIn.email({
+      const { data, error } = await authClient.signIn.email({
         // Used by the verification link Better-Auth re-sends to unverified users.
         callbackURL: `${window.location.origin}/dashboard`,
         email: value.email,
@@ -47,6 +49,10 @@ export function SignInForm({
       }
       if (error) {
         setSubmitError(authErrorMessage(error, messages.errors));
+        return;
+      }
+      if ("twoFactorRedirect" in data) {
+        onTwoFactorRequired();
         return;
       }
       router.push("/dashboard");

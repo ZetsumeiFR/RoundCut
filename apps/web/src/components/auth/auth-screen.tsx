@@ -11,9 +11,10 @@ import { ForgotPasswordForm } from "./forgot-password-form";
 import { GoogleSignIn } from "./google-sign-in";
 import { SignInForm } from "./sign-in-form";
 import { SignUpForm } from "./sign-up-form";
+import { TwoFactorChallenge } from "./two-factor-challenge";
 
 type AuthView =
-  | { name: InitialAuthView }
+  | { name: InitialAuthView | "two-factor" }
   | { name: "check-email"; email: string; unverifiedSignIn: boolean };
 
 export function AuthScreen({
@@ -34,6 +35,7 @@ export function AuthScreen({
     () => setView({ name: "forgot-password" }),
     []
   );
+  const showTwoFactor = useCallback(() => setView({ name: "two-factor" }), []);
   const showCheckEmail = useCallback(
     (email: string) =>
       setView({ email, name: "check-email", unverifiedSignIn: false }),
@@ -64,6 +66,10 @@ export function AuthScreen({
     );
   }
 
+  if (view.name === "two-factor") {
+    return <TwoFactorChallenge messages={messages} onBack={showSignIn} />;
+  }
+
   if (view.name === "forgot-password") {
     return (
       <ForgotPasswordForm
@@ -84,6 +90,7 @@ export function AuthScreen({
         onEmailNotVerified={showUnverifiedSignIn}
         onForgotPassword={showForgotPassword}
         onSwitchToSignUp={showSignUp}
+        onTwoFactorRequired={showTwoFactor}
         social={
           googleSignIn ? (
             <GoogleSignIn
