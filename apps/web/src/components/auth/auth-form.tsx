@@ -1,8 +1,14 @@
 "use client";
 
 import { Button } from "@roundcut/ui/components/button";
-import { Field, FieldError, FieldLabel } from "@roundcut/ui/components/field";
+import {
+  Field,
+  FieldDescription,
+  FieldError,
+  FieldLabel,
+} from "@roundcut/ui/components/field";
 import { Input } from "@roundcut/ui/components/input";
+import { Textarea } from "@roundcut/ui/components/textarea";
 import {
   createFormHook,
   createFormHookContexts,
@@ -25,7 +31,7 @@ type ControlledInputProps = "id" | "name" | "value" | "onBlur" | "onChange";
 function useInputField() {
   const field = useFieldContext<string>();
   const handleChange = useCallback(
-    (event: ChangeEvent<HTMLInputElement>) =>
+    (event: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
       field.handleChange(event.target.value),
     [field]
   );
@@ -44,12 +50,14 @@ function useInputField() {
 
 function FieldShell({
   label,
+  description,
   htmlFor,
   invalid,
   errors,
   children,
 }: {
   label: string;
+  description?: string;
   htmlFor: string;
   invalid: boolean;
   errors: Array<{ message?: string } | undefined>;
@@ -59,6 +67,7 @@ function FieldShell({
     <Field className="gap-2" data-invalid={invalid}>
       <FieldLabel htmlFor={htmlFor}>{label}</FieldLabel>
       {children}
+      {description ? <FieldDescription>{description}</FieldDescription> : null}
       <FieldError errors={errors} />
     </Field>
   );
@@ -66,20 +75,44 @@ function FieldShell({
 
 function TextField({
   label,
+  description,
   ...props
-}: { label: string } & Omit<
+}: { label: string; description?: string } & Omit<
   ComponentProps<typeof Input>,
   ControlledInputProps
 >) {
   const { field, invalid, inputProps } = useInputField();
   return (
     <FieldShell
+      description={description}
       errors={field.state.meta.errors}
       htmlFor={field.name}
       invalid={invalid}
       label={label}
     >
       <Input aria-invalid={invalid} {...props} {...inputProps} />
+    </FieldShell>
+  );
+}
+
+function TextareaField({
+  label,
+  description,
+  ...props
+}: { label: string; description?: string } & Omit<
+  ComponentProps<typeof Textarea>,
+  ControlledInputProps
+>) {
+  const { field, invalid, inputProps } = useInputField();
+  return (
+    <FieldShell
+      description={description}
+      errors={field.state.meta.errors}
+      htmlFor={field.name}
+      invalid={invalid}
+      label={label}
+    >
+      <Textarea aria-invalid={invalid} {...props} {...inputProps} />
     </FieldShell>
   );
 }
@@ -125,7 +158,7 @@ function SubmitButton({
 }
 
 export const { useAppForm } = createFormHook({
-  fieldComponents: { PasswordField, TextField },
+  fieldComponents: { PasswordField, TextareaField, TextField },
   fieldContext,
   formComponents: { SubmitButton },
   formContext,

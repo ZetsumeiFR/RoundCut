@@ -20,15 +20,18 @@ export default async function DashboardPage() {
     redirect("/onboarding");
   }
 
-  const [locale, workspace] = await Promise.all([
+  const api = createServerApi(session);
+  const [locale, workspace, clients] = await Promise.all([
     getLocale(),
-    createServerApi(session).workspace.get(),
+    api.workspace.get(),
+    api.client.list(),
   ]);
 
   return (
     <main className="flex w-full min-w-0 flex-col gap-6 px-4 py-6 sm:px-8">
       <div className="w-full max-w-3xl">
         <SetupChecklist
+          hasClient={clients.length > 0}
           messages={getMessages(locale).dashboard.checklist}
           setupDone={workspace.onboardingCompletedAt !== null}
         />
