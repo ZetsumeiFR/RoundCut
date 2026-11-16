@@ -805,6 +805,7 @@ const en = {
         title: "Version not found",
       },
       round: "Round {current} of {included} included",
+      roundSubmitted: "Round {current} submitted",
       shortcuts: {
         description:
           "The player responds to these keys while this page is open.",
@@ -1027,6 +1028,7 @@ const en = {
       openVersion: "Play V{number} of {title}",
       round: "Round {current}/{included}",
       roundLabel: "Round {current} of {included} included",
+      roundSubmitted: "Round {current} submitted",
       settings: {
         client: "Client",
         createdAt: "Created on",
@@ -1118,6 +1120,27 @@ const en = {
     play: "Watch {title}",
     retry: "Try again",
     sharedBy: "Shared by {workspace} · {client}",
+    submit: {
+      action: "Submit my feedback ({count})",
+      alreadySubmitted:
+        "This round's feedback was already submitted. New comments will join the next round.",
+      cancel: "Cancel",
+      confirm: "Submit",
+      confirmDescription:
+        "After submitting, round {round} is closed and {workspace} is notified. Comments you add afterwards will open round {next}.",
+      confirmTitle: "Submit your feedback?",
+      empty: "Add a comment to submit.",
+      error: "Couldn't submit your feedback. Try again.",
+      loadError: "Couldn't load the round.",
+      loading: "Loading the round…",
+      retry: "Try again",
+      round: "Round {current} of {included} included",
+      submitted: "Feedback sent to {workspace}",
+      submittedDescription:
+        "Sent on {date}. {workspace} has been notified. Comments you add now will open the next round.",
+      submittedTitle: "Round {round} feedback submitted",
+      submitting: "Submitting…",
+    },
     title: "{deliverable} · V{number}",
     version: "V{number}",
     videos: "Videos",
@@ -1951,6 +1974,7 @@ const fr: Messages = {
         title: "Version introuvable",
       },
       round: "Tour {current} sur {included} inclus",
+      roundSubmitted: "Tour {current} soumis",
       shortcuts: {
         description:
           "Le lecteur répond à ces touches tant que cette page est ouverte.",
@@ -2177,6 +2201,7 @@ const fr: Messages = {
       openVersion: "Lire la V{number} de {title}",
       round: "Tour {current}/{included}",
       roundLabel: "Tour {current} sur {included} inclus",
+      roundSubmitted: "Tour {current} soumis",
       settings: {
         client: "Client",
         createdAt: "Créé le",
@@ -2269,6 +2294,27 @@ const fr: Messages = {
     play: "Regarder {title}",
     retry: "Réessayer",
     sharedBy: "Partagé par {workspace} · {client}",
+    submit: {
+      action: "Soumettre mes retours ({count})",
+      alreadySubmitted:
+        "Les retours de ce tour ont déjà été soumis. Les nouveaux retours rejoindront le tour suivant.",
+      cancel: "Annuler",
+      confirm: "Soumettre",
+      confirmDescription:
+        "Après soumission, le tour {round} est clos et {workspace} est prévenu. Les retours suivants ouvriront le tour {next}.",
+      confirmTitle: "Soumettre vos retours ?",
+      empty: "Ajoutez un retour pour soumettre.",
+      error: "Impossible de soumettre vos retours. Réessayez.",
+      loadError: "Impossible de charger le tour.",
+      loading: "Chargement du tour…",
+      retry: "Réessayer",
+      round: "Tour {current} sur {included} inclus",
+      submitted: "Retours envoyés à {workspace}",
+      submittedDescription:
+        "Envoyés le {date}. {workspace} a été prévenu. Les retours ajoutés maintenant ouvriront le tour suivant.",
+      submittedTitle: "Retours du tour {round} soumis",
+      submitting: "Envoi…",
+    },
     title: "{deliverable} · V{number}",
     version: "V{number}",
     videos: "Vidéos",

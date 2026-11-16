@@ -1,12 +1,20 @@
 import { ORPCError } from "@orpc/server";
+import { batchSubmittedEmail, sendEmail } from "@roundcut/auth/email";
+import { resolveLocale } from "@roundcut/auth/locale";
+import type { Database } from "@roundcut/db";
+import { user } from "@roundcut/db/schema/auth";
 import { client } from "@roundcut/db/schema/client";
+import { comment } from "@roundcut/db/schema/comment";
 import { deliverable } from "@roundcut/db/schema/deliverable";
 import { project } from "@roundcut/db/schema/project";
 import { reviewer } from "@roundcut/db/schema/reviewer";
+import { round } from "@roundcut/db/schema/round";
 import { version } from "@roundcut/db/schema/version";
 import { workspace } from "@roundcut/db/schema/workspace";
-import { and, asc, eq, ne } from "drizzle-orm";
+import { and, asc, count, desc, eq, isNull, ne } from "drizzle-orm";
+import z from "zod";
 
+import type { Notifications } from "../context";
 import {
   publicProcedure,
   requireReviewLink,
@@ -15,7 +23,89 @@ import {
 import { reviewTokenSchema } from "../review-link";
 import { isAllowedReviewer, reviewerIdentitySchema } from "../reviewer";
 import type { FrameRate } from "../timecode";
+import { findReviewVersion, requireReviewer } from "./comment";
 import { thumbnailUrl } from "./version";
+
+const versionInput = z.object({
+  token: reviewTokenSchema,
+  versionId: z.string().min(1),
+});
+
+const roundColumns = {
+  id: round.id,
+  number: round.number,
+  status: round.status,
+  submittedAt: round.submittedAt,
+};
+
+// The round reviewers comment in on a version: the latest one opened on it.
+async function findVersionRound(db: Database, versionId: string) {
+  const [current] = await db
+    .select(roundColumns)
+    .from(round)
+    .where(eq(round.versionId, versionId))
+    .orderBy(desc(round.number))
+    .limit(1);
+  return current ?? null;
+}
+
+// A round's batch is its top-level comments; replies follow their thread.
+async function batchSize(db: Database, roundId: string) {
+  const [row] = await db
+    .select({ total: count() })
+    .from(comment)
+    .where(and(eq(comment.roundId, roundId), isNull(comment.parentId)));
+  return row?.total ?? 0;
+}
+
+// Emails the workspace owner, in the workspace language, that a client
+// submitted a batch. The submission is already saved: a mail failure is
+// logged rather than reported to the client, who could not submit again.
+async function notifyBatchSubmitted(
+  db: Database,
+  notifications: Notifications,
+  batch: {
+    count: number;
+    projectId: string;
+    reviewerName: string;
+    roundNumber: number;
+    versionId: string;
+  }
+) {
+  const [row] = await db
+    .select({
+      deliverableTitle: deliverable.title,
+      editorEmail: user.email,
+      locale: workspace.locale,
+      projectName: project.name,
+      versionNumber: version.number,
+    })
+    .from(version)
+    .innerJoin(deliverable, eq(version.deliverableId, deliverable.id))
+    .innerJoin(project, eq(deliverable.projectId, project.id))
+    .innerJoin(workspace, eq(project.workspaceId, workspace.id))
+    .innerJoin(user, eq(workspace.ownerUserId, user.id))
+    .where(eq(version.id, batch.versionId));
+  if (!row) {
+    return;
+  }
+  try {
+    await sendEmail(
+      notifications.email,
+      batchSubmittedEmail(resolveLocale(row.locale), row.editorEmail, {
+        count: batch.count,
+        deliverableTitle: row.deliverableTitle,
+        projectName: row.projectName,
+        reviewerName: batch.reviewerName,
+        roundNumber: batch.roundNumber,
+        url: `${notifications.appUrl}/projects/${batch.projectId}/versions/${batch.versionId}`,
+        versionNumber: row.versionNumber,
+      })
+    );
+  } catch (error) {
+    console.error("Batch submitted email failed", error);
+  }
+}
 
 export const reviewRouter = {
   // Clears the identity cookie so someone else can identify on this device.
@@ -136,4 +226,64 @@ export const reviewRouter = {
       reviewer: context.reviewer,
     };
   }),
+  // The review round of a version and the project's included rounds, for the
+  // reviewer's submit button and banner (REV-05).
+  round: publicProcedure
+    .input(versionInput)
+    .use(requireReviewLink)
+    .handler(async ({ context, input: { versionId } }) => {
+      requireReviewer(context.reviewer);
+      const { projectId } = context.reviewLink;
+      const target = await findReviewVersion(context.db, projectId, versionId);
+      const [terms] = await context.db
+        .select({ termsSnapshot: project.termsSnapshot })
+        .from(project)
+        .where(eq(project.id, projectId));
+      return {
+        includedRounds: terms?.termsSnapshot.includedRounds ?? 0,
+        round: await findVersionRound(context.db, target.id),
+      };
+    }),
+
+  // The reviewer submits the feedback batch of the round open on a version
+  // (REV-05): the round moves to submitted, later comments wait for the next
+  // round, and the editor is emailed. Only one submission wins a race.
+  submitBatch: publicProcedure
+    .input(versionInput)
+    .use(requireReviewLink)
+    .handler(async ({ context, input: { versionId } }) => {
+      const author = requireReviewer(context.reviewer);
+      const { projectId } = context.reviewLink;
+      const target = await findReviewVersion(context.db, projectId, versionId);
+      const current = await findVersionRound(context.db, target.id);
+      if (current?.status !== "open") {
+        throw new ORPCError("CONFLICT", {
+          message: "No open round to submit on this version",
+        });
+      }
+      const total = await batchSize(context.db, current.id);
+      if (total === 0) {
+        throw new ORPCError("BAD_REQUEST", {
+          message: "Add feedback before submitting",
+        });
+      }
+      const [saved] = await context.db
+        .update(round)
+        .set({ status: "submitted", submittedAt: new Date() })
+        .where(and(eq(round.id, current.id), eq(round.status, "open")))
+        .returning(roundColumns);
+      if (!saved) {
+        throw new ORPCError("CONFLICT", {
+          message: "No open round to submit on this version",
+        });
+      }
+      await notifyBatchSubmitted(context.db, context.notifications, {
+        count: total,
+        projectId,
+        reviewerName: author.name,
+        roundNumber: saved.number,
+        versionId: target.id,
+      });
+      return { ...saved, count: total };
+    }),
 };

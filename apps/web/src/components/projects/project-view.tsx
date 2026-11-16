@@ -262,16 +262,25 @@ function buildColumns(
     {
       accessorFn: (deliverable) => deliverable.review.currentRound?.number ?? 0,
       cell: ({ row }) => (
-        <RoundCell
-          current={row.original.review.currentRound?.number ?? 0}
-          included={includedRounds}
-          messages={view}
-        />
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+          <RoundCell
+            current={row.original.review.currentRound?.number ?? 0}
+            included={includedRounds}
+            messages={view}
+          />
+          {row.original.review.currentRound?.status === "submitted" ? (
+            <Badge variant="info-light">
+              {formatMessage(view.roundSubmitted, {
+                current: row.original.review.currentRound.number,
+              })}
+            </Badge>
+          ) : null}
+        </div>
       ),
       header: ({ column }) => <SortableHeader column={column} />,
       id: "round",
       meta: { headerTitle: view.columns.round },
-      size: 140,
+      size: 220,
     },
     {
       accessorFn: (deliverable) => deliverable.review.openComments,

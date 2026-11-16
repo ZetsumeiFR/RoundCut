@@ -473,6 +473,11 @@ export function ReviewView({
               })}
             </Badge>
           ) : null}
+          {deliverable.review.currentRound?.status === "submitted" ? (
+            <Badge size="lg" variant="info-light">
+              {formatMessage(player.roundSubmitted, { current: currentRound })}
+            </Badge>
+          ) : null}
           <Select onValueChange={handleVersionChange} value={versionId}>
             <SelectTrigger
               aria-label={player.versionLabel}
