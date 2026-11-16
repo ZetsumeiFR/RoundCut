@@ -1,3 +1,4 @@
+import { PROJECT_STATUSES } from "@roundcut/db/project-status";
 import z from "zod";
 
 import { deliverableSchema, PROJECT_MAX_DELIVERABLES } from "./deliverable";
@@ -23,3 +24,8 @@ export const projectSchema = z.object({
 });
 
 export type ProjectInput = z.input<typeof projectSchema>;
+
+export const projectStatusSchema = z.object({
+  id: z.string().min(1),
+  status: z.enum(PROJECT_STATUSES),
+});
