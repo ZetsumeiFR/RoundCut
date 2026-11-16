@@ -34,6 +34,23 @@ export type ManualCloseReason = (typeof MANUAL_CLOSE_REASONS)[number];
 
 export const ROUND_CLOSE_NOTE_MAX_LENGTH = 500;
 
+// The editor's message to the client when gifting a round (ROUND-06).
+export const ROUND_GIFT_NOTE_MAX_LENGTH = 500;
+
+// A round the editor can offer for free (ROUND-06, "commercial gesture"):
+// still open, beyond the included rounds and not already extra or gifted.
+// Gifted rounds keep their trace and never create a billable line.
+export function canGiftRound(
+  round: { kind: RoundKind; position: number; status: RoundStatus },
+  includedRounds: number
+) {
+  return (
+    round.status === "open" &&
+    round.kind === "included" &&
+    round.position > includedRounds
+  );
+}
+
 interface RoundTransition {
   closedReason?: RoundClosedReason;
   from: readonly RoundStatus[];

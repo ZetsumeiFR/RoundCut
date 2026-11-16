@@ -1,8 +1,10 @@
 import { ORPCError } from "@orpc/server";
 import type { Database } from "@roundcut/db";
 import {
+  canGiftRound,
   MANUAL_CLOSE_REASONS,
   ROUND_CLOSE_NOTE_MAX_LENGTH,
+  ROUND_GIFT_NOTE_MAX_LENGTH,
   ROUND_TRANSITIONS,
   type RoundEvent,
   roundPositions,
@@ -67,26 +69,31 @@ const closeRoundSchema = z
     path: ["note"],
   });
 
+// The project a round belongs to, owned by the signed-in editor: other
+// workspaces' rounds read as missing.
+async function findOwnedRound(
+  db: Database,
+  owner: { id: string; name: string },
+  roundId: string
+) {
+  const [target] = await db
+    .select({ projectId: deliverable.projectId })
+    .from(round)
+    .innerJoin(deliverable, eq(round.deliverableId, deliverable.id))
+    .where(eq(round.id, roundId));
+  if (!target) {
+    throw new ORPCError("NOT_FOUND", { message: "Round not found" });
+  }
+  return findOwnedProject(db, owner, target.projectId);
+}
+
 export const roundRouter = {
   // The editor closes an open round by hand (ROUND-03, §7.2: open -> closed).
   // A submitted round waits for the next version or the approval instead.
   closeManually: protectedProcedure
     .input(closeRoundSchema)
     .handler(async ({ context, input: { note, reason, roundId } }) => {
-      const [target] = await context.db
-        .select({ projectId: deliverable.projectId })
-        .from(round)
-        .innerJoin(deliverable, eq(round.deliverableId, deliverable.id))
-        .where(eq(round.id, roundId));
-      if (!target) {
-        throw new ORPCError("NOT_FOUND", { message: "Round not found" });
-      }
-      // Other workspaces' rounds read as missing too.
-      await findOwnedProject(
-        context.db,
-        context.session.user,
-        target.projectId
-      );
+      await findOwnedRound(context.db, context.session.user, roundId);
       const closing = roundTransition("closeManually");
       const [saved] = await context.db
         .update(round)
@@ -112,6 +119,75 @@ export const roundRouter = {
       return saved;
     }),
 
+  // The editor offers an open round beyond the included ones for free
+  // (ROUND-06, "commercial gesture"): the round becomes a gift, keeps who
+  // gifted it, when and the message to the client, and never creates a
+  // billable line.
+  giftExtra: protectedProcedure
+    .input(
+      z.object({
+        note: z.string().trim().max(ROUND_GIFT_NOTE_MAX_LENGTH),
+        roundId: z.string().min(1),
+      })
+    )
+    .handler(async ({ context, input: { note, roundId } }) => {
+      const owned = await findOwnedRound(
+        context.db,
+        context.session.user,
+        roundId
+      );
+      const [[current], [terms], positions] = await Promise.all([
+        context.db
+          .select({ kind: round.kind, status: round.status })
+          .from(round)
+          .where(eq(round.id, roundId)),
+        context.db
+          .select({ termsSnapshot: project.termsSnapshot })
+          .from(project)
+          .where(eq(project.id, owned.id)),
+        projectRoundPositions(context.db, owned.id),
+      ]);
+      const giftable =
+        current !== undefined &&
+        terms !== undefined &&
+        canGiftRound(
+          { ...current, position: positions.get(roundId) ?? 0 },
+          terms.termsSnapshot.includedRounds
+        );
+      // Guarded on the state just checked, so a round submitted or closed
+      // meanwhile is left untouched.
+      const [saved] = giftable
+        ? await context.db
+            .update(round)
+            .set({
+              giftedAt: new Date(),
+              giftedByUserId: context.session.user.id,
+              giftNote: note || null,
+              kind: "gift",
+            })
+            .where(
+              and(
+                eq(round.id, roundId),
+                eq(round.status, "open"),
+                eq(round.kind, "included")
+              )
+            )
+            .returning({
+              giftedAt: round.giftedAt,
+              giftNote: round.giftNote,
+              id: round.id,
+              kind: round.kind,
+              status: round.status,
+            })
+        : [];
+      if (!saved) {
+        throw new ORPCError("CONFLICT", {
+          message: "Only an open round beyond the included ones can be gifted",
+        });
+      }
+      return saved;
+    }),
+
   // Every round of the project's deliverables with its version and dates,
   // latest first within each deliverable.
   list: protectedProcedure
@@ -129,6 +205,8 @@ export const roundRouter = {
           closedReason: round.closedReason,
           deciderReminderCount: round.deciderReminderCount,
           deliverable: { id: deliverable.id, title: deliverable.title },
+          giftedAt: round.giftedAt,
+          giftNote: round.giftNote,
           id: round.id,
           kind: round.kind,
           manualCloseReason: round.manualCloseReason,

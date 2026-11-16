@@ -14,6 +14,7 @@ import type {
   RoundKind,
   RoundStatus,
 } from "../round";
+import { user } from "./auth";
 import { deliverable } from "./deliverable";
 import { version } from "./version";
 
@@ -37,6 +38,13 @@ export const round = pgTable(
     deliverableId: text("deliverable_id")
       .notNull()
       .references(() => deliverable.id, { onDelete: "cascade" }),
+    // Trace of the editor gifting the round (ROUND-06, kind "gift"): when,
+    // by whom, and the message shown to the client.
+    giftedAt: timestamp("gifted_at"),
+    giftedByUserId: text("gifted_by_user_id").references(() => user.id, {
+      onDelete: "set null",
+    }),
+    giftNote: text("gift_note"),
     id: text("id")
       .primaryKey()
       .$defaultFn(() => crypto.randomUUID()),

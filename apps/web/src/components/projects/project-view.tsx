@@ -5,7 +5,7 @@ import type { AppRouterClient } from "@roundcut/api/routers/index";
 import { DECIDER_REMINDER_MAX_SENDS } from "@roundcut/api/workspace";
 import type { Locale } from "@roundcut/auth/locale";
 import type { DeliverableStatus } from "@roundcut/db/deliverable";
-import type { RoundStatus } from "@roundcut/db/round";
+import { canGiftRound, type RoundStatus } from "@roundcut/db/round";
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -59,6 +59,7 @@ import {
   ClapperboardIcon,
   CopyIcon,
   FolderIcon,
+  GiftIcon,
   HistoryIcon,
   LinkIcon,
   PlayIcon,
@@ -80,6 +81,7 @@ import { CloseRoundDialog } from "./close-round-dialog";
 import { deliverableCountLabel, formatDuration } from "./deliverable-form";
 import { DeliverablesSheet } from "./deliverables-sheet";
 import { DuplicateProjectDialog } from "./duplicate-project-dialog";
+import { GiftRoundDialog } from "./gift-round-dialog";
 import { formatTargetDate } from "./project-sheet";
 import { STATUS_BADGES } from "./projects-view";
 import { ReviewLinkDialog } from "./review-link-dialog";
@@ -472,23 +474,35 @@ function DeliverablesTab({
 
 function RoundItem({
   dateFormat,
+  includedRounds,
   messages,
   projectId,
   round,
 }: {
   dateFormat: Intl.DateTimeFormat;
+  includedRounds: number;
   messages: ViewMessages;
   projectId: string;
   round: ProjectRound;
 }) {
   const { rounds } = messages;
   const [closing, setClosing] = useState(false);
+  const [gifting, setGifting] = useState(false);
   const openClose = useCallback(() => setClosing(true), []);
+  const openGift = useCallback(() => setGifting(true), []);
+  const giftable = canGiftRound(round, includedRounds);
   const dates = [
     formatMessage(rounds.openedOn, {
       date: dateFormat.format(new Date(round.openedAt)),
     }),
   ];
+  if (round.giftedAt) {
+    dates.push(
+      formatMessage(rounds.giftedOn, {
+        date: dateFormat.format(new Date(round.giftedAt)),
+      })
+    );
+  }
   if (round.submittedAt) {
     dates.push(
       formatMessage(rounds.submittedOn, {
@@ -537,7 +551,26 @@ function RoundItem({
           {dates.join(" · ")}
         </p>
         {round.status === "open" ? (
-          <>
+          <div className="flex flex-wrap gap-2">
+            {giftable ? (
+              <>
+                <Button
+                  onClick={openGift}
+                  size="sm"
+                  type="button"
+                  variant="outline"
+                >
+                  <GiftIcon aria-hidden="true" />
+                  {rounds.gift.action}
+                </Button>
+                <GiftRoundDialog
+                  messages={rounds}
+                  onOpenChange={setGifting}
+                  open={gifting}
+                  round={round}
+                />
+              </>
+            ) : null}
             <Button
               onClick={openClose}
               size="sm"
@@ -552,9 +585,14 @@ function RoundItem({
               open={closing}
               round={round}
             />
-          </>
+          </div>
         ) : null}
       </div>
+      {round.giftNote ? (
+        <p className="whitespace-pre-line text-muted-foreground text-xs">
+          {formatMessage(rounds.giftNote, { note: round.giftNote })}
+        </p>
+      ) : null}
       {round.closedNote ? (
         <p className="whitespace-pre-line text-muted-foreground text-xs">
           {formatMessage(rounds.closedNote, { note: round.closedNote })}
@@ -567,10 +605,12 @@ function RoundItem({
 // The rounds of every deliverable (ROUND-01), grouped by deliverable in the
 // order the API returns them.
 function RoundsTab({
+  includedRounds,
   locale,
   messages,
   projectId,
 }: {
+  includedRounds: number;
   locale: Locale;
   messages: ProjectsMessages;
   projectId: string;
@@ -668,6 +708,7 @@ function RoundsTab({
           {group.items.map((item) => (
             <RoundItem
               dateFormat={dateFormat}
+              includedRounds={includedRounds}
               key={item.id}
               messages={messages.view}
               projectId={projectId}
@@ -963,6 +1004,7 @@ export function ProjectView({
         </TabsContent>
         <TabsContent className="pt-3" value="history">
           <RoundsTab
+            includedRounds={project.data.termsSnapshot.includedRounds}
             locale={locale}
             messages={messages}
             projectId={project.data.id}
