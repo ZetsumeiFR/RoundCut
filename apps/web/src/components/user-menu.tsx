@@ -59,6 +59,9 @@ export default function UserMenu({
           <DropdownMenuItem render={<Link href="/account/workspace" />}>
             {messages.workspace}
           </DropdownMenuItem>
+          <DropdownMenuItem render={<Link href="/account/team" />}>
+            {messages.team}
+          </DropdownMenuItem>
           <DropdownMenuItem render={<Link href="/account/security" />}>
             {messages.security}
           </DropdownMenuItem>

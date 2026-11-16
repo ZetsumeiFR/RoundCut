@@ -3,6 +3,9 @@ import type { Database } from "@roundcut/db";
 import {
   account,
   authRelations,
+  invitation,
+  member,
+  organization as organizationTable,
   rateLimit,
   session,
   twoFactor as twoFactorTable,
@@ -10,17 +13,27 @@ import {
   verification,
 } from "@roundcut/db/schema/auth";
 import { betterAuth } from "better-auth";
+import { APIError } from "better-auth/api";
 import { nextCookies } from "better-auth/next-js";
+import { organization } from "better-auth/plugins/organization";
 import { twoFactor } from "better-auth/plugins/two-factor";
+import { eq } from "drizzle-orm";
 
 import {
   type EmailConfig,
+  invitationEmail,
   resetPasswordEmail,
   sendEmail,
   verificationEmail,
 } from "./email";
 import { resolveLocale } from "./locale";
 import { MIN_PASSWORD_LENGTH } from "./password-policy";
+import {
+  isAssignableRole,
+  TEAM_SEATS,
+  teamAccessControl,
+  teamRoles,
+} from "./team";
 
 interface GoogleConfig {
   GOOGLE_CLIENT_ID?: string;
@@ -57,6 +70,51 @@ const googleProvider = ({
 // Shown as the account issuer in authenticator apps.
 const APP_NAME = "RoundCut";
 
+const ROLE_NOT_ASSIGNABLE = {
+  code: "ROLE_NOT_ASSIGNABLE",
+  message: "Studio members can only be editors or viewers",
+};
+
+const requireAssignableRole = (role: string) =>
+  isAssignableRole(role)
+    ? Promise.resolve()
+    : Promise.reject(APIError.from("BAD_REQUEST", ROLE_NOT_ASSIGNABLE));
+
+// Studio team (WS-04). Each Studio is created by the API with the owner's
+// workspace id, so accounts cannot create organizations themselves.
+const studioTeam = (env: AuthConfig, database: Database) =>
+  organization({
+    ac: teamAccessControl,
+    allowUserToCreateOrganization: false,
+    disableOrganizationDeletion: true,
+    // Seats left for pending invitations once members are counted.
+    invitationLimit: async ({ organization: studio }) =>
+      TEAM_SEATS -
+      (await database.$count(member, eq(member.organizationId, studio.id))),
+    membershipLimit: TEAM_SEATS,
+    organizationHooks: {
+      beforeCreateInvitation: ({ invitation: invite }) =>
+        requireAssignableRole(invite.role),
+      beforeUpdateMemberRole: ({ newRole }) => requireAssignableRole(newRole),
+    },
+    roles: teamRoles,
+    sendInvitationEmail: async (
+      { email, id, inviter, organization: studio, role },
+      request
+    ) => {
+      const locale = resolveLocale(request?.headers.get("accept-language"));
+      await sendEmail(
+        env,
+        invitationEmail(locale, email, {
+          inviterName: inviter.user.name,
+          role,
+          studioName: studio.name,
+          url: `${env.BETTER_AUTH_URL}/invitation/${id}`,
+        })
+      );
+    },
+  });
+
 export function createAuth(env: AuthConfig, database: Database) {
   return betterAuth({
     appName: APP_NAME,
@@ -66,6 +124,9 @@ export function createAuth(env: AuthConfig, database: Database) {
       schema: {
         account,
         authRelations,
+        invitation,
+        member,
+        organization: organizationTable,
         rateLimit,
         session,
         twoFactor: twoFactorTable,
@@ -93,8 +154,13 @@ export function createAuth(env: AuthConfig, database: Database) {
         await sendEmail(env, verificationEmail(locale, newUser.email, url));
       },
     },
-    // TOTP second factor (AUTH-07); nextCookies must stay last.
-    plugins: [twoFactor({ issuer: APP_NAME }), nextCookies()],
+    // TOTP second factor (AUTH-07), Studio team (WS-04); nextCookies must
+    // stay last.
+    plugins: [
+      twoFactor({ issuer: APP_NAME }),
+      studioTeam(env, database),
+      nextCookies(),
+    ],
     // On in every environment (Better-Auth defaults to production only) and
     // stored in Postgres so limits survive restarts and span instances.
     // Password-reset and verification emails keep Better-Auth's 3/min rule.

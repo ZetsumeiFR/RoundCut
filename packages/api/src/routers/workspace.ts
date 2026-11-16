@@ -1,4 +1,5 @@
 import type { Database } from "@roundcut/db";
+import { organization } from "@roundcut/db/schema/auth";
 import { workspace } from "@roundcut/db/schema/workspace";
 import { eq } from "drizzle-orm";
 
@@ -43,7 +44,7 @@ async function findWorkspace(db: Database, ownerUserId: string) {
   return row;
 }
 
-async function getOrCreateWorkspace(
+export async function getOrCreateWorkspace(
   db: Database,
   owner: { id: string; name: string }
 ) {
@@ -75,6 +76,11 @@ async function upsertWorkspace(
   if (!row) {
     throw new Error(`Workspace upsert returned no row for user ${ownerUserId}`);
   }
+  // The Studio (WS-04) shares the workspace id and shows its name.
+  await db
+    .update(organization)
+    .set({ name: row.name })
+    .where(eq(organization.id, row.id));
   return toWorkspace(row);
 }
 

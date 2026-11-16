@@ -6,6 +6,7 @@ import {
   MonitorSmartphoneIcon,
   RepeatIcon,
   ShieldCheckIcon,
+  UsersIcon,
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -15,6 +16,7 @@ import type { Messages } from "@/i18n/messages";
 const SECTIONS = [
   { href: "/account/workspace", icon: Building2Icon, key: "workspace" },
   { href: "/account/terms", icon: RepeatIcon, key: "terms" },
+  { href: "/account/team", icon: UsersIcon, key: "team" },
   { href: "/account/security", icon: ShieldCheckIcon, key: "security" },
   { href: "/account/sessions", icon: MonitorSmartphoneIcon, key: "sessions" },
 ] as const;
