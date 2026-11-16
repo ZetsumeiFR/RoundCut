@@ -1110,6 +1110,23 @@ const en = {
         emptyDescription:
           "A round opens when you publish a version of a deliverable.",
         emptyTitle: "No rounds yet",
+        gift: {
+          action: "Gift this round",
+          cancel: "Cancel",
+          conflict: "This round can no longer be gifted.",
+          description:
+            "A commercial gesture: the round stays open, the client sees it as free and no billable line is created. The history keeps the trace.",
+          error: "Couldn't gift the round. Try again.",
+          note: "Message to the client",
+          noteDescription: "Optional, shown on the review link.",
+          saved: "Round {number} gifted",
+          submit: "Gift the round",
+          submitting: "Saving…",
+          title: "Gift round {number}?",
+          tooLong: "{max} characters maximum.",
+        },
+        giftedOn: "Gifted on {date}",
+        giftNote: "Gift message: {note}",
         kinds: { extra: "Extra", gift: "Gift" },
         loadError: "Couldn't load the rounds.",
         loading: "Loading rounds…",
@@ -1262,6 +1279,9 @@ const en = {
       exhaustedDescription:
         "Any further changes will need an extra round, beyond the {included} included.",
       extraRound: "Round {current}, beyond the {included} included",
+      gift: "Round offered by {workspace}",
+      giftDescription:
+        "Round {current} is offered on top of your included rounds, at no extra charge.",
       lastIncluded: "Last included round",
       loadError: "Couldn't load the round.",
       loading: "Loading the round…",
@@ -2427,6 +2447,23 @@ const fr: Messages = {
         emptyDescription:
           "Un tour s'ouvre quand vous publiez une version d'un livrable.",
         emptyTitle: "Aucun tour pour l'instant",
+        gift: {
+          action: "Offrir ce tour",
+          cancel: "Annuler",
+          conflict: "Ce tour ne peut plus être offert.",
+          description:
+            "Geste commercial : le tour reste ouvert, le client le voit comme offert et aucune ligne facturable n'est créée. L'historique en garde la trace.",
+          error: "Impossible d'offrir le tour. Réessayez.",
+          note: "Message au client",
+          noteDescription: "Facultatif, affiché sur le lien de revue.",
+          saved: "Tour {number} offert",
+          submit: "Offrir le tour",
+          submitting: "Enregistrement…",
+          title: "Offrir le tour {number} ?",
+          tooLong: "{max} caractères maximum.",
+        },
+        giftedOn: "Offert le {date}",
+        giftNote: "Message du geste commercial : {note}",
         kinds: { extra: "Supplémentaire", gift: "Offert" },
         loadError: "Impossible de charger les tours.",
         loading: "Chargement des tours…",
@@ -2580,6 +2617,9 @@ const fr: Messages = {
       exhaustedDescription:
         "Toute nouvelle modification demandera un tour supplémentaire, au-delà des {included} inclus.",
       extraRound: "Tour {current}, au-delà des {included} inclus",
+      gift: "Tour offert par {workspace}",
+      giftDescription:
+        "Le tour {current} vous est offert en plus des tours inclus, sans supplément.",
       lastIncluded: "Dernier tour inclus",
       loadError: "Impossible de charger le tour.",
       loading: "Chargement du tour…",

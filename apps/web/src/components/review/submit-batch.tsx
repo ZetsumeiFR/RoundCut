@@ -2,7 +2,11 @@
 
 import { ORPCError } from "@orpc/client";
 import type { Locale } from "@roundcut/auth/locale";
-import type { ManualCloseReason, RoundStatus } from "@roundcut/db/round";
+import type {
+  ManualCloseReason,
+  RoundKind,
+  RoundStatus,
+} from "@roundcut/db/round";
 import {
   AlertDialog,
   AlertDialogCancel,
@@ -23,6 +27,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   BadgeCheckIcon,
   CircleCheckIcon,
+  GiftIcon,
   RepeatIcon,
   SendIcon,
   TriangleAlertIcon,
@@ -38,6 +43,8 @@ type SubmitMessages = Messages["review"]["submit"];
 interface BannerRound {
   closedAt: Date | null;
   closedNote: string | null;
+  giftNote: string | null;
+  kind: RoundKind;
   manualCloseReason: ManualCloseReason | null;
   // Place in the counter, per deliverable or per project (ROUND-02).
   position: number;
@@ -83,7 +90,31 @@ function bannerLines(
   includedRounds: number,
   closing: { locale: Locale; messages: SubmitMessages; workspaceName: string }
 ) {
-  const { messages } = closing;
+  const { messages, workspaceName } = closing;
+  // A round the editor offered (ROUND-06) reads as a gift, not as the
+  // included rounds running out.
+  if (round.kind === "gift") {
+    const lines = [
+      formatMessage(messages.giftDescription, { current: round.position }),
+    ];
+    if (round.giftNote) {
+      lines.push(
+        formatMessage(messages.closedNote, {
+          note: round.giftNote,
+          workspace: workspaceName,
+        })
+      );
+    }
+    if (round.status === "closed") {
+      lines.push(...closedLines(round, closing));
+    }
+    return {
+      gift: true,
+      lines,
+      title: formatMessage(messages.gift, { workspace: workspaceName }),
+      warning: false,
+    };
+  }
   const extra = round.position > includedRounds;
   const lastIncluded = round.position === includedRounds;
   const exhausted = extra || (lastIncluded && round.status !== "open");
@@ -105,7 +136,12 @@ function bannerLines(
   if (round.status === "closed") {
     lines.push(...closedLines(round, closing));
   }
-  return { exhausted, lines, title: exhausted ? messages.exhausted : label };
+  return {
+    gift: false,
+    lines,
+    title: exhausted ? messages.exhausted : label,
+    warning: exhausted,
+  };
 }
 
 // The reviewer's permanent round banner (REV-07): shown whatever the round's
@@ -144,18 +180,20 @@ function RoundBanner({
   if (round === null) {
     return null;
   }
-  const { exhausted, lines, title } = bannerLines(round, includedRounds, {
+  const { gift, lines, title, warning } = bannerLines(round, includedRounds, {
     locale,
     messages,
     workspaceName,
   });
+  let icon = <RepeatIcon aria-hidden="true" />;
+  if (gift) {
+    icon = <GiftIcon aria-hidden="true" />;
+  } else if (warning) {
+    icon = <TriangleAlertIcon aria-hidden="true" />;
+  }
   return (
-    <Alert variant={exhausted ? "warning" : "info"}>
-      {exhausted ? (
-        <TriangleAlertIcon aria-hidden="true" />
-      ) : (
-        <RepeatIcon aria-hidden="true" />
-      )}
+    <Alert variant={warning ? "warning" : "info"}>
+      {icon}
       <AlertTitle className="line-clamp-none">{title}</AlertTitle>
       {lines.length > 0 ? (
         <AlertDescription>
