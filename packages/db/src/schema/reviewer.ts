@@ -26,6 +26,9 @@ export const reviewer = pgTable(
     projectId: text("project_id")
       .notNull()
       .references(() => project.id, { onDelete: "cascade" }),
+    // Last "unsubmitted feedback" reminder (ROUND-04); a comment written
+    // after it arms the next one.
+    unsubmittedReminderSentAt: timestamp("unsubmitted_reminder_sent_at"),
     updatedAt: timestamp("updated_at")
       .defaultNow()
       .$onUpdate(() => /* @__PURE__ */ new Date())

@@ -13,6 +13,7 @@ import {
   brandingSchema,
   brandLogoUploadSchema,
   onboardingSchema,
+  reviewerRemindersSchema,
   revisionTermsSchema,
   type WorkspaceSettings,
   workspaceSettingsSchema,
@@ -63,6 +64,10 @@ const toWorkspace = async (row: WorkspaceRow, storage: Storage) => ({
   name: row.name,
   onboardingCompletedAt: row.onboardingCompletedAt,
   plan: row.plan,
+  reviewerReminders: {
+    delayHours: row.reviewerReminderHours,
+    enabled: row.reviewerReminderEnabled,
+  },
   revisionTerms: row.revisionTerms,
   timezone: row.timezone,
   whiteLabel: hasWhiteLabel(row.plan),
@@ -209,6 +214,28 @@ export const workspaceRouter = {
       }
       if (logoChanged && current.brandLogoKey) {
         await context.storage.deleteObject(current.brandLogoKey);
+      }
+      return toWorkspace(row, context.storage);
+    }),
+  // Turns the "unsubmitted feedback" reminder on or off and sets its delay
+  // (ROUND-04).
+  updateReminders: protectedProcedure
+    .input(reviewerRemindersSchema)
+    .handler(async ({ context, input }) => {
+      const current = await getOrCreateWorkspace(
+        context.db,
+        context.session.user
+      );
+      const [row] = await context.db
+        .update(workspace)
+        .set({
+          reviewerReminderEnabled: input.enabled,
+          reviewerReminderHours: input.delayHours,
+        })
+        .where(eq(workspace.id, current.id))
+        .returning();
+      if (!row) {
+        throw new Error("Workspace reminders update returned no row");
       }
       return toWorkspace(row, context.storage);
     }),

@@ -141,6 +141,36 @@ export function batchSubmittedEmail(
   return { to, ...batchSubmittedEmails[locale](details) };
 }
 
+export interface UnsubmittedFeedbackDetails {
+  count: number;
+  projectName: string;
+  reviewerName: string;
+  studioName: string;
+}
+
+const unsubmittedFeedbackEmails = {
+  en: (details: UnsubmittedFeedbackDetails) => ({
+    subject: `${details.projectName}: you have unsubmitted feedback`,
+    text: `Hello ${details.reviewerName},\n\nYou wrote ${details.count === 1 ? "1 comment" : `${details.count} comments`} on ${details.projectName} that ${details.studioName} hasn't received yet: your feedback is only sent once you submit it.\n\nOpen the review link ${details.studioName} shared with you and click "Submit my feedback".`,
+  }),
+  fr: (details: UnsubmittedFeedbackDetails) => ({
+    subject: `${details.projectName} : vous avez des retours non soumis`,
+    text: `Bonjour ${details.reviewerName},\n\nVous avez écrit ${details.count === 1 ? "1 retour" : `${details.count} retours`} sur ${details.projectName} que ${details.studioName} n'a pas encore reçus : vos retours ne sont transmis qu'une fois soumis.\n\nOuvrez le lien de revue partagé par ${details.studioName} et cliquez sur « Soumettre mes retours ».`,
+  }),
+} satisfies Record<
+  Locale,
+  (details: UnsubmittedFeedbackDetails) => Omit<EmailMessage, "to">
+>;
+
+// Reminds a reviewer that their comments wait to be submitted (ROUND-04).
+export function unsubmittedFeedbackEmail(
+  locale: Locale,
+  to: string,
+  details: UnsubmittedFeedbackDetails
+): EmailMessage {
+  return { to, ...unsubmittedFeedbackEmails[locale](details) };
+}
+
 export function resetPasswordEmail(
   locale: Locale,
   to: string,

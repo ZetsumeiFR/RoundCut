@@ -43,6 +43,17 @@ export const revisionTermsSchema = z.object({
   scope: z.enum(REVISION_SCOPES),
 });
 
+// "Unsubmitted feedback" reminder to reviewers (ROUND-04): sent this many
+// hours after their last comment that still waits to be submitted.
+export const REVIEWER_REMINDER_MAX_HOURS = 14 * 24;
+
+export const reviewerRemindersSchema = z.object({
+  delayHours: z.int().min(1).max(REVIEWER_REMINDER_MAX_HOURS),
+  enabled: z.boolean(),
+});
+
+export type ReviewerReminders = z.infer<typeof reviewerRemindersSchema>;
+
 // White label of the review links (REV-10): the logo is a PNG, JPEG or
 // WebP image (same formats as comment attachments) and the accent a hex color.
 export const BRAND_LOGO_MAX_BYTES = 2 * 1024 * 1024;

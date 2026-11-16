@@ -1,4 +1,11 @@
-import { integer, jsonb, pgTable, text, timestamp } from "drizzle-orm/pg-core";
+import {
+  boolean,
+  integer,
+  jsonb,
+  pgTable,
+  text,
+  timestamp,
+} from "drizzle-orm/pg-core";
 
 import { DEFAULT_PLAN, type Plan } from "../plan";
 import { DEFAULT_REVISION_TERMS, type RevisionTerms } from "../revision-terms";
@@ -27,6 +34,14 @@ export const workspace = pgTable("workspace", {
     .references(() => user.id, { onDelete: "cascade" }),
   // Subscription plan (SUB-01); sets the upload limits (VER-02).
   plan: text("plan").$type<Plan>().default(DEFAULT_PLAN).notNull(),
+  // Reminder emailed to a reviewer whose feedback still waits to be
+  // submitted, this many hours after their last comment (ROUND-04).
+  reviewerReminderEnabled: boolean("reviewer_reminder_enabled")
+    .default(true)
+    .notNull(),
+  reviewerReminderHours: integer("reviewer_reminder_hours")
+    .default(48)
+    .notNull(),
   revisionTerms: jsonb("revision_terms")
     .$type<RevisionTerms>()
     .default(DEFAULT_REVISION_TERMS)

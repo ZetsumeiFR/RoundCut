@@ -34,6 +34,25 @@ services:
       start_period: 10s
     restart: unless-stopped
 
+  # Scheduled jobs (ROUND-04 reminders): calls the web app's cron route every
+  # 15 minutes with CRON_SECRET from apps/web/.env.
+  cron:
+    image: curlimages/curl:8.17.0
+    init: true
+    env_file:
+      - path: apps/web/.env
+        required: false
+    entrypoint:
+      [
+        "sh",
+        "-c",
+        'while true; do curl -fsS -H "Authorization: Bearer $$CRON_SECRET" http://web:3001/api/cron/reminders || echo "cron: reminders call failed"; echo; sleep 900; done',
+      ]
+    depends_on:
+      web:
+        condition: service_healthy
+    restart: unless-stopped
+
   postgres:
     image: postgres:18
     container_name: roundcut-postgres

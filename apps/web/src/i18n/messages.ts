@@ -167,6 +167,20 @@ const en = {
       priceInvalid:
         "Enter an amount between 0 and {max} with at most two decimals.",
       priceSuffix: "{currency} excl. VAT",
+      reminders: {
+        delay: "Delay",
+        delayDescription:
+          "Hours after the reviewer's last unsubmitted comment.",
+        delayInvalid: "Enter a whole number of hours between 1 and {max}.",
+        delaySuffix: "hours",
+        description:
+          'Emails "You have unsubmitted feedback" to a reviewer who commented without submitting.',
+        enabled: "Remind reviewers",
+        enabledDescription:
+          "One reminder per series of comments, while the round is open.",
+        saved: "Reminders saved.",
+        title: "Unsubmitted feedback reminder",
+      },
       requirePayment: "Payment before opening",
       requirePaymentDescription:
         "Your client pays for an extra round before it opens.",
@@ -1433,6 +1447,20 @@ const fr: Messages = {
       priceInvalid:
         "Saisissez un montant entre 0 et {max}, avec au plus deux décimales.",
       priceSuffix: "{currency} HT",
+      reminders: {
+        delay: "Délai",
+        delayDescription:
+          "Heures après le dernier commentaire non soumis du relecteur.",
+        delayInvalid: "Saisissez un nombre entier d'heures entre 1 et {max}.",
+        delaySuffix: "heures",
+        description:
+          "Envoie « Vous avez des retours non soumis » au relecteur qui a commenté sans soumettre.",
+        enabled: "Relancer les relecteurs",
+        enabledDescription:
+          "Une relance par série de commentaires, tant que le tour est ouvert.",
+        saved: "Relances enregistrées.",
+        title: "Relance des retours non soumis",
+      },
       requirePayment: "Paiement avant ouverture",
       requirePaymentDescription:
         "Le client règle le tour supplémentaire avant son ouverture.",
