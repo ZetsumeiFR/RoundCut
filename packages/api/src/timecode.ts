@@ -44,3 +44,35 @@ export function formatTimecode(ms: number, frameRate: FrameRate) {
     .map(pad)
     .join(":");
 }
+
+const TIMECODE_PATTERN = /^(?:(\d{1,2}):)?(\d{1,2}):(\d{1,2})(?::(\d{1,2}))?$/;
+
+// Reads a typed position back: "HH:MM:SS:FF" as formatted above, or the
+// shorter "MM:SS" and "HH:MM:SS". Returns the start of that frame in
+// milliseconds (rounded up so formatTimecode gives the same frame back), or
+// null when the text isn't a valid timecode at this frame rate.
+export function parseTimecode(text: string, frameRate: FrameRate) {
+  const match = TIMECODE_PATTERN.exec(text.trim());
+  if (!match) {
+    return null;
+  }
+  const [hours, minutes, seconds, frames] = match
+    .slice(1)
+    .map((part) => Number(part ?? 0));
+  if (
+    hours === undefined ||
+    minutes === undefined ||
+    seconds === undefined ||
+    frames === undefined ||
+    minutes >= MINUTES_PER_HOUR ||
+    seconds >= SECONDS_PER_MINUTE ||
+    frames >= frameRate
+  ) {
+    return null;
+  }
+  const totalSeconds =
+    (hours * MINUTES_PER_HOUR + minutes) * SECONDS_PER_MINUTE + seconds;
+  return Math.ceil(
+    ((totalSeconds * frameRate + frames) * MS_PER_SECOND) / frameRate
+  );
+}

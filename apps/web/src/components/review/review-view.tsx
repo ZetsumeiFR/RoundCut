@@ -1,6 +1,7 @@
 "use client";
 
 import { ORPCError } from "@orpc/client";
+import type { FrameRate } from "@roundcut/api/timecode";
 import type { Locale } from "@roundcut/auth/locale";
 import {
   CLIENT_DOWNLOAD_POLICIES,
@@ -38,14 +39,13 @@ import {
   CloudUploadIcon,
   Columns2Icon,
   DownloadIcon,
-  MessageSquareIcon,
   SearchXIcon,
   UploadIcon,
   XIcon,
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { type ReactNode, useCallback, useState } from "react";
+import { type ReactNode, useCallback, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import {
@@ -54,13 +54,16 @@ import {
 } from "@/components/projects/version-upload-sheet";
 import { formatMessage, type Messages } from "@/i18n/messages";
 import { client, orpc } from "@/utils/orpc";
-import { type PlayerMarker, VideoPlayer } from "./video-player";
+import {
+  CommentThread,
+  type FeedbackComment,
+  toMarkers,
+} from "./comment-thread";
+import { type PlayerHandle, VideoPlayer } from "./video-player";
 
 type ProjectsMessages = Messages["projects"];
 
 const MAX_RETRIES = 3;
-// Feedback comments arrive with REV-03; until then no version has markers.
-const NO_MARKERS: PlayerMarker[] = [];
 
 export const isNotFound = (error: unknown) =>
   error instanceof ORPCError && error.code === "NOT_FOUND";
@@ -103,26 +106,49 @@ export function ReviewViewSkeleton({ label }: { label?: string }) {
   );
 }
 
-function FeedbackPanel({ messages }: { messages: ProjectsMessages["player"] }) {
+// The client's timestamped feedback on this version, read-only until replies
+// and statuses arrive (REV-04).
+function FeedbackPanel({
+  comments,
+  frameRate,
+  isError,
+  locale,
+  messages,
+  onRetry,
+  onSeek,
+}: {
+  comments: FeedbackComment[] | undefined;
+  frameRate: FrameRate | null;
+  isError: boolean;
+  locale: Locale;
+  messages: ProjectsMessages;
+  onRetry: () => void;
+  onSeek: (ms: number) => void;
+}) {
+  const { feedback } = messages.player;
   return (
     <Frame className="w-full" dense spacing="default" variant="default">
-      <FrameHeader>
+      <FrameHeader className="flex-row items-center justify-between gap-2">
         <FrameTitle>
-          <h2 className="font-semibold text-sm">{messages.feedback.title}</h2>
+          <h2 className="font-semibold text-sm">{feedback.title}</h2>
         </FrameTitle>
+        {comments && comments.length > 0 ? (
+          <Badge variant="secondary">{comments.length}</Badge>
+        ) : null}
       </FrameHeader>
-      <FramePanel className="p-0">
-        <Empty className="py-12">
-          <EmptyHeader>
-            <EmptyMedia variant="icon">
-              <MessageSquareIcon aria-hidden="true" />
-            </EmptyMedia>
-            <EmptyTitle>{messages.feedback.emptyTitle}</EmptyTitle>
-            <EmptyDescription>
-              {messages.feedback.emptyDescription}
-            </EmptyDescription>
-          </EmptyHeader>
-        </Empty>
+      <FramePanel className="p-0 lg:max-h-[70vh] lg:overflow-y-auto">
+        <CommentThread
+          comments={comments}
+          emptyDescription={feedback.emptyDescription}
+          emptyTitle={feedback.emptyTitle}
+          frameRate={frameRate}
+          isError={isError}
+          locale={locale}
+          messages={feedback}
+          onRetry={onRetry}
+          onSeek={onSeek}
+          retryLabel={messages.retry}
+        />
       </FramePanel>
     </Frame>
   );
@@ -272,6 +298,28 @@ export function ReviewView({
     queryKey: ["playback", versionId],
     staleTime: Number.POSITIVE_INFINITY,
   });
+  const comments = useQuery(
+    orpc.comment.list.queryOptions({
+      enabled: playable,
+      input: { versionId },
+      meta: { inlineError: true },
+      retry: retryUnlessMissing,
+    })
+  );
+  const markers = useMemo(
+    () => toMarkers(comments.data ?? []),
+    [comments.data]
+  );
+  const playerRef = useRef<PlayerHandle | null>(null);
+  const handleSeek = useCallback(
+    (ms: number) => playerRef.current?.seekToMs(ms),
+    []
+  );
+  const refetchComments = comments.refetch;
+  const handleRetryComments = useCallback(
+    () => refetchComments(),
+    [refetchComments]
+  );
   const [uploadTarget, setUploadTarget] = useState<UploadTarget>();
   const closeUpload = useCallback((open: boolean) => {
     if (!open) {
@@ -453,10 +501,11 @@ export function ReviewView({
                 durationMs={version.data.durationMs}
                 frameRate={version.data.frameRate}
                 locale={locale}
-                markers={NO_MARKERS}
+                markers={markers}
                 messages={player}
                 onSourceError={handleSourceError}
                 poster={version.data.thumbnailUrl}
+                ref={playerRef}
                 src={playback.data.url}
               />
             ) : (
@@ -472,7 +521,15 @@ export function ReviewView({
             />
           </div>
         )}
-        <FeedbackPanel messages={player} />
+        <FeedbackPanel
+          comments={playable ? comments.data : []}
+          frameRate={version.data.frameRate}
+          isError={comments.isError}
+          locale={locale}
+          messages={messages}
+          onRetry={handleRetryComments}
+          onSeek={handleSeek}
+        />
       </div>
       <VersionUploadSheet
         deliverable={uploadTarget}

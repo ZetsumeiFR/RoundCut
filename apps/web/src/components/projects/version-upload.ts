@@ -15,7 +15,7 @@ const PARALLEL_PARTS = 3;
 const SUCCESS_MIN = 200;
 const SUCCESS_MAX = 299;
 
-function putBlob(
+export function putBlob(
   url: string,
   body: Blob,
   signal: AbortSignal,
