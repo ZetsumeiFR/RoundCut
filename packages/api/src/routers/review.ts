@@ -24,6 +24,7 @@ import { reviewTokenSchema } from "../review-link";
 import { isAllowedReviewer, reviewerIdentitySchema } from "../reviewer";
 import type { FrameRate } from "../timecode";
 import { findReviewVersion, requireReviewer } from "./comment";
+import { roundTransition } from "./round";
 import { thumbnailUrl } from "./version";
 import { brandOf } from "./workspace";
 
@@ -299,10 +300,11 @@ export const reviewRouter = {
           message: "Add feedback before submitting",
         });
       }
+      const submitting = roundTransition("submit");
       const [saved] = await context.db
         .update(round)
-        .set({ status: "submitted", submittedAt: new Date() })
-        .where(and(eq(round.id, current.id), eq(round.status, "open")))
+        .set(submitting.set)
+        .where(and(eq(round.id, current.id), submitting.guard))
         .returning(roundColumns);
       if (!saved) {
         throw new ORPCError("CONFLICT", {

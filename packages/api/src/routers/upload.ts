@@ -3,7 +3,7 @@ import { PLAN_MAX_FILE_BYTES } from "@roundcut/db/plan";
 import { comment } from "@roundcut/db/schema/comment";
 import { round } from "@roundcut/db/schema/round";
 import { version } from "@roundcut/db/schema/version";
-import { and, eq, inArray, isNull, max, ne } from "drizzle-orm";
+import { and, eq, inArray, isNull, max } from "drizzle-orm";
 import z from "zod";
 
 import { protectedProcedure } from "../index";
@@ -21,6 +21,7 @@ import {
   UPLOAD_FORMATS,
   uploadFormat,
 } from "../upload";
+import { roundTransition } from "./round";
 import {
   findOwnedDeliverable,
   findOwnedVersion,
@@ -167,18 +168,12 @@ export const uploadRouter = {
             message: "Upload already completed",
           });
         }
+        const closing = roundTransition("nextVersion");
         await tx
           .update(round)
-          .set({
-            closedAt: new Date(),
-            closedReason: "next_version",
-            status: "closed",
-          })
+          .set(closing.set)
           .where(
-            and(
-              eq(round.deliverableId, ready.deliverableId),
-              ne(round.status, "closed")
-            )
+            and(eq(round.deliverableId, ready.deliverableId), closing.guard)
           );
         const [last] = await tx
           .select({ number: max(round.number) })
