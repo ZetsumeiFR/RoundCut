@@ -45,7 +45,7 @@ const reviewInput = z.object({ token: reviewTokenSchema });
 
 // The reviewer must have identified (REV-02) before reading or writing
 // feedback; requireReviewLink leaves them null otherwise.
-const requireReviewer = <T>(reviewerOf: T | null) => {
+export const requireReviewer = <T>(reviewerOf: T | null) => {
   if (!reviewerOf) {
     throw new ORPCError("UNAUTHORIZED", {
       message: "Identify on the review link first",
@@ -55,7 +55,7 @@ const requireReviewer = <T>(reviewerOf: T | null) => {
 };
 
 // A published version of the linked project; anything else reads as missing.
-async function findReviewVersion(
+export async function findReviewVersion(
   db: Database,
   projectId: string,
   versionId: string
@@ -88,6 +88,7 @@ const commentColumns = {
   parentId: comment.parentId,
   rejectReason: comment.rejectReason,
   reviewerName: reviewer.name,
+  roundId: comment.roundId,
   status: comment.status,
   timecodeMs: comment.timecodeMs,
 };
@@ -102,6 +103,7 @@ type CommentRow = Pick<
   | "id"
   | "parentId"
   | "rejectReason"
+  | "roundId"
   | "status"
   | "timecodeMs"
 > & { editorName: string | null; reviewerName: string | null };
@@ -118,6 +120,7 @@ const toComment = async (storage: Storage, row: CommentRow) => ({
   id: row.id,
   parentId: row.parentId,
   rejectReason: row.rejectReason,
+  roundId: row.roundId,
   status: row.status,
   timecodeMs: row.timecodeMs,
 });
@@ -223,8 +226,9 @@ const isWithin = (durationMs: number | null, timecodeMs: number | null) =>
 
 export const commentRouter = {
   // A reviewer's timestamped comment (REV-03) on a published version of the
-  // linked project. It joins the round open on that version; without one it
-  // waits for the next round (REV-06).
+  // linked project. It joins the round open on that version; without one
+  // (none yet, or its batch was submitted: REV-05) it waits for the next
+  // round (REV-06).
   create: publicProcedure
     .input(commentSchema.extend({ token: reviewTokenSchema }))
     .use(requireReviewLink)

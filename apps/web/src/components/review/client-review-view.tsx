@@ -24,6 +24,7 @@ import { CommentComposer } from "./comment-composer";
 import { CommentThread, type ReplyHandler, toMarkers } from "./comment-thread";
 import { ReviewState } from "./review-view";
 import { ReviewerIdentityForm } from "./reviewer-identity-form";
+import { SubmitBatch } from "./submit-batch";
 import { type PlayerHandle, VideoPlayer } from "./video-player";
 
 type ReviewMessages = Messages["review"];
@@ -232,6 +233,14 @@ function LinkedReview({
               {formatMessage(messages.version, { number: version.number })}
             </Badge>
           </div>
+          <SubmitBatch
+            comments={comments.data ?? []}
+            locale={locale}
+            messages={messages.submit}
+            token={token}
+            versionId={version.id}
+            workspaceName={project.workspaceName}
+          />
           <div className="min-w-0 border">
             <VideoPlayer
               durationMs={version.durationMs}

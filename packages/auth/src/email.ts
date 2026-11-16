@@ -108,6 +108,39 @@ export function invitationEmail(
   return { to, ...invitationEmails[locale](details) };
 }
 
+export interface BatchSubmittedDetails {
+  count: number;
+  deliverableTitle: string;
+  projectName: string;
+  reviewerName: string;
+  roundNumber: number;
+  url: string;
+  versionNumber: number;
+}
+
+const batchSubmittedEmails = {
+  en: (details: BatchSubmittedDetails) => ({
+    subject: `${details.projectName}: round ${details.roundNumber} feedback submitted`,
+    text: `${details.reviewerName} submitted ${details.count === 1 ? "1 comment" : `${details.count} comments`} on ${details.deliverableTitle} V${details.versionNumber} (${details.projectName}). Round ${details.roundNumber} is now closed to new feedback.\n\nReview the comments:\n${details.url}`,
+  }),
+  fr: (details: BatchSubmittedDetails) => ({
+    subject: `${details.projectName} : retours du tour ${details.roundNumber} soumis`,
+    text: `${details.reviewerName} a soumis ${details.count === 1 ? "1 retour" : `${details.count} retours`} sur ${details.deliverableTitle} V${details.versionNumber} (${details.projectName}). Le tour ${details.roundNumber} est clos aux nouveaux retours.\n\nConsultez les retours :\n${details.url}`,
+  }),
+} satisfies Record<
+  Locale,
+  (details: BatchSubmittedDetails) => Omit<EmailMessage, "to">
+>;
+
+// Tells the editor a client submitted the feedback batch of a round (REV-05).
+export function batchSubmittedEmail(
+  locale: Locale,
+  to: string,
+  details: BatchSubmittedDetails
+): EmailMessage {
+  return { to, ...batchSubmittedEmails[locale](details) };
+}
+
 export function resetPasswordEmail(
   locale: Locale,
   to: string,
