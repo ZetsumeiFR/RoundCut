@@ -16,9 +16,11 @@ import { useAppForm } from "./auth-form";
 
 export function SignInForm({
   messages,
+  onEmailNotVerified,
   onSwitchToSignUp,
 }: {
   messages: Messages["auth"];
+  onEmailNotVerified: (email: string) => void;
   onSwitchToSignUp: () => void;
 }) {
   const router = useRouter();
@@ -30,9 +32,15 @@ export function SignInForm({
     onSubmit: async ({ value }) => {
       setSubmitError(null);
       const { error } = await authClient.signIn.email({
+        // Used by the verification link Better-Auth re-sends to unverified users.
+        callbackURL: `${window.location.origin}/dashboard`,
         email: value.email,
         password: value.password,
       });
+      if (error?.code === "EMAIL_NOT_VERIFIED") {
+        onEmailNotVerified(value.email);
+        return;
+      }
       if (error) {
         setSubmitError(authErrorMessage(error.code, messages.errors));
         return;

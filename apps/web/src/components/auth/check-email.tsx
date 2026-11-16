@@ -15,10 +15,12 @@ import { AuthErrorAlert } from "./auth-error-alert";
 type ResendState = "idle" | "sending" | "sent" | "error";
 
 export function CheckEmail({
+  description,
   email,
   messages,
   footer,
 }: {
+  description?: string;
   email: string;
   messages: Messages["auth"];
   footer?: ReactNode;
@@ -43,7 +45,9 @@ export function CheckEmail({
 
   return (
     <AuthCard
-      description={formatMessage(checkEmail.description, { email })}
+      description={formatMessage(description ?? checkEmail.description, {
+        email,
+      })}
       footer={footer}
       title={checkEmail.title}
     >

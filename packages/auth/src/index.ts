@@ -26,9 +26,14 @@ export function createAuth(env: AuthConfig, database: Database) {
       provider: "pg",
       schema: { account, authRelations, session, user, verification },
     }),
-    emailAndPassword: { enabled: true, minPasswordLength: MIN_PASSWORD_LENGTH },
+    emailAndPassword: {
+      enabled: true,
+      minPasswordLength: MIN_PASSWORD_LENGTH,
+      requireEmailVerification: true,
+    },
     emailVerification: {
       autoSignInAfterVerification: true,
+      sendOnSignIn: true,
       sendOnSignUp: true,
       sendVerificationEmail: async ({ user: newUser, url }, request) => {
         const locale = resolveLocale(request?.headers.get("accept-language"));
