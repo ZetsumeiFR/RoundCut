@@ -10,7 +10,6 @@ import {
   splitEmails,
 } from "@roundcut/api/client";
 import type { AppRouterClient } from "@roundcut/api/routers/index";
-import { EXTRA_ROUND_DELAY_MAX_DAYS } from "@roundcut/api/workspace";
 import type { Locale } from "@roundcut/auth/locale";
 import type { RevisionTerms } from "@roundcut/db/revision-terms";
 import { Button } from "@roundcut/ui/components/button";
@@ -36,12 +35,11 @@ import { type ReactNode, useCallback, useMemo, useState } from "react";
 import { toast } from "sonner";
 import z from "zod";
 import {
+  addTermsIssues,
   formatPrice,
-  isDelay,
-  isPrice,
-  PRICE_MAX,
   type TermsFormValues,
   type TermsMessages,
+  termsFormValuesSchema,
   toRevisionTerms,
   toTermsFormValues,
   useTermsOptions,
@@ -123,37 +121,13 @@ function clientFormSchema(
         const siren = normalizeSiren(value);
         return siren === "" || isSiren(siren);
       }, errors.sirenInvalid),
-      terms: z.object({
-        extraRoundDelayDays: z.string(),
-        extraRoundPrice: z.string(),
-        includedRounds: z.string(),
-        requirePayment: z.boolean(),
-        scope: z.string(),
-      }),
+      terms: termsFormValuesSchema,
     })
     .superRefine(({ customTerms, terms: values }, context) => {
       // Hidden plan terms fields are ignored when the client follows the
       // workspace defaults.
-      if (!customTerms) {
-        return;
-      }
-      if (!isPrice(values.extraRoundPrice)) {
-        context.addIssue({
-          code: "custom",
-          message: formatMessage(terms.priceInvalid, {
-            max: new Intl.NumberFormat(locale).format(PRICE_MAX),
-          }),
-          path: ["terms", "extraRoundPrice"],
-        });
-      }
-      if (!isDelay(values.extraRoundDelayDays)) {
-        context.addIssue({
-          code: "custom",
-          message: formatMessage(terms.delayInvalid, {
-            max: EXTRA_ROUND_DELAY_MAX_DAYS,
-          }),
-          path: ["terms", "extraRoundDelayDays"],
-        });
+      if (customTerms) {
+        addTermsIssues(values, terms, locale, context);
       }
     });
 }

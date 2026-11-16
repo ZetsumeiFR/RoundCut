@@ -72,6 +72,42 @@ const createFormSchema = (messages: TermsMessages, locale: Locale) =>
     scope: z.string(),
   });
 
+export const termsFormValuesSchema = z.object({
+  extraRoundDelayDays: z.string(),
+  extraRoundPrice: z.string(),
+  includedRounds: z.string(),
+  requirePayment: z.boolean(),
+  scope: z.string(),
+});
+
+// Checks plan terms typed in a form where they are optional (client or
+// project specific terms); issues land on the nested `terms.*` fields.
+export function addTermsIssues(
+  values: TermsFormValues,
+  messages: TermsMessages,
+  locale: Locale,
+  context: z.RefinementCtx
+) {
+  if (!isPrice(values.extraRoundPrice)) {
+    context.addIssue({
+      code: "custom",
+      message: formatMessage(messages.priceInvalid, {
+        max: new Intl.NumberFormat(locale).format(PRICE_MAX),
+      }),
+      path: ["terms", "extraRoundPrice"],
+    });
+  }
+  if (!isDelay(values.extraRoundDelayDays)) {
+    context.addIssue({
+      code: "custom",
+      message: formatMessage(messages.delayInvalid, {
+        max: EXTRA_ROUND_DELAY_MAX_DAYS,
+      }),
+      path: ["terms", "extraRoundDelayDays"],
+    });
+  }
+}
+
 export const formatPrice = (cents: number, locale: Locale) =>
   new Intl.NumberFormat(locale, {
     minimumFractionDigits: cents % CENTS_PER_UNIT ? 2 : 0,

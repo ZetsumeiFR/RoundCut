@@ -21,10 +21,11 @@ export default async function DashboardPage() {
   }
 
   const api = createServerApi(session);
-  const [locale, workspace, clients] = await Promise.all([
+  const [locale, workspace, clients, projects] = await Promise.all([
     getLocale(),
     api.workspace.get(),
     api.client.list(),
+    api.project.list(),
   ]);
 
   return (
@@ -32,6 +33,8 @@ export default async function DashboardPage() {
       <div className="w-full max-w-3xl">
         <SetupChecklist
           hasClient={clients.length > 0}
+          hasProject={projects.length > 0}
+          locale={locale}
           messages={getMessages(locale).dashboard.checklist}
           setupDone={workspace.onboardingCompletedAt !== null}
         />
