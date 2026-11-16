@@ -28,6 +28,24 @@ const NO_REVIEW_ACTIVITY: ReviewActivity = {
   roundsUsed: 0,
 };
 
+export interface DashboardIndicators {
+  // Amount still to bill: flat fees and accepted extra rounds (BILL-01).
+  billableCents: number;
+  extraRoundsThisMonth: number;
+  openRounds: number;
+  submittedBatches: number;
+}
+
+// Rounds, comment batches, extra rounds and billable lines don't exist yet
+// (ROUND-01, REV-03, EXTRA-05, BILL-01): until they ship, the dashboard
+// reads as having nothing to process.
+const NO_DASHBOARD_ACTIVITY: DashboardIndicators = {
+  billableCents: 0,
+  extraRoundsThisMonth: 0,
+  openRounds: 0,
+  submittedBatches: 0,
+};
+
 const toProject = <D extends Deliverable>(
   row: ProjectRow,
   owner: { id: string; name: string },
@@ -142,6 +160,9 @@ export const projectRouter = {
         }))
       );
     }),
+  indicators: protectedProcedure.handler(
+    (): DashboardIndicators => NO_DASHBOARD_ACTIVITY
+  ),
   list: protectedProcedure.handler(async ({ context }) => {
     const workspace = await getOrCreateWorkspace(
       context.db,
