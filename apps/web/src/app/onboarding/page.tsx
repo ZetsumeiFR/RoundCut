@@ -1,12 +1,11 @@
-import { Button } from "@roundcut/ui/components/button";
 import { headers } from "next/headers";
-import Link from "next/link";
 import { redirect } from "next/navigation";
 
-import { AuthCard } from "@/components/auth/auth-card";
 import { CheckEmail } from "@/components/auth/check-email";
+import { Onboarding } from "@/components/onboarding/onboarding";
 import { getLocale } from "@/i18n/get-locale";
 import { getMessages } from "@/i18n/messages";
+import { createServerApi } from "@/lib/server-api";
 import { auth } from "@/services";
 
 export default async function OnboardingPage() {
@@ -15,26 +14,30 @@ export default async function OnboardingPage() {
     redirect("/login");
   }
 
-  const messages = getMessages(await getLocale());
+  const locale = await getLocale();
+  const messages = getMessages(locale);
+
+  if (!session.user.emailVerified) {
+    return (
+      <main className="flex w-full items-center justify-center px-4 py-6 sm:px-8 sm:py-10">
+        <CheckEmail email={session.user.email} messages={messages.auth} />
+      </main>
+    );
+  }
+
+  const workspace = await createServerApi(session).workspace.get();
+  if (workspace.onboardingCompletedAt) {
+    redirect("/dashboard");
+  }
 
   return (
-    <main className="flex w-full items-center justify-center px-4 py-6 sm:px-8 sm:py-10">
-      {session.user.emailVerified ? (
-        <AuthCard
-          description={messages.onboarding.description}
-          title={messages.onboarding.title}
-        >
-          <Button
-            className="w-full"
-            nativeButton={false}
-            render={<Link href="/dashboard" />}
-          >
-            {messages.onboarding.continue}
-          </Button>
-        </AuthCard>
-      ) : (
-        <CheckEmail email={session.user.email} messages={messages.auth} />
-      )}
-    </main>
+    <Onboarding
+      locale={locale}
+      messages={{
+        onboarding: messages.onboarding,
+        terms: messages.account.terms,
+        workspace: messages.account.workspace,
+      }}
+    />
   );
 }
