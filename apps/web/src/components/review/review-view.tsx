@@ -36,6 +36,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   CircleAlertIcon,
   CloudUploadIcon,
+  Columns2Icon,
   DownloadIcon,
   MessageSquareIcon,
   SearchXIcon,
@@ -61,13 +62,13 @@ const MAX_RETRIES = 3;
 // Feedback comments arrive with REV-03; until then no version has markers.
 const NO_MARKERS: PlayerMarker[] = [];
 
-const isNotFound = (error: unknown) =>
+export const isNotFound = (error: unknown) =>
   error instanceof ORPCError && error.code === "NOT_FOUND";
 
-const retryUnlessMissing = (failures: number, error: unknown) =>
+export const retryUnlessMissing = (failures: number, error: unknown) =>
   !isNotFound(error) && failures < MAX_RETRIES;
 
-function ReviewState({
+export function ReviewState({
   action,
   description,
   icon,
@@ -416,12 +417,27 @@ export function ReviewView({
             </SelectContent>
           </Select>
           {playable ? (
-            <DownloadControls
-              clientCanDownload={version.data.clientCanDownload}
-              clientDownload={version.data.clientDownload}
-              messages={player.download}
-              versionId={versionId}
-            />
+            <>
+              <Button
+                nativeButton={false}
+                render={
+                  <Link
+                    href={`/projects/${projectId}/versions/${versionId}/compare`}
+                  />
+                }
+                size="sm"
+                variant="outline"
+              >
+                <Columns2Icon aria-hidden="true" data-icon="inline-start" />
+                {player.compare.action}
+              </Button>
+              <DownloadControls
+                clientCanDownload={version.data.clientCanDownload}
+                clientDownload={version.data.clientDownload}
+                messages={player.download}
+                versionId={versionId}
+              />
+            </>
           ) : null}
           <Button onClick={openUpload} size="sm" type="button">
             <UploadIcon aria-hidden="true" data-icon="inline-start" />

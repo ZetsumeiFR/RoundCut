@@ -70,23 +70,23 @@ export interface PlayerMarker {
 
 export const PLAYBACK_RATES = [0.5, 1, 1.5, 2] as const;
 
-type PlaybackRate = (typeof PLAYBACK_RATES)[number];
+export type PlaybackRate = (typeof PLAYBACK_RATES)[number];
 
 // Versions uploaded before VER-03 have no declared rate.
-const FALLBACK_FRAME_RATE: FrameRate = 25;
-const MS_PER_SECOND = 1000;
-const SEEK_SECONDS = 1;
+export const FALLBACK_FRAME_RATE: FrameRate = 25;
+export const MS_PER_SECOND = 1000;
+export const SEEK_SECONDS = 1;
 // Absorbs float noise so a position exactly on a frame boundary reads as that
 // frame, not the one before.
 const FRAME_EPSILON = 1e-6;
 // Seeking to the middle of a frame makes every browser decode that frame
 // rather than its neighbour.
-const MID_FRAME = 0.5;
+export const MID_FRAME = 0.5;
 
-const frameAt = (seconds: number, frameRate: number) =>
+export const frameAt = (seconds: number, frameRate: number) =>
   Math.floor(seconds * frameRate + FRAME_EPSILON);
 
-const isPlaybackRate = (value: number): value is PlaybackRate =>
+export const isPlaybackRate = (value: number): value is PlaybackRate =>
   PLAYBACK_RATES.some((rate) => rate === value);
 
 const TEXT_INPUT =
@@ -107,14 +107,14 @@ const SLIDER_KEYS = new Set([
 // keys on the timeline, and Space/Enter on buttons and links.
 // Space is matched on its physical code: some layouts and input methods
 // report it with an empty or composed `key`.
-function shortcutKey(event: KeyboardEvent) {
+export function shortcutKey(event: KeyboardEvent) {
   if (event.code === "Space") {
     return " ";
   }
   return event.key.length === 1 ? event.key.toLowerCase() : event.key;
 }
 
-function belongsToTarget(event: KeyboardEvent, key: string) {
+export function belongsToTarget(event: KeyboardEvent, key: string) {
   const { target } = event;
   if (!(target instanceof Element)) {
     return false;
@@ -172,7 +172,7 @@ function runShortcut(
   handler();
 }
 
-function ControlButton({
+export function ControlButton({
   children,
   label,
   onClick,
@@ -297,6 +297,39 @@ function ShortcutsDialog({
   );
 }
 
+export function RateSelect({
+  label,
+  locale,
+  onRateChange,
+  rate,
+}: {
+  label: string;
+  locale: Locale;
+  onRateChange: (value: string | null) => void;
+  rate: PlaybackRate;
+}) {
+  const rateLabel = useMemo(() => {
+    const format = new Intl.NumberFormat(locale);
+    return (value: number) => `${format.format(value)}×`;
+  }, [locale]);
+  return (
+    <Select onValueChange={onRateChange} value={String(rate)}>
+      <SelectTrigger aria-label={label} className="w-20" size="sm">
+        <SelectValue>{rateLabel(rate)}</SelectValue>
+      </SelectTrigger>
+      <SelectContent container={use(PortalContainer)}>
+        <SelectGroup>
+          {PLAYBACK_RATES.map((value) => (
+            <SelectItem key={value} value={String(value)}>
+              {rateLabel(value)}
+            </SelectItem>
+          ))}
+        </SelectGroup>
+      </SelectContent>
+    </Select>
+  );
+}
+
 function PlayerOptions({
   controls,
   fullscreen,
@@ -318,26 +351,14 @@ function PlayerOptions({
   onToggleMute: () => void;
   rate: PlaybackRate;
 }) {
-  const rateLabel = useMemo(() => {
-    const format = new Intl.NumberFormat(locale);
-    return (value: number) => `${format.format(value)}×`;
-  }, [locale]);
   return (
     <div className="ms-auto flex items-center gap-1">
-      <Select onValueChange={onRateChange} value={String(rate)}>
-        <SelectTrigger aria-label={controls.speed} className="w-20" size="sm">
-          <SelectValue>{rateLabel(rate)}</SelectValue>
-        </SelectTrigger>
-        <SelectContent container={use(PortalContainer)}>
-          <SelectGroup>
-            {PLAYBACK_RATES.map((value) => (
-              <SelectItem key={value} value={String(value)}>
-                {rateLabel(value)}
-              </SelectItem>
-            ))}
-          </SelectGroup>
-        </SelectContent>
-      </Select>
+      <RateSelect
+        label={controls.speed}
+        locale={locale}
+        onRateChange={onRateChange}
+        rate={rate}
+      />
       <ControlButton
         label={muted ? controls.unmute : controls.mute}
         onClick={onToggleMute}
@@ -366,7 +387,7 @@ function PlayerOptions({
   );
 }
 
-function VideoError({
+export function VideoError({
   messages,
   onRetry,
 }: {
