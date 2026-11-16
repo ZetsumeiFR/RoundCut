@@ -16,6 +16,7 @@ import z from "zod";
 
 import { formatMessage, type Messages } from "@/i18n/messages";
 import { orpc } from "@/utils/orpc";
+import { ReviewerRemindersForm } from "./reviewer-reminders-settings";
 import { SettingsCard } from "./settings-card";
 import {
   SettingsAlert,
@@ -327,12 +328,18 @@ export function RevisionTermsSettings({
 
   if (data) {
     return (
-      <RevisionTermsForm
-        currency={data.currency}
-        locale={locale}
-        messages={messages}
-        terms={data.revisionTerms}
-      />
+      <div className="flex flex-col gap-6">
+        <RevisionTermsForm
+          currency={data.currency}
+          locale={locale}
+          messages={messages}
+          terms={data.revisionTerms}
+        />
+        <ReviewerRemindersForm
+          messages={messages}
+          reminders={data.reviewerReminders}
+        />
+      </div>
     );
   }
 
