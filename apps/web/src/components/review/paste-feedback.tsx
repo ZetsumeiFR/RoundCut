@@ -133,6 +133,9 @@ export function PasteFeedback({
             queryKey: orpc.comment.listForReview.key(),
           }),
           queryClient.invalidateQueries({ queryKey: orpc.review.round.key() }),
+          queryClient.invalidateQueries({
+            queryKey: orpc.extraRound.getOffer.key(),
+          }),
         ]);
         toast.success(count(created, messages.savedOne, messages.savedOther));
         setText("");

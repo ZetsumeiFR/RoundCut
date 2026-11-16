@@ -2,6 +2,7 @@ export * from "./auth";
 export * from "./client";
 export * from "./comment";
 export * from "./deliverable";
+export * from "./extra-round-offer";
 export * from "./project";
 export * from "./review-link";
 export * from "./reviewer";

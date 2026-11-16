@@ -4,6 +4,7 @@ import { protectedProcedure, publicProcedure } from "../index";
 import { clientRouter } from "./client";
 import { commentRouter } from "./comment";
 import { deliverableRouter } from "./deliverable";
+import { extraRoundRouter } from "./extra-round";
 import { projectRouter } from "./project";
 import { reviewRouter } from "./review";
 import { reviewLinkRouter } from "./review-link";
@@ -17,6 +18,7 @@ export const appRouter = {
   client: clientRouter,
   comment: commentRouter,
   deliverable: deliverableRouter,
+  extraRound: extraRoundRouter,
   healthCheck: publicProcedure.handler(() => "OK"),
   privateData: protectedProcedure.handler(({ context }) => ({
     message: "This is private",

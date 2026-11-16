@@ -2,6 +2,7 @@ import { ORPCError } from "@orpc/server";
 import { batchSubmittedEmail, sendEmail } from "@roundcut/auth/email";
 import { resolveLocale } from "@roundcut/auth/locale";
 import type { Database } from "@roundcut/db";
+import { canGiftRound } from "@roundcut/db/round";
 import { user } from "@roundcut/db/schema/auth";
 import { client } from "@roundcut/db/schema/client";
 import { comment } from "@roundcut/db/schema/comment";
@@ -47,7 +48,7 @@ const roundColumns = {
 };
 
 // The round reviewers comment in on a version: the latest one opened on it.
-async function findVersionRound(db: Database, versionId: string) {
+export async function findVersionRound(db: Database, versionId: string) {
   const [current] = await db
     .select(roundColumns)
     .from(round)
@@ -58,7 +59,7 @@ async function findVersionRound(db: Database, versionId: string) {
 }
 
 // A round's batch is its top-level comments; replies follow their thread.
-async function batchSize(db: Database, roundId: string) {
+export async function batchSize(db: Database, roundId: string) {
   const [row] = await db
     .select({ total: count() })
     .from(comment)
@@ -68,7 +69,7 @@ async function batchSize(db: Database, roundId: string) {
 
 // Top-level comments of a version written while no round was open on it:
 // they wait for the next round (REV-06).
-async function pendingSize(db: Database, versionId: string) {
+export async function pendingSize(db: Database, versionId: string) {
   const [row] = await db
     .select({ total: count() })
     .from(comment)
@@ -300,6 +301,26 @@ export const reviewRouter = {
       if (current?.status !== "open") {
         throw new ORPCError("CONFLICT", {
           message: "No open round to submit on this version",
+        });
+      }
+      // A round beyond the included ones waits for the extra round agreement
+      // (EXTRA-01, §7.1) or the editor's gift (ROUND-06): its comments are
+      // kept, but it can't be submitted yet.
+      const [terms] = await context.db
+        .select({ termsSnapshot: project.termsSnapshot })
+        .from(project)
+        .where(eq(project.id, projectId));
+      const position = (await projectRoundPositions(context.db, projectId)).get(
+        current.id
+      );
+      if (
+        canGiftRound(
+          { ...current, position: position ?? current.number },
+          terms?.termsSnapshot.includedRounds ?? 0
+        )
+      ) {
+        throw new ORPCError("CONFLICT", {
+          message: "This round needs the extra round agreement first",
         });
       }
       const total = await batchSize(context.db, current.id);

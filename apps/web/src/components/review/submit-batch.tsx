@@ -2,6 +2,7 @@
 
 import { ORPCError } from "@orpc/client";
 import type { Locale } from "@roundcut/auth/locale";
+import { needsExtraRound } from "@roundcut/db/extra-round";
 import type {
   ManualCloseReason,
   RoundKind,
@@ -37,6 +38,7 @@ import { toast } from "sonner";
 
 import { formatMessage, type Messages } from "@/i18n/messages";
 import { client as api, orpc } from "@/utils/orpc";
+import { ExtraRoundOffer } from "./extra-round-offer";
 
 type SubmitMessages = Messages["review"]["submit"];
 
@@ -249,18 +251,73 @@ function ConfirmSubmitDialog({
   );
 }
 
+// What the reviewer sees once the round's batch is submitted (REV-05), with
+// the comments already waiting for the next round (REV-06).
+function SubmittedNotice({
+  locale,
+  messages,
+  pendingCount,
+  position,
+  submittedAt,
+  workspaceName,
+}: {
+  locale: Locale;
+  messages: SubmitMessages;
+  pendingCount: number;
+  position: number;
+  submittedAt: Date | null;
+  workspaceName: string;
+}) {
+  const date = submittedAt
+    ? new Intl.DateTimeFormat(locale, {
+        dateStyle: "long",
+        timeStyle: "short",
+      }).format(submittedAt)
+    : "";
+  return (
+    <Alert variant="info">
+      <CircleCheckIcon aria-hidden="true" />
+      <AlertTitle className="line-clamp-none">
+        {formatMessage(messages.submittedTitle, { round: position })}
+      </AlertTitle>
+      <AlertDescription>
+        <p>
+          {formatMessage(messages.submittedDescription, {
+            date,
+            workspace: workspaceName,
+          })}
+        </p>
+        {pendingCount > 0 ? (
+          <p className="font-medium">
+            {formatMessage(
+              new Intl.PluralRules(locale).select(pendingCount) === "one"
+                ? messages.pendingOne
+                : messages.pendingOther,
+              { count: pendingCount }
+            )}
+          </p>
+        ) : null}
+      </AlertDescription>
+    </Alert>
+  );
+}
+
 // The reviewer's permanent round banner (REV-07) and "Submit my feedback (n)"
 // button (REV-05). Once submitted, the batch is closed: new comments wait for
-// the next round (REV-06) and the submitted notice counts them.
+// the next round (REV-06) and the submitted notice counts them. Beyond the
+// included rounds, the extra round offer (EXTRA-01) replaces the button as
+// soon as the client starts a new batch.
 export function SubmitBatch({
   locale,
   messages,
+  offerMessages,
   token,
   versionId,
   workspaceName,
 }: {
   locale: Locale;
   messages: SubmitMessages;
+  offerMessages: Messages["review"]["extraRound"];
   token: string;
   versionId: string;
   workspaceName: string;
@@ -338,49 +395,64 @@ export function SubmitBatch({
       workspaceName={workspaceName}
     />
   );
-  if (approval || round === null || round.status === "closed") {
+  const offer = (
+    <ExtraRoundOffer
+      locale={locale}
+      messages={offerMessages}
+      token={token}
+      versionId={versionId}
+      workspaceName={workspaceName}
+    />
+  );
+  if (approval || round === null) {
     return banner;
+  }
+  const extraRoundNeeded = needsExtraRound(round, includedRounds);
+  if (round.status === "closed") {
+    return extraRoundNeeded && pendingCount > 0 ? (
+      <div className="flex flex-col gap-2">
+        {banner}
+        {offer}
+      </div>
+    ) : (
+      banner
+    );
   }
 
   if (round.status === "submitted") {
-    const date = round.submittedAt
-      ? new Intl.DateTimeFormat(locale, {
-          dateStyle: "long",
-          timeStyle: "short",
-        }).format(round.submittedAt)
-      : "";
     return (
       <div className="flex flex-col gap-2">
         {banner}
-        <Alert variant="info">
-          <CircleCheckIcon aria-hidden="true" />
-          <AlertTitle className="line-clamp-none">
-            {formatMessage(messages.submittedTitle, { round: round.position })}
-          </AlertTitle>
-          <AlertDescription>
-            <p>
-              {formatMessage(messages.submittedDescription, {
-                date,
-                workspace: workspaceName,
-              })}
-            </p>
-            {pendingCount > 0 ? (
-              <p className="font-medium">
-                {formatMessage(
-                  new Intl.PluralRules(locale).select(pendingCount) === "one"
-                    ? messages.pendingOne
-                    : messages.pendingOther,
-                  { count: pendingCount }
-                )}
-              </p>
-            ) : null}
-          </AlertDescription>
-        </Alert>
+        <SubmittedNotice
+          locale={locale}
+          messages={messages}
+          pendingCount={pendingCount}
+          position={round.position}
+          submittedAt={round.submittedAt}
+          workspaceName={workspaceName}
+        />
+        {extraRoundNeeded && pendingCount > 0 ? offer : null}
       </div>
     );
   }
 
   const count = round.batchCount;
+  // A round beyond the included ones, neither offered nor granted yet: its
+  // comments wait for the extra round agreement instead of being submitted.
+  if (extraRoundNeeded) {
+    return (
+      <div className="flex flex-col gap-2">
+        {banner}
+        {count > 0 ? (
+          offer
+        ) : (
+          <p className="border p-2 text-muted-foreground text-xs">
+            {offerMessages.hint}
+          </p>
+        )}
+      </div>
+    );
+  }
   return (
     <div className="flex flex-col gap-2">
       {banner}
