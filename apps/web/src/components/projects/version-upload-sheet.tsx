@@ -933,7 +933,7 @@ function VersionUploadPanel({
         toast.success(
           formatMessage(messages.uploadedToast, {
             number: ready.number,
-            round: ready.round.number,
+            round: ready.round.position,
             title: deliverable.title,
           })
         );
@@ -1151,7 +1151,7 @@ function VersionUploadPanel({
           <AlertTitle>
             {formatMessage(messages.uploaded, {
               number: upload.version.number,
-              round: upload.version.round.number,
+              round: upload.version.round.position,
             })}
           </AlertTitle>
         </Alert>

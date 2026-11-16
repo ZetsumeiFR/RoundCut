@@ -273,18 +273,19 @@ function buildColumns(
       size: 160,
     },
     {
-      accessorFn: (deliverable) => deliverable.review.currentRound?.number ?? 0,
+      accessorFn: (deliverable) =>
+        deliverable.review.currentRound?.position ?? 0,
       cell: ({ row }) => (
         <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
           <RoundCell
-            current={row.original.review.currentRound?.number ?? 0}
+            current={row.original.review.currentRound?.position ?? 0}
             included={includedRounds}
             messages={view}
           />
           {row.original.review.currentRound?.status === "submitted" ? (
             <Badge variant="info-light">
               {formatMessage(view.roundSubmitted, {
-                current: row.original.review.currentRound.number,
+                current: row.original.review.currentRound.position,
               })}
             </Badge>
           ) : null}
@@ -505,7 +506,7 @@ function RoundItem({
     <li className="flex flex-col gap-1 px-4 py-3">
       <div className="flex flex-wrap items-center gap-2">
         <span className="font-medium text-sm tabular-nums">
-          {formatMessage(rounds.round, { number: round.number })}
+          {formatMessage(rounds.round, { number: round.position })}
         </span>
         {round.kind === "included" ? null : (
           <Badge variant="outline">{rounds.kinds[round.kind]}</Badge>

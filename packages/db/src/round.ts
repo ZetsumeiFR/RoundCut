@@ -1,3 +1,5 @@
+import type { RevisionTerms } from "./revision-terms";
+
 // Revision round lifecycle (§7.2). Client-safe: no drizzle import.
 // A round opens when a version is published (VER-04) or an extra round is
 // granted (EXTRA); the client submits it, and it closes when the next version
@@ -40,3 +42,26 @@ export const ROUND_TRANSITIONS = {
 } as const satisfies Record<string, RoundTransition>;
 
 export type RoundEvent = keyof typeof ROUND_TRANSITIONS;
+
+interface CountedRound {
+  id: string;
+  number: number;
+  openedAt: Date;
+}
+
+// Each round's place in the "round n of included" counter (ROUND-02): its
+// number within its deliverable, or its opening order across all the
+// project's deliverables when the revision terms count rounds per project.
+export function roundPositions(
+  rounds: readonly CountedRound[],
+  scope: RevisionTerms["scope"]
+): Map<string, number> {
+  if (scope === "deliverable") {
+    return new Map(rounds.map((item) => [item.id, item.number]));
+  }
+  const ordered = rounds.toSorted(
+    (a, b) =>
+      a.openedAt.getTime() - b.openedAt.getTime() || a.id.localeCompare(b.id)
+  );
+  return new Map(ordered.map((item, index) => [item.id, index + 1]));
+}

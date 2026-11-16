@@ -1,6 +1,7 @@
 import { ORPCError } from "@orpc/server";
 import { PLAN_MAX_FILE_BYTES } from "@roundcut/db/plan";
 import { comment } from "@roundcut/db/schema/comment";
+import { deliverable } from "@roundcut/db/schema/deliverable";
 import { round } from "@roundcut/db/schema/round";
 import { version } from "@roundcut/db/schema/version";
 import { and, eq, inArray, isNull, max } from "drizzle-orm";
@@ -21,7 +22,7 @@ import {
   UPLOAD_FORMATS,
   uploadFormat,
 } from "../upload";
-import { roundTransition } from "./round";
+import { projectRoundPositions, roundTransition } from "./round";
 import {
   findOwnedDeliverable,
   findOwnedVersion,
@@ -207,11 +208,22 @@ export const uploadRouter = {
               )
             )
           );
-        return { ready, round: { number: opened.number } };
+        return { opened, ready };
       });
+      const [owner] = await context.db
+        .select({ projectId: deliverable.projectId })
+        .from(deliverable)
+        .where(eq(deliverable.id, row.deliverableId));
+      const positions = owner
+        ? await projectRoundPositions(context.db, owner.projectId)
+        : new Map<string, number>();
       return {
         ...(await withThumbnail(context.storage, published.ready)),
-        round: published.round,
+        round: {
+          number: published.opened.number,
+          position:
+            positions.get(published.opened.id) ?? published.opened.number,
+        },
       };
     }),
   createUpload: protectedProcedure

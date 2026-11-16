@@ -17,6 +17,7 @@ import {
   projectStatusSchema,
 } from "../project";
 import { toDeliverable } from "./deliverable";
+import { projectRoundPositions } from "./round";
 import { thumbnailUrl } from "./version";
 import { getOrCreateWorkspace } from "./workspace";
 
@@ -24,8 +25,13 @@ type ProjectRow = typeof project.$inferSelect;
 type Deliverable = ReturnType<typeof toDeliverable>;
 
 export interface ReviewActivity {
-  // Latest round, opened when its version was published (VER-04).
-  currentRound: { number: number; status: RoundStatus } | null;
+  // Latest round, opened when its version was published (VER-04), with its
+  // place in the "round n of included" counter (ROUND-02).
+  currentRound: {
+    number: number;
+    position: number;
+    status: RoundStatus;
+  } | null;
   latestVersion: {
     id: string;
     number: number;
@@ -286,6 +292,7 @@ export const projectRouter = {
       const rounds = await context.db
         .select({
           deliverableId: round.deliverableId,
+          id: round.id,
           number: round.number,
           status: round.status,
         })
@@ -294,8 +301,12 @@ export const projectRouter = {
         .where(eq(deliverable.projectId, row.project.id))
         .orderBy(asc(round.number));
       // Ascending order: the last round seen per deliverable is its latest.
+      const positions = await projectRoundPositions(context.db, row.project.id);
       const currentRounds = new Map(
-        rounds.map(({ deliverableId, ...current }) => [deliverableId, current])
+        rounds.map(({ deliverableId, id: roundId, ...current }) => [
+          deliverableId,
+          { ...current, position: positions.get(roundId) ?? current.number },
+        ])
       );
       return toProject(
         row.project,
