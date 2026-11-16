@@ -4,9 +4,16 @@ import { ORPCError } from "@orpc/client";
 import {
   isSupportedMedia,
   type MediaTracks,
-  readMediaTracks,
+  readMedia,
+  type VideoInfo,
 } from "@roundcut/api/media";
 import type { AppRouterClient } from "@roundcut/api/routers/index";
+import {
+  detectFrameRate,
+  FRAME_RATES,
+  type FrameRate,
+  formatTimecode,
+} from "@roundcut/api/timecode";
 import { UPLOAD_ACCEPT, uploadFormat } from "@roundcut/api/upload";
 import type { Locale } from "@roundcut/auth/locale";
 import {
@@ -26,6 +33,11 @@ import {
   EmptyMedia,
   EmptyTitle,
 } from "@roundcut/ui/components/empty";
+import {
+  Field,
+  FieldDescription,
+  FieldLabel,
+} from "@roundcut/ui/components/field";
 import { Progress } from "@roundcut/ui/components/progress";
 import {
   Alert,
@@ -33,6 +45,14 @@ import {
   AlertTitle,
 } from "@roundcut/ui/components/reui/alert";
 import { Badge } from "@roundcut/ui/components/reui/badge";
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@roundcut/ui/components/select";
 import {
   Sheet,
   SheetContent,
@@ -76,6 +96,13 @@ type Version = Awaited<ReturnType<AppRouterClient["version"]["list"]>>[number];
 export interface UploadTarget {
   id: string;
   title: string;
+}
+
+// A checked file waiting for its frame rate to be confirmed (VER-03).
+interface Picked {
+  file: File;
+  frameRate: FrameRate | null;
+  video: VideoInfo;
 }
 
 type Upload =
@@ -125,25 +152,27 @@ function codecProblem(name: string, tracks: MediaTracks): Problem {
 const readFile = (file: File) => async (offset: number, length: number) =>
   new Uint8Array(await file.slice(offset, offset + length).arrayBuffer());
 
-// Checks the format and codecs before anything is sent (VER-02).
+// Checks the format and codecs (VER-02) and reads the duration, resolution
+// and frame rate (VER-03) before anything is sent.
 async function inspectFile(
   file: File,
   maxBytes: number
-): Promise<Problem | undefined> {
+): Promise<{ problem: Problem } | { video: VideoInfo }> {
   const format = uploadFormat(file.name);
   if (!format) {
-    return { kind: "format", name: file.name };
+    return { problem: { kind: "format", name: file.name } };
   }
   if (file.size > maxBytes) {
-    return { kind: "tooLarge", max: maxBytes, name: file.name };
+    return { problem: { kind: "tooLarge", max: maxBytes, name: file.name } };
   }
-  const tracks = await readMediaTracks(readFile(file), file.size);
-  if (!tracks) {
-    return { kind: "format", name: file.name };
+  const media = await readMedia(readFile(file), file.size);
+  if (!media?.video) {
+    return { problem: { kind: "format", name: file.name } };
   }
-  if (!isSupportedMedia(format, tracks)) {
-    return codecProblem(file.name, tracks);
+  if (!isSupportedMedia(format, media.tracks)) {
+    return { problem: codecProblem(file.name, media.tracks) };
   }
+  return { video: media.video };
 }
 
 const errorCode = (error: unknown) =>
@@ -183,6 +212,24 @@ export function formatBytes(bytes: number, locale: Locale) {
     unit,
   }).format(bytes / size);
 }
+
+// HH:MM:SS:FF once the frame rate is known, seconds until then.
+function formatDuration(
+  durationMs: number,
+  frameRate: FrameRate | null,
+  locale: Locale
+) {
+  if (frameRate) {
+    return formatTimecode(durationMs, frameRate);
+  }
+  return new Intl.NumberFormat(locale, {
+    maximumFractionDigits: 1,
+    style: "unit",
+    unit: "second",
+  }).format(durationMs / MS_PER_SECOND);
+}
+
+const MS_PER_SECOND = 1000;
 
 function describeProblem(
   problem: Problem,
@@ -515,6 +562,146 @@ function InterruptedRow({
   );
 }
 
+function PickedFile({
+  locale,
+  messages,
+  onFrameRate,
+  onRemove,
+  onSend,
+  picked,
+  sending,
+}: {
+  locale: Locale;
+  messages: VersionMessages;
+  onFrameRate: (frameRate: FrameRate) => void;
+  onRemove: () => void;
+  onSend: () => void;
+  picked: Picked;
+  sending: boolean;
+}) {
+  const selectId = useId();
+  const { file, frameRate, video } = picked;
+  const measured = video.frameRate;
+  const detected = detectFrameRate(measured);
+  const rateLabel = (rate: number) =>
+    formatMessage(messages.frameRate.option, {
+      rate: new Intl.NumberFormat(locale, { maximumFractionDigits: 3 }).format(
+        rate
+      ),
+    });
+  const handleValueChange = useCallback(
+    (next: string | null) => {
+      const rate = FRAME_RATES.find((item) => String(item) === next);
+      if (rate) {
+        onFrameRate(rate);
+      }
+    },
+    [onFrameRate]
+  );
+  let hint = messages.frameRate.undetected;
+  if (detected) {
+    hint = messages.frameRate.detected;
+  } else if (measured !== null) {
+    hint = formatMessage(messages.frameRate.unusual, {
+      rate: rateLabel(measured),
+    });
+  }
+  return (
+    <div className="flex flex-col gap-4">
+      <Attachment className="w-full" state="idle">
+        <AttachmentMedia>
+          <FileVideoIcon aria-hidden="true" />
+        </AttachmentMedia>
+        <AttachmentContent>
+          <AttachmentTitle>{file.name}</AttachmentTitle>
+          <AttachmentDescription className="whitespace-normal">
+            {formatDuration(video.durationMs, frameRate, locale)} ·{" "}
+            {formatMessage(messages.resolution, {
+              height: video.height,
+              width: video.width,
+            })}{" "}
+            · {formatBytes(file.size, locale)}
+          </AttachmentDescription>
+        </AttachmentContent>
+        <AttachmentActions>
+          <AttachmentAction
+            aria-label={formatMessage(messages.remove, { name: file.name })}
+            disabled={sending}
+            onClick={onRemove}
+          >
+            <XIcon aria-hidden="true" />
+          </AttachmentAction>
+        </AttachmentActions>
+      </Attachment>
+      <Field data-invalid={frameRate === null || undefined}>
+        <FieldLabel htmlFor={selectId}>{messages.frameRate.label}</FieldLabel>
+        <Select
+          onValueChange={handleValueChange}
+          value={frameRate === null ? null : String(frameRate)}
+        >
+          <SelectTrigger
+            aria-invalid={frameRate === null || undefined}
+            className="w-full sm:w-52"
+            id={selectId}
+          >
+            <SelectValue>
+              {frameRate === null
+                ? messages.frameRate.placeholder
+                : rateLabel(frameRate)}
+            </SelectValue>
+          </SelectTrigger>
+          <SelectContent>
+            <SelectGroup>
+              {FRAME_RATES.map((rate) => (
+                <SelectItem key={rate} value={String(rate)}>
+                  {rateLabel(rate)}
+                </SelectItem>
+              ))}
+            </SelectGroup>
+          </SelectContent>
+        </Select>
+        <FieldDescription>
+          {hint} {messages.frameRate.usage}
+        </FieldDescription>
+      </Field>
+      <Button
+        className="self-start"
+        disabled={frameRate === null || sending}
+        onClick={onSend}
+        type="button"
+      >
+        {sending ? (
+          <Spinner data-icon="inline-start" />
+        ) : (
+          <UploadIcon aria-hidden="true" data-icon="inline-start" />
+        )}
+        {messages.send}
+      </Button>
+    </div>
+  );
+}
+
+// "00:00:03:00 · 1920 × 1080 · 25 fps"; versions uploaded before VER-03 have
+// no metadata and show none.
+function versionDetails(
+  item: Version,
+  messages: VersionMessages,
+  locale: Locale
+) {
+  const { durationMs, frameRate, height, width } = item;
+  return [
+    durationMs === null ? null : formatDuration(durationMs, frameRate, locale),
+    width && height
+      ? formatMessage(messages.resolution, { height, width })
+      : null,
+    frameRate
+      ? formatMessage(messages.frameRate.option, { rate: frameRate })
+      : null,
+  ]
+    .filter(Boolean)
+    .join(" · ");
+}
+
 const STATUS_BADGES = {
   approved: "success-light",
   ready: "outline",
@@ -578,30 +765,38 @@ function VersionList({
   });
   return (
     <ul className="flex flex-col gap-2">
-      {finished.map((item) => (
-        <li key={item.id}>
-          <Attachment className="w-full" state="done">
-            <AttachmentMedia>
-              <CheckIcon aria-hidden="true" />
-            </AttachmentMedia>
-            <AttachmentContent>
-              <AttachmentTitle>
-                {formatMessage(messages.version, { number: item.number })} ·{" "}
-                {item.fileName}
-              </AttachmentTitle>
-              <AttachmentDescription>
-                {formatBytes(item.sizeBytes, locale)} ·{" "}
-                {date.format(new Date(item.createdAt))}
-              </AttachmentDescription>
-            </AttachmentContent>
-            <AttachmentActions>
-              <Badge variant={STATUS_BADGES[item.status]}>
-                {messages.status[item.status]}
-              </Badge>
-            </AttachmentActions>
-          </Attachment>
-        </li>
-      ))}
+      {finished.map((item) => {
+        const details = versionDetails(item, messages, locale);
+        return (
+          <li key={item.id}>
+            <Attachment className="w-full" state="done">
+              <AttachmentMedia>
+                <CheckIcon aria-hidden="true" />
+              </AttachmentMedia>
+              <AttachmentContent>
+                <AttachmentTitle>
+                  {formatMessage(messages.version, { number: item.number })} ·{" "}
+                  {item.fileName}
+                </AttachmentTitle>
+                {details ? (
+                  <AttachmentDescription className="whitespace-normal">
+                    {details}
+                  </AttachmentDescription>
+                ) : null}
+                <AttachmentDescription>
+                  {formatBytes(item.sizeBytes, locale)} ·{" "}
+                  {date.format(new Date(item.createdAt))}
+                </AttachmentDescription>
+              </AttachmentContent>
+              <AttachmentActions>
+                <Badge variant={STATUS_BADGES[item.status]}>
+                  {messages.status[item.status]}
+                </Badge>
+              </AttachmentActions>
+            </Attachment>
+          </li>
+        );
+      })}
     </ul>
   );
 }
@@ -632,6 +827,7 @@ function VersionUploadPanel({
   const maxBytes = workspace.data?.maxUploadBytes;
   const [upload, setUpload] = useState<Upload | undefined>();
   const [problem, setProblem] = useState<Problem | undefined>();
+  const [picked, setPicked] = useState<Picked | undefined>();
   const [starting, setStarting] = useState(false);
   const controller = useRef<AbortController>(undefined);
   const busy = starting || upload?.phase === "uploading";
@@ -732,39 +928,67 @@ function VersionUploadPanel({
     [run]
   );
 
-  const start = useCallback(
+  const pick = useCallback(
     async (file: File) => {
       if (maxBytes === undefined) {
         return;
       }
       setProblem(undefined);
+      setUpload(undefined);
       setStarting(true);
       try {
-        const refused = await inspectFile(file, maxBytes);
-        if (refused) {
-          setStarting(false);
-          setProblem(refused);
+        const inspected = await inspectFile(file, maxBytes);
+        if ("problem" in inspected) {
+          setProblem(inspected.problem);
           return;
         }
-        const created = await api.upload.createUpload({
-          deliverableId: deliverable.id,
-          fileName: file.name,
-          sizeBytes: file.size,
+        setPicked({
+          file,
+          frameRate: detectFrameRate(inspected.video.frameRate),
+          video: inspected.video,
         });
+      } catch {
+        setProblem({ kind: "format", name: file.name });
+      } finally {
         setStarting(false);
-        await run(file, created.version, created.upload, []);
-      } catch (error) {
-        setStarting(false);
-        setProblem(
-          refusalOf(error, file.name) ?? {
-            kind: errorCode(error) === "CONFLICT" ? "conflict" : "startError",
-          }
-        );
-        await refresh();
       }
     },
-    [deliverable.id, maxBytes, refresh, run]
+    [maxBytes]
   );
+  const setFrameRate = useCallback(
+    (frameRate: FrameRate) =>
+      setPicked((current) => current && { ...current, frameRate }),
+    []
+  );
+  const removePicked = useCallback(() => setPicked(undefined), []);
+
+  const start = useCallback(async () => {
+    if (!picked?.frameRate) {
+      return;
+    }
+    const { file, frameRate } = picked;
+    setProblem(undefined);
+    setStarting(true);
+    try {
+      const created = await api.upload.createUpload({
+        deliverableId: deliverable.id,
+        fileName: file.name,
+        frameRate,
+        sizeBytes: file.size,
+      });
+      setStarting(false);
+      setPicked(undefined);
+      await run(file, created.version, created.upload, []);
+    } catch (error) {
+      setStarting(false);
+      setProblem(
+        refusalOf(error, file.name) ?? {
+          kind: errorCode(error) === "CONFLICT" ? "conflict" : "startError",
+        }
+      );
+      await refresh();
+    }
+  }, [deliverable.id, picked, refresh, run]);
 
   const cancel = useCallback(
     async (version: Version) => {
@@ -850,13 +1074,24 @@ function VersionUploadPanel({
           version={interrupted}
         />
       ) : null}
-      {inFlight || interrupted ? null : (
+      {picked && !inFlight && !interrupted ? (
+        <PickedFile
+          locale={locale}
+          messages={messages}
+          onFrameRate={setFrameRate}
+          onRemove={removePicked}
+          onSend={start}
+          picked={picked}
+          sending={starting}
+        />
+      ) : null}
+      {inFlight || interrupted || picked ? null : (
         <Dropzone
           disabled={starting || !versions.data || maxBytes === undefined}
           locale={locale}
           maxBytes={maxBytes}
           messages={messages}
-          onFile={start}
+          onFile={pick}
         />
       )}
       {upload?.phase === "done" ? (

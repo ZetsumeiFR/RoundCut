@@ -759,6 +759,15 @@ const en = {
       format: "{name} isn't an MP4 or MOV video",
       formats: "MP4 (H.264, AAC) or MOV (H.264), up to {max}",
       formatsLoading: "MP4 (H.264, AAC) or MOV (H.264)",
+      frameRate: {
+        detected: "Detected from the file.",
+        label: "Frame rate",
+        option: "{rate} fps",
+        placeholder: "Choose…",
+        undetected: "Couldn't detect it: choose your export's frame rate.",
+        unusual: "{rate} measured, not a standard rate: choose your export's.",
+        usage: "Feedback timecodes (HH:MM:SS:FF) use it.",
+      },
       interrupted:
         "This upload was interrupted. Select the same file to resume it, or cancel it.",
       list: "Versions",
@@ -777,10 +786,13 @@ const en = {
         tip: "1080p at 8 to 10 Mb/s is plenty for review. Then upload the proxy here.",
         title: "Export a proxy from your editing software:",
       },
+      remove: "Remove {name}",
+      resolution: "{width}\u00a0×\u00a0{height}",
       resume: "Resume upload of {name}",
       retry: "Retry",
       select: "Choose a file",
       selectAgain: "Select the file again",
+      send: "Upload",
       startError: "Couldn't start the upload. Try again.",
       status: {
         approved: "Approved",
@@ -1637,6 +1649,17 @@ const fr: Messages = {
       format: "{name} n'est pas une vidéo MP4 ou MOV",
       formats: "MP4 (H.264, AAC) ou MOV (H.264), jusqu'à {max}",
       formatsLoading: "MP4 (H.264, AAC) ou MOV (H.264)",
+      frameRate: {
+        detected: "Détecté dans le fichier.",
+        label: "Framerate",
+        option: "{rate} i/s",
+        placeholder: "Choisir…",
+        undetected:
+          "Détection impossible : choisissez le framerate de votre export.",
+        unusual:
+          "{rate} mesurés, une cadence non standard : choisissez celle de votre export.",
+        usage: "Il sert aux timecodes des retours (HH:MM:SS:FF).",
+      },
       interrupted:
         "Cet upload a été interrompu. Sélectionnez le même fichier pour le reprendre, ou annulez-le.",
       list: "Versions",
@@ -1656,10 +1679,13 @@ const fr: Messages = {
         tip: "Du 1080p à 8-10 Mb/s suffit pour la relecture. Uploadez ensuite le proxy ici.",
         title: "Exportez un proxy depuis votre logiciel de montage :",
       },
+      remove: "Retirer {name}",
+      resolution: "{width}\u00a0×\u00a0{height}",
       resume: "Reprendre l'upload de {name}",
       retry: "Réessayer",
       select: "Choisir un fichier",
       selectAgain: "Sélectionner à nouveau le fichier",
+      send: "Lancer l'upload",
       startError: "Impossible de démarrer l'upload. Réessayez.",
       status: {
         approved: "Validée",

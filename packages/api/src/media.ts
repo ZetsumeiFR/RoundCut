@@ -1,13 +1,30 @@
-// Reads the codecs of an MP4 / MOV file (ISO base media file format) without
-// decoding it (VER-02). Shared by the browser, which reads the picked File,
-// and the API, which reads the stored object through ranged requests: only
-// the box headers and the "moov" box are fetched, never the media data.
+// Reads the codecs (VER-02) and the duration, resolution and frame rate
+// (VER-03) of an MP4 / MOV file (ISO base media file format) without decoding
+// it. Shared by the browser, which reads the picked File, and the API, which
+// reads the stored object through ranged requests: only the box headers and
+// the "moov" box are fetched, never the media data.
 
 export type ReadBytes = (offset: number, length: number) => Promise<Uint8Array>;
 
 export interface MediaTracks {
   audio: string[];
   video: string[];
+}
+
+export interface VideoInfo {
+  durationMs: number;
+  // Average frames per second measured from the sample table, e.g. 23.976;
+  // null when the track has no samples.
+  frameRate: number | null;
+  // Displayed size: a rotated (portrait phone) clip reports 1080 x 1920.
+  height: number;
+  width: number;
+}
+
+export interface MediaInfo {
+  tracks: MediaTracks;
+  // The first video track; null when the file has none.
+  video: VideoInfo | null;
 }
 
 const BOX_HEADER = 8;
@@ -22,6 +39,14 @@ const H264_TYPES = new Set(["avc1", "avc3"]);
 const AAC_OBJECT_TYPES = new Set([0x40, 0x66, 0x67, 0x68]);
 const DECODER_CONFIG_TAG = 0x04;
 const ES_DESCRIPTOR_TAG = 0x03;
+const MS_PER_SECOND = 1000;
+// mvhd / mdhd: version 1 stores times on 64 bits.
+const HEADER_TIMESCALE_OFFSET = { 0: 12, 1: 20 } as const;
+// tkhd: matrix then width and height, all 16.16 fixed point.
+const TKHD_MATRIX_OFFSET = { 0: 40, 1: 52 } as const;
+const MATRIX_TO_WIDTH = 36;
+const FIXED_ONE = 0x1_00_00;
+const STTS_ENTRY_BYTES = 8;
 
 const fourCC = (bytes: Uint8Array, offset: number) =>
   String.fromCharCode(...bytes.subarray(offset, offset + 4));
@@ -144,9 +169,88 @@ function sampleCodec(view: DataView, stsd: Box) {
   return entry.type.trim();
 }
 
-function tracksOf(view: DataView, moov: Box): MediaTracks {
+const boxVersion = (view: DataView, box: Box) =>
+  view.getUint8(box.start) === 1 ? 1 : 0;
+
+// Timescale (units per second) and duration of a mvhd or mdhd box.
+function timing(view: DataView, header: Box) {
+  const version = boxVersion(view, header);
+  const offset = header.start + HEADER_TIMESCALE_OFFSET[version];
+  return {
+    duration:
+      version === 1
+        ? Number(view.getBigUint64(offset + 4))
+        : view.getUint32(offset + 4),
+    timescale: view.getUint32(offset),
+  };
+}
+
+// Width and height as displayed: a 90° or 270° matrix swaps them.
+function displaySize(view: DataView, tkhd: Box) {
+  const matrix = tkhd.start + TKHD_MATRIX_OFFSET[boxVersion(view, tkhd)];
+  const width = Math.round(
+    view.getUint32(matrix + MATRIX_TO_WIDTH) / FIXED_ONE
+  );
+  const height = Math.round(
+    view.getUint32(matrix + MATRIX_TO_WIDTH + 4) / FIXED_ONE
+  );
+  const rotated =
+    view.getInt32(matrix) === 0 &&
+    Math.abs(view.getInt32(matrix + 4)) === FIXED_ONE;
+  return rotated ? { height: width, width: height } : { height, width };
+}
+
+// Samples per second from the time-to-sample table: count / total duration.
+function frameRateOf(view: DataView, stts: Box, timescale: number) {
+  const entries = view.getUint32(stts.start + FULL_BOX_HEADER);
+  let samples = 0;
+  let duration = 0;
+  for (let index = 0; index < entries; index += 1) {
+    const entry = stts.start + STSD_ENTRIES_OFFSET + index * STTS_ENTRY_BYTES;
+    if (entry + STTS_ENTRY_BYTES > stts.end) {
+      break;
+    }
+    const count = view.getUint32(entry);
+    samples += count;
+    duration += count * view.getUint32(entry + 4);
+  }
+  return samples > 0 && duration > 0 ? (samples * timescale) / duration : null;
+}
+
+function videoInfo(
+  view: DataView,
+  movie: { duration: number; timescale: number },
+  trak: Box,
+  mdia: Box,
+  stbl: Box
+): VideoInfo | null {
+  const tkhd = child(view, trak, "tkhd");
+  const mdhd = child(view, mdia, "mdhd");
+  if (!(tkhd && mdhd)) {
+    return null;
+  }
+  const track = timing(view, mdhd);
+  // The movie duration covers edits; a track-only file falls back on mdhd.
+  const { duration, timescale } =
+    movie.duration > 0 && movie.timescale > 0 ? movie : track;
+  const stts = child(view, stbl, "stts");
+  return {
+    ...displaySize(view, tkhd),
+    durationMs:
+      timescale > 0 ? Math.round((duration * MS_PER_SECOND) / timescale) : 0,
+    frameRate:
+      stts && track.timescale > 0
+        ? frameRateOf(view, stts, track.timescale)
+        : null,
+  };
+}
+
+function mediaOf(view: DataView, moov: Box): MediaInfo {
   const tracks: MediaTracks = { audio: [], video: [] };
+  let video: VideoInfo | null = null;
   const bytes = new Uint8Array(view.buffer, view.byteOffset);
+  const mvhd = child(view, moov, "mvhd");
+  const movie = mvhd ? timing(view, mvhd) : { duration: 0, timescale: 0 };
   for (const trak of children(view, moov.start, moov.end)) {
     if (trak.type !== "trak") {
       continue;
@@ -163,21 +267,22 @@ function tracksOf(view: DataView, moov: Box): MediaTracks {
     const handler = fourCC(bytes, hdlr.start + HANDLER_OFFSET);
     if (codec && handler === "vide") {
       tracks.video.push(codec);
+      video ??= videoInfo(view, movie, trak, mdia, stbl);
     } else if (codec && handler === "soun") {
       tracks.audio.push(codec);
     }
   }
-  return tracks;
+  return { tracks, video };
 }
 
-// Walks the top-level boxes up to "moov" and lists its tracks' codecs.
+// Walks the top-level boxes up to "moov" and reads its tracks.
 // Null when the file isn't an MP4 / MOV or has no readable "moov".
-export async function readMediaTracks(
+export async function readMedia(
   read: ReadBytes,
   size: number,
   offset = 0,
   visited = 0
-): Promise<MediaTracks | null> {
+): Promise<MediaInfo | null> {
   const length = Math.min(LARGE_BOX_HEADER, size - offset);
   if (length < BOX_HEADER || visited >= MAX_TOP_LEVEL_BOXES) {
     return null;
@@ -192,13 +297,13 @@ export async function readMediaTracks(
     return null;
   }
   if (box.type !== "moov") {
-    return readMediaTracks(read, size, offset + box.end, visited + 1);
+    return readMedia(read, size, offset + box.end, visited + 1);
   }
   if (box.end > MAX_MOOV_BYTES) {
     return null;
   }
   const moov = await read(offset, box.end);
-  return tracksOf(
+  return mediaOf(
     new DataView(moov.buffer, moov.byteOffset, moov.byteLength),
     box
   );
