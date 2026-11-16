@@ -1,11 +1,12 @@
 import { ORPCError } from "@orpc/server";
+import { projectStatusSources } from "@roundcut/db/project-status";
 import { client } from "@roundcut/db/schema/client";
 import { deliverable } from "@roundcut/db/schema/deliverable";
 import { project } from "@roundcut/db/schema/project";
 import { and, asc, desc, eq, inArray, isNull } from "drizzle-orm";
 
 import { protectedProcedure } from "../index";
-import { projectSchema } from "../project";
+import { projectSchema, projectStatusSchema } from "../project";
 import { toDeliverable } from "./deliverable";
 import { getOrCreateWorkspace } from "./workspace";
 
@@ -129,4 +130,41 @@ export const projectRouter = {
       )
     );
   }),
+  updateStatus: protectedProcedure
+    .input(projectStatusSchema)
+    .handler(async ({ context, input: { id, status } }) => {
+      const workspace = await getOrCreateWorkspace(
+        context.db,
+        context.session.user
+      );
+      const ownProject = and(
+        eq(project.id, id),
+        eq(project.workspaceId, workspace.id)
+      );
+      // The allowed source statuses are part of the update itself, so two
+      // concurrent changes can never skip a step of the lifecycle.
+      const sources = projectStatusSources(status);
+      const [updated] =
+        sources.length > 0
+          ? await context.db
+              .update(project)
+              .set({ status })
+              .where(and(ownProject, inArray(project.status, sources)))
+              .returning({ id: project.id, status: project.status })
+          : [];
+      if (updated) {
+        return updated;
+      }
+      // Other workspaces' projects read as missing so their ids leak nothing.
+      const [current] = await context.db
+        .select({ status: project.status })
+        .from(project)
+        .where(ownProject);
+      if (!current) {
+        throw new ORPCError("NOT_FOUND", { message: "Project not found" });
+      }
+      throw new ORPCError("CONFLICT", {
+        message: `Cannot move a project from ${current.status} to ${status}`,
+      });
+    }),
 };

@@ -647,6 +647,17 @@ const en = {
       draft: "Draft",
       in_progress: "In progress",
     },
+    statusChange: {
+      actions: "Change the status of {name}, currently {status}",
+      archive: "Archive",
+      archiveDescription:
+        "{name} will be archived. An archived project can no longer change status.",
+      archiveTitle: "Archive this project?",
+      archiving: "Archiving…",
+      changed: "{name}: {status}",
+      error: "Couldn't change this project's status. Try again.",
+      moveTo: "Mark as “{status}”",
+    },
     title: "Projects",
   },
 };
@@ -1316,6 +1327,17 @@ const fr: Messages = {
       awaiting_client: "En attente client",
       draft: "Brouillon",
       in_progress: "En cours",
+    },
+    statusChange: {
+      actions: "Changer le statut de {name}, actuellement {status}",
+      archive: "Archiver",
+      archiveDescription:
+        "{name} sera archivé. Un projet archivé ne peut plus changer de statut.",
+      archiveTitle: "Archiver ce projet ?",
+      archiving: "Archivage…",
+      changed: "{name} : {status}",
+      error: "Impossible de changer le statut de ce projet. Réessayez.",
+      moveTo: "Passer en « {status} »",
     },
     title: "Projets",
   },
