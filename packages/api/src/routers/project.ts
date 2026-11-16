@@ -3,7 +3,8 @@ import { projectStatusSources } from "@roundcut/db/project-status";
 import { client } from "@roundcut/db/schema/client";
 import { deliverable } from "@roundcut/db/schema/deliverable";
 import { project } from "@roundcut/db/schema/project";
-import { and, asc, desc, eq, inArray, isNull } from "drizzle-orm";
+import { version } from "@roundcut/db/schema/version";
+import { and, asc, desc, eq, inArray, isNull, max, ne } from "drizzle-orm";
 import z from "zod";
 
 import { protectedProcedure } from "../index";
@@ -24,13 +25,9 @@ export interface ReviewActivity {
   roundsUsed: number;
 }
 
-// Versions, rounds and comments don't exist yet (VER-04, ROUND-01, REV-04):
-// until they ship, every deliverable reads as never sent for review.
-const NO_REVIEW_ACTIVITY: ReviewActivity = {
-  latestVersion: null,
-  openComments: 0,
-  roundsUsed: 0,
-};
+// Rounds and comments don't exist yet (ROUND-01, REV-04): until they ship,
+// every deliverable reads as having no round used and no open feedback.
+const NO_ROUND_ACTIVITY = { openComments: 0, roundsUsed: 0 };
 
 export interface DashboardIndicators {
   // Amount still to bill: flat fees and accepted extra rounds (BILL-01).
@@ -224,13 +221,37 @@ export const projectRouter = {
         .from(deliverable)
         .where(eq(deliverable.projectId, row.project.id))
         .orderBy(asc(deliverable.position));
+      // Latest version whose upload finished, per deliverable.
+      const latest = await context.db
+        .select({
+          deliverableId: version.deliverableId,
+          number: max(version.number),
+        })
+        .from(version)
+        .innerJoin(deliverable, eq(version.deliverableId, deliverable.id))
+        .where(
+          and(
+            eq(deliverable.projectId, row.project.id),
+            ne(version.status, "uploading")
+          )
+        )
+        .groupBy(version.deliverableId);
+      const latestNumbers = new Map(
+        latest.map((item) => [item.deliverableId, item.number])
+      );
       return toProject(
         row.project,
         row.client,
-        deliverables.map((item) => ({
-          ...toDeliverable(item),
-          review: NO_REVIEW_ACTIVITY,
-        }))
+        deliverables.map((item): Deliverable & { review: ReviewActivity } => {
+          const number = latestNumbers.get(item.id);
+          return {
+            ...toDeliverable(item),
+            review: {
+              ...NO_ROUND_ACTIVITY,
+              latestVersion: number ? { number } : null,
+            },
+          };
+        })
       );
     }),
   indicators: protectedProcedure.handler(

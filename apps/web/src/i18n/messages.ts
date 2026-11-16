@@ -741,8 +741,59 @@ const en = {
       },
     },
     title: "Projects",
+    versions: {
+      cancel: "Cancel upload of {name}",
+      cancelError: "Couldn't cancel this upload. Try again.",
+      cancelled: "Upload cancelled",
+      close: "Close",
+      conflict:
+        "Another upload is already in progress for this deliverable. Resume or cancel it first.",
+      description:
+        "The file goes straight to secure storage. Large files upload in parts and can be resumed.",
+      drop: "Drag and drop a video here",
+      emptyDescription: "The first file you upload becomes V1.",
+      emptyTitle: "No version yet",
+      formats: "MP4 or MOV video, up to {max}",
+      interrupted:
+        "This upload was interrupted. Select the same file to resume it, or cancel it.",
+      list: "Versions",
+      loadError: "Couldn't load the versions.",
+      loading: "Loading versions…",
+      mismatch: "That's not the file being uploaded. Select {name} ({size}).",
+      notVideo: {
+        description:
+          "Export a proxy from your editing software (MP4, H.264 and AAC, 1080p is plenty), then upload it.",
+        title: "{name} isn't a video file",
+      },
+      or: "or",
+      progress: "{percent} · {loaded} of {total}",
+      resume: "Resume upload of {name}",
+      retry: "Retry",
+      select: "Choose a file",
+      selectAgain: "Select the file again",
+      startError: "Couldn't start the upload. Try again.",
+      status: {
+        approved: "Approved",
+        interrupted: "Interrupted",
+        ready: "Ready",
+        uploading: "Uploading",
+      },
+      title: "New version · {title}",
+      tooLarge: {
+        description:
+          "Files are limited to {max}. Export a lighter proxy (MP4, H.264, 1080p), then upload it.",
+        title: "{name} is too large",
+      },
+      uploadError:
+        "The upload stopped. Parts already sent are kept: resume it when your connection is back.",
+      uploaded: "V{number} uploaded",
+      uploadedToast: "{title}: V{number} uploaded",
+      uploading: "Keep this panel open until the upload finishes.",
+      version: "V{number}",
+    },
     view: {
       columns: {
+        actions: "Actions",
         deliverable: "Deliverable",
         openComments: "Open feedback",
         round: "Round",
@@ -791,6 +842,7 @@ const en = {
         label: "Project sections",
         settings: "Settings",
       },
+      upload: "Upload a version of {title}",
       version: "V{number}",
     },
   },
@@ -1558,8 +1610,60 @@ const fr: Messages = {
       },
     },
     title: "Projets",
+    versions: {
+      cancel: "Annuler l'upload de {name}",
+      cancelError: "Impossible d'annuler cet upload. Réessayez.",
+      cancelled: "Upload annulé",
+      close: "Fermer",
+      conflict:
+        "Un autre upload est déjà en cours pour ce livrable. Reprenez-le ou annulez-le d'abord.",
+      description:
+        "Le fichier part directement vers un stockage sécurisé. Les gros fichiers sont envoyés par morceaux et peuvent être repris.",
+      drop: "Glissez-déposez une vidéo ici",
+      emptyDescription: "Le premier fichier uploadé devient la V1.",
+      emptyTitle: "Aucune version pour l'instant",
+      formats: "Vidéo MP4 ou MOV, jusqu'à {max}",
+      interrupted:
+        "Cet upload a été interrompu. Sélectionnez le même fichier pour le reprendre, ou annulez-le.",
+      list: "Versions",
+      loadError: "Impossible de charger les versions.",
+      loading: "Chargement des versions…",
+      mismatch:
+        "Ce n'est pas le fichier en cours d'upload. Sélectionnez {name} ({size}).",
+      notVideo: {
+        description:
+          "Exportez un proxy depuis votre logiciel de montage (MP4, H.264 et AAC, 1080p suffit), puis uploadez-le.",
+        title: "{name} n'est pas un fichier vidéo",
+      },
+      or: "ou",
+      progress: "{percent} · {loaded} sur {total}",
+      resume: "Reprendre l'upload de {name}",
+      retry: "Réessayer",
+      select: "Choisir un fichier",
+      selectAgain: "Sélectionner à nouveau le fichier",
+      startError: "Impossible de démarrer l'upload. Réessayez.",
+      status: {
+        approved: "Validée",
+        interrupted: "Interrompu",
+        ready: "Prête",
+        uploading: "Upload en cours",
+      },
+      title: "Nouvelle version · {title}",
+      tooLarge: {
+        description:
+          "Les fichiers sont limités à {max}. Exportez un proxy plus léger (MP4, H.264, 1080p), puis uploadez-le.",
+        title: "{name} est trop volumineux",
+      },
+      uploadError:
+        "L'upload s'est arrêté. Les morceaux déjà envoyés sont conservés : reprenez-le quand la connexion revient.",
+      uploaded: "V{number} uploadée",
+      uploadedToast: "{title} : V{number} uploadée",
+      uploading: "Gardez ce panneau ouvert jusqu'à la fin de l'upload.",
+      version: "V{number}",
+    },
     view: {
       columns: {
+        actions: "Actions",
         deliverable: "Livrable",
         openComments: "Retours ouverts",
         round: "Tour",
@@ -1608,6 +1712,7 @@ const fr: Messages = {
         label: "Sections du projet",
         settings: "Réglages",
       },
+      upload: "Uploader une version de {title}",
       version: "V{number}",
     },
   },

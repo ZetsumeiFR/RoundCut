@@ -2,7 +2,7 @@ import { createRouterClient } from "@orpc/server";
 import { appRouter } from "@roundcut/api/routers/index";
 import type { Session } from "@roundcut/auth";
 
-import { db } from "@/services";
+import { db, storage } from "@/services";
 
 export const createServerApi = (session: Session) =>
-  createRouterClient(appRouter, { context: { db, session } });
+  createRouterClient(appRouter, { context: { db, session, storage } });
