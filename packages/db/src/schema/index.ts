@@ -3,6 +3,7 @@ export * from "./client";
 export * from "./deliverable";
 export * from "./project";
 export * from "./review-link";
+export * from "./reviewer";
 export * from "./round";
 export * from "./version";
 export * from "./workspace";
