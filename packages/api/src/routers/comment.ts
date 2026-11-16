@@ -196,8 +196,33 @@ async function insertReply(
   return saved;
 }
 
-// The browser uploads the image through a presigned URL, so only a stored
-// object of the project, small enough and really an image, is kept.
+const BYTES_PER_MEGABYTE = 1024 * 1024;
+
+// Browsers upload images through a presigned URL, so only a stored object
+// small enough and really a PNG, JPEG or WebP image is kept (comment
+// attachments, workspace logo).
+export async function checkStoredImage(
+  storage: Storage,
+  key: string,
+  { label, maxBytes }: { label: string; maxBytes: number }
+) {
+  const size = await storage.objectSize(key);
+  if (size === null) {
+    throw new ORPCError("BAD_REQUEST", { message: `${label} not uploaded` });
+  }
+  const head =
+    size >= IMAGE_SIGNATURE_BYTES
+      ? await storage.readRange(key, 0, IMAGE_SIGNATURE_BYTES)
+      : new Uint8Array();
+  if (size > maxBytes || sniffImageType(head) === null) {
+    await storage.deleteObject(key);
+    throw new ORPCError("BAD_REQUEST", {
+      message: `${label} must be a PNG, JPEG or WebP image up to ${maxBytes / BYTES_PER_MEGABYTE} MB`,
+    });
+  }
+}
+
+// An attachment must also belong to the project of the review link.
 async function checkAttachment(
   storage: Storage,
   projectId: string,
@@ -206,20 +231,10 @@ async function checkAttachment(
   if (!isAttachmentKeyOf(projectId, key)) {
     throw new ORPCError("BAD_REQUEST", { message: "Unknown attachment" });
   }
-  const size = await storage.objectSize(key);
-  if (size === null) {
-    throw new ORPCError("BAD_REQUEST", { message: "Attachment not uploaded" });
-  }
-  const head =
-    size >= IMAGE_SIGNATURE_BYTES
-      ? await storage.readRange(key, 0, IMAGE_SIGNATURE_BYTES)
-      : new Uint8Array();
-  if (size > COMMENT_ATTACHMENT_MAX_BYTES || sniffImageType(head) === null) {
-    await storage.deleteObject(key);
-    throw new ORPCError("BAD_REQUEST", {
-      message: "Attachments must be PNG, JPEG or WebP images up to 5 MB",
-    });
-  }
+  await checkStoredImage(storage, key, {
+    label: "Attachment",
+    maxBytes: COMMENT_ATTACHMENT_MAX_BYTES,
+  });
 }
 
 const isWithin = (durationMs: number | null, timecodeMs: number | null) =>

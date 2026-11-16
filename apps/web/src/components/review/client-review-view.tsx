@@ -20,6 +20,7 @@ import { useCallback, useMemo, useRef, useState } from "react";
 import { VersionThumbnail } from "@/components/projects/version-thumbnail";
 import { formatMessage, type Messages } from "@/i18n/messages";
 import { client as api, orpc } from "@/utils/orpc";
+import { BrandLogo, brandStyle } from "./brand";
 import { CommentComposer } from "./comment-composer";
 import { CommentThread, type ReplyHandler, toMarkers } from "./comment-thread";
 import { PasteFeedback } from "./paste-feedback";
@@ -123,9 +124,18 @@ function ReviewHeader({
   onSwitchReviewer: () => void;
   project: LinkedProject;
 }) {
-  const { reviewer } = project;
+  const { brand, reviewer } = project;
   return (
     <header className="flex flex-col gap-1">
+      {brand?.logoUrl ? (
+        <BrandLogo
+          alt={formatMessage(messages.brandLogo, {
+            workspace: project.workspaceName,
+          })}
+          className="mb-2 h-10 w-auto max-w-48 self-start object-contain"
+          src={brand.logoUrl}
+        />
+      ) : null}
       <p className="text-muted-foreground text-xs">
         {formatMessage(messages.sharedBy, {
           client: project.clientName,
@@ -388,8 +398,13 @@ export function ClientReviewView({
   if (!project.data) {
     return <ClientReviewSkeleton label={messages.loading} />;
   }
+  // The editor's accent color (REV-10) recolors every primary element of
+  // the page: the theme reads --primary at use.
   return (
-    <>
+    <div
+      className="contents"
+      style={brandStyle(project.data.brand?.accentColor)}
+    >
       <ReviewHeader
         locale={locale}
         messages={messages}
@@ -412,6 +427,6 @@ export function ClientReviewView({
           token={token}
         />
       )}
-    </>
+    </div>
   );
 }

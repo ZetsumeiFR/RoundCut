@@ -15,6 +15,7 @@ import z from "zod";
 
 import { formatMessage, type Messages } from "@/i18n/messages";
 import { orpc } from "@/utils/orpc";
+import { BrandingSettings } from "./branding-settings";
 import { SettingsCard } from "./settings-card";
 import {
   SettingsAlert,
@@ -230,7 +231,10 @@ export function WorkspaceSettings({
 
   if (data) {
     return (
-      <WorkspaceForm locale={locale} messages={messages} workspace={data} />
+      <div className="flex flex-col gap-6">
+        <WorkspaceForm locale={locale} messages={messages} workspace={data} />
+        <BrandingSettings messages={messages} workspace={data} />
+      </div>
     );
   }
 

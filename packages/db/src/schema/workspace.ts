@@ -7,6 +7,10 @@ import { user } from "./auth";
 // One workspace per account (WS-01). The VAT rate is stored in basis points
 // (2000 = 20 %) to keep two-decimal rates exact.
 export const workspace = pgTable("workspace", {
+  // White label of the review links (REV-10, Pro and Studio): a #rrggbb
+  // accent color and the storage key of the logo, null when unset.
+  brandAccentColor: text("brand_accent_color"),
+  brandLogoKey: text("brand_logo_key"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   currency: text("currency").default("EUR").notNull(),
   defaultVatRateBps: integer("default_vat_rate_bps").default(2000).notNull(),

@@ -183,6 +183,33 @@ const en = {
       title: "Plan terms",
     },
     workspace: {
+      branding: {
+        accent: "Accent color",
+        accentDescription: "Buttons and highlights on your review links.",
+        accentInvalid: "Enter a hex color such as #1d4ed8.",
+        accentPicker: "Pick the accent color",
+        chooseLogo: "Choose an image",
+        description:
+          "Your logo and accent color on the review links your clients open.",
+        locked: "Available with the Pro and Studio plans",
+        lockedDescription:
+          "Upgrade to show your own logo and color to your clients.",
+        logo: "Logo",
+        logoAlt: "{name} logo",
+        logoDescription:
+          "PNG, JPEG or WebP up to 2 MB, shown at the top of review links.",
+        logoInvalid: "Choose a PNG, JPEG or WebP image up to 2 MB.",
+        noLogo: "No logo",
+        preview: "Preview",
+        previewAction: "Submit my feedback",
+        previewDescription: "The top of a review link, as your clients see it.",
+        removeLogo: "Remove",
+        replaceLogo: "Replace",
+        resetAccent: "Default",
+        saved: "White label saved.",
+        saveError: "Couldn't save the white label. Try again.",
+        title: "White label",
+      },
       cancel: "Cancel",
       currency: "Currency",
       currencyDescription: "Used for extra round prices and billable lines.",
@@ -1055,6 +1082,7 @@ const en = {
     },
   },
   review: {
+    brandLogo: "{workspace} logo",
     comments: {
       attach: "Add an image",
       attachmentInvalid: "Use a PNG, JPEG or WebP image up to 5 MB.",
@@ -1373,6 +1401,36 @@ const fr: Messages = {
       title: "Conditions de forfait",
     },
     workspace: {
+      branding: {
+        accent: "Couleur d'accent",
+        accentDescription:
+          "Boutons et éléments mis en avant sur vos liens de revue.",
+        accentInvalid:
+          "Saisissez une couleur hexadécimale, par exemple #1d4ed8.",
+        accentPicker: "Choisir la couleur d'accent",
+        chooseLogo: "Choisir une image",
+        description:
+          "Votre logo et votre couleur d'accent sur les liens de revue de vos clients.",
+        locked: "Disponible avec les plans Pro et Studio",
+        lockedDescription:
+          "Passez à un plan supérieur pour afficher votre logo et votre couleur à vos clients.",
+        logo: "Logo",
+        logoAlt: "Logo de {name}",
+        logoDescription:
+          "PNG, JPEG ou WebP jusqu'à 2 Mo, affiché en haut des liens de revue.",
+        logoInvalid: "Choisissez une image PNG, JPEG ou WebP de 2 Mo maximum.",
+        noLogo: "Aucun logo",
+        preview: "Aperçu",
+        previewAction: "Soumettre mes retours",
+        previewDescription:
+          "Le haut d'un lien de revue, tel que vos clients le voient.",
+        removeLogo: "Retirer",
+        replaceLogo: "Remplacer",
+        resetAccent: "Par défaut",
+        saved: "Marque blanche enregistrée.",
+        saveError: "Impossible d'enregistrer la marque blanche. Réessayez.",
+        title: "Marque blanche",
+      },
       cancel: "Annuler",
       currency: "Devise",
       currencyDescription:
@@ -2265,6 +2323,7 @@ const fr: Messages = {
     },
   },
   review: {
+    brandLogo: "Logo de {workspace}",
     comments: {
       attach: "Ajouter une image",
       attachmentInvalid:

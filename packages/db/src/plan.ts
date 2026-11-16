@@ -14,3 +14,6 @@ export const PLAN_MAX_FILE_BYTES: Record<Plan, number> = {
   solo: 2 * GIGABYTE,
   studio: 5 * GIGABYTE,
 };
+
+// White-labelled review links (REV-10): the editor's logo and accent color.
+export const hasWhiteLabel = (plan: Plan) => plan !== "solo";
