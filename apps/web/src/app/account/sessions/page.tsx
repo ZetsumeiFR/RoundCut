@@ -69,11 +69,7 @@ export default async function SessionsPage() {
     if (!isStaleSessionError(error)) {
       throw error;
     }
-    return (
-      <main className="flex w-full items-center justify-center px-4 py-6 sm:px-8 sm:py-10">
-        <StaleSession messages={sessionMessages} />
-      </main>
-    );
+    return <StaleSession messages={sessionMessages} />;
   }
 
   const { format } = new Intl.DateTimeFormat(locale, {
@@ -86,19 +82,17 @@ export default async function SessionsPage() {
   const current = sessions.find(({ token }) => token === currentToken);
 
   return (
-    <main className="mx-auto flex w-full max-w-2xl flex-col px-4 py-6 sm:px-8 sm:py-10">
-      <ActiveSessions
-        current={toRow(current ?? session.session)}
-        errors={messages.auth.errors}
-        messages={sessionMessages}
-        others={sessions
-          .filter(({ token }) => token !== currentToken)
-          .toSorted(
-            (a, b) =>
-              new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
-          )
-          .map(toRow)}
-      />
-    </main>
+    <ActiveSessions
+      current={toRow(current ?? session.session)}
+      errors={messages.auth.errors}
+      messages={sessionMessages}
+      others={sessions
+        .filter(({ token }) => token !== currentToken)
+        .toSorted(
+          (a, b) =>
+            new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
+        )
+        .map(toRow)}
+    />
   );
 }

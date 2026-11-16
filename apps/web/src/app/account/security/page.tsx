@@ -23,15 +23,13 @@ export default async function SecurityPage() {
   const messages = getMessages(locale);
 
   return (
-    <main className="mx-auto flex w-full max-w-2xl flex-col px-4 py-6 sm:px-8 sm:py-10">
-      <TwoFactorSettings
-        authMessages={messages.auth}
-        enabled={session.user.twoFactorEnabled === true}
-        hasPassword={accounts.some(
-          ({ providerId }) => providerId === "credential"
-        )}
-        messages={messages.account.security}
-      />
-    </main>
+    <TwoFactorSettings
+      authMessages={messages.auth}
+      enabled={session.user.twoFactorEnabled === true}
+      hasPassword={accounts.some(
+        ({ providerId }) => providerId === "credential"
+      )}
+      messages={messages.account.security}
+    />
   );
 }

@@ -8,6 +8,12 @@ const en = {
       sessions: "Active sessions",
       signIn: "Sign in",
       signOut: "Sign out",
+      workspace: "Workspace",
+    },
+    nav: {
+      description: "Manage your workspace, security and signed-in devices.",
+      label: "Settings sections",
+      title: "Settings",
     },
     security: {
       backupCodesDescription:
@@ -67,6 +73,33 @@ const en = {
       unknownBrowser: "Unknown browser",
       unknownDevice: "Unknown device",
       unknownIp: "Unknown IP",
+    },
+    workspace: {
+      cancel: "Cancel",
+      currency: "Currency",
+      currencyDescription: "Used for extra round prices and billable lines.",
+      description: "Defaults applied to your clients, projects and billing.",
+      language: "Language",
+      languageDescription:
+        "Default language for what you send to your clients.",
+      loadErrorDescription: "Check your connection and try again.",
+      loadErrorTitle: "Couldn't load your workspace",
+      name: "Workspace name",
+      nameDescription: "Shown to your clients on review links and emails.",
+      nameRequired: "Enter a workspace name.",
+      nameTooLong: "The name must be at most {max} characters.",
+      retry: "Try again",
+      save: "Save changes",
+      saved: "Workspace settings saved.",
+      saveError: "Couldn't save your changes. Try again.",
+      saving: "Saving…",
+      timezone: "Time zone",
+      timezoneDescription: "Used for due dates and reminders.",
+      title: "Workspace",
+      vatRate: "Default VAT rate",
+      vatRateDescription: "Applied to new billable lines.",
+      vatRateInvalid:
+        "Enter a rate between 0 and 100 with at most two decimals.",
     },
   },
   auth: {
@@ -198,6 +231,13 @@ const fr: Messages = {
       sessions: "Sessions actives",
       signIn: "Se connecter",
       signOut: "Se déconnecter",
+      workspace: "Espace de travail",
+    },
+    nav: {
+      description:
+        "Gérez votre espace de travail, votre sécurité et vos appareils connectés.",
+      label: "Sections des réglages",
+      title: "Réglages",
     },
     security: {
       backupCodesDescription:
@@ -258,6 +298,36 @@ const fr: Messages = {
       unknownBrowser: "Navigateur inconnu",
       unknownDevice: "Appareil inconnu",
       unknownIp: "IP inconnue",
+    },
+    workspace: {
+      cancel: "Annuler",
+      currency: "Devise",
+      currencyDescription:
+        "Utilisée pour le prix des tours supplémentaires et les lignes facturables.",
+      description:
+        "Valeurs par défaut appliquées à vos clients, projets et à la facturation.",
+      language: "Langue",
+      languageDescription:
+        "Langue par défaut de ce que vous envoyez à vos clients.",
+      loadErrorDescription: "Vérifiez votre connexion et réessayez.",
+      loadErrorTitle: "Impossible de charger votre espace",
+      name: "Nom de l'espace",
+      nameDescription:
+        "Affiché à vos clients sur les liens de revue et dans les emails.",
+      nameRequired: "Saisissez un nom d'espace.",
+      nameTooLong: "Le nom doit contenir au plus {max} caractères.",
+      retry: "Réessayer",
+      save: "Enregistrer",
+      saved: "Réglages de l'espace enregistrés.",
+      saveError: "Impossible d'enregistrer vos modifications. Réessayez.",
+      saving: "Enregistrement…",
+      timezone: "Fuseau horaire",
+      timezoneDescription: "Utilisé pour les échéances et les relances.",
+      title: "Espace de travail",
+      vatRate: "Taux de TVA par défaut",
+      vatRateDescription: "Appliqué aux nouvelles lignes facturables.",
+      vatRateInvalid:
+        "Saisissez un taux entre 0 et 100, avec au plus deux décimales.",
     },
   },
   auth: {
