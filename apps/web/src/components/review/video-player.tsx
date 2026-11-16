@@ -184,11 +184,13 @@ function runShortcut(
 
 export function ControlButton({
   children,
+  className,
   label,
   onClick,
   pressed,
 }: {
   children: ReactNode;
+  className?: string;
   label: string;
   onClick: () => void;
   pressed?: boolean;
@@ -200,6 +202,8 @@ export function ControlButton({
           <Button
             aria-label={label}
             aria-pressed={pressed}
+            // Finger-sized on touch screens (REV-08).
+            className={cn("pointer-coarse:size-10", className)}
             onClick={onClick}
             size="icon-sm"
             type="button"
@@ -242,7 +246,7 @@ function MarkerButton({
         render={
           <button
             aria-label={label}
-            className="absolute top-0 size-2.5 -translate-x-1/2 rotate-45 bg-warning outline-none ring-ring/50 transition-colors hover:bg-warning/80 focus-visible:ring-2"
+            className="absolute top-0 size-2.5 -translate-x-1/2 rotate-45 bg-warning outline-none ring-ring/50 transition-colors after:absolute after:-inset-2 pointer-coarse:after:-inset-3 hover:bg-warning/80 focus-visible:ring-2"
             onClick={handleClick}
             style={{ left: `${position * 100}%` }}
             type="button"
@@ -380,7 +384,12 @@ function PlayerOptions({
           <Volume2Icon aria-hidden="true" />
         )}
       </ControlButton>
-      <ControlButton label={controls.shortcuts} onClick={onOpenShortcuts}>
+      {/* Keyboard shortcuts mean nothing on a phone or a tablet. */}
+      <ControlButton
+        className="pointer-coarse:hidden"
+        label={controls.shortcuts}
+        onClick={onOpenShortcuts}
+      >
         <KeyboardIcon aria-hidden="true" />
       </ControlButton>
       <ControlButton

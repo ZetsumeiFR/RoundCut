@@ -139,6 +139,7 @@ function TimecodeField({
         <InputGroupAddon align="inline-end">
           <InputGroupButton
             aria-label={captureLabel}
+            className="pointer-coarse:size-8"
             onClick={onCapture}
             size="icon-xs"
             title={captureLabel}
@@ -504,6 +505,7 @@ export function CommentComposer({
           </Attachment>
         ) : (
           <Button
+            className="pointer-coarse:h-9"
             onClick={openFilePicker}
             size="sm"
             type="button"
@@ -523,7 +525,7 @@ export function CommentComposer({
           type="file"
         />
         <Button
-          className="ms-auto"
+          className="ms-auto pointer-coarse:h-9"
           disabled={submitting}
           size="sm"
           type="submit"
