@@ -1,16 +1,22 @@
-"use client";
+import { headers } from "next/headers";
+import { redirect } from "next/navigation";
 
-import { useState } from "react";
+import { AuthScreen } from "@/components/auth/auth-screen";
+import { getLocale } from "@/i18n/get-locale";
+import { getMessages } from "@/i18n/messages";
+import { auth } from "@/services";
 
-import SignInForm from "@/components/sign-in-form";
-import SignUpForm from "@/components/sign-up-form";
+export default async function LoginPage() {
+  const session = await auth.api.getSession({ headers: await headers() });
+  if (session?.user.emailVerified) {
+    redirect("/dashboard");
+  }
 
-export default function LoginPage() {
-  const [showSignIn, setShowSignIn] = useState(false);
+  const messages = getMessages(await getLocale());
 
-  return showSignIn ? (
-    <SignInForm onSwitchToSignUp={() => setShowSignIn(false)} />
-  ) : (
-    <SignUpForm onSwitchToSignIn={() => setShowSignIn(true)} />
+  return (
+    <main className="flex w-full items-center justify-center px-4 py-6 sm:px-8 sm:py-10">
+      <AuthScreen messages={messages.auth} />
+    </main>
   );
 }
