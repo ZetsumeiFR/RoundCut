@@ -286,7 +286,7 @@ function buildColumns(
   ];
 }
 
-function gridI18n(
+export function gridI18n(
   grid: ClientsMessages["grid"],
   empty: string
 ): DataGridI18nOverrides {

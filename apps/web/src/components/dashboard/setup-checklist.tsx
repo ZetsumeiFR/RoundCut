@@ -1,3 +1,4 @@
+import type { Locale } from "@roundcut/auth/locale";
 import { Button } from "@roundcut/ui/components/button";
 import {
   Card,
@@ -20,7 +21,7 @@ import { formatMessage, type Messages } from "@/i18n/messages";
 type ChecklistMessages = Messages["dashboard"]["checklist"];
 
 interface ChecklistItem {
-  action?: { href: "/clients" | "/onboarding"; label: string };
+  action?: { href: "/clients" | "/onboarding" | "/projects"; label: string };
   description: string;
   done: boolean;
   id: string;
@@ -63,13 +64,17 @@ function ChecklistStatus({
 }
 
 // Stays on the dashboard until the first review link is sent (WS-03).
-// Projects and review links don't exist yet, so those steps can't be done.
+// Review links don't exist yet, so that step can't be done.
 export function SetupChecklist({
   hasClient,
+  hasProject,
+  locale,
   messages,
   setupDone,
 }: {
   hasClient: boolean;
+  hasProject: boolean;
+  locale: Locale;
   messages: ChecklistMessages;
   setupDone: boolean;
 }) {
@@ -89,8 +94,9 @@ export function SetupChecklist({
       title: messages.firstClient,
     },
     {
+      action: { href: "/projects", label: messages.firstProjectAction },
       description: messages.firstProjectDescription,
-      done: false,
+      done: hasProject,
       id: "first-project",
       title: messages.firstProject,
     },
@@ -110,7 +116,7 @@ export function SetupChecklist({
           <CardTitle>{messages.title}</CardTitle>
           <CardDescription>{messages.description}</CardDescription>
         </div>
-        <Progress value={(doneCount / items.length) * PERCENT}>
+        <Progress locale={locale} value={(doneCount / items.length) * PERCENT}>
           <ProgressLabel className="text-muted-foreground">
             {formatMessage(messages.progress, {
               done: doneCount,
