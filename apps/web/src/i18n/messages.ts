@@ -704,6 +704,26 @@ const en = {
     none: "None",
     player: {
       back: "Back to {project}",
+      compare: {
+        action: "Compare",
+        audio: {
+          label: "Audio",
+          off: "Sound off",
+          version: "Sound: V{number}",
+        },
+        back: "Back to V{number}",
+        emptyDescription:
+          "This deliverable has a single playable version. Publish a new one to compare it with this one.",
+        emptyTitle: "Nothing to compare yet",
+        ended: "V{number} ended",
+        leftLabel: "Left version",
+        loadErrorTitle: "Couldn't load the comparison",
+        loading: "Loading the comparison…",
+        rightLabel: "Right version",
+        swap: "Swap sides",
+        title: "{deliverable} · V{left} vs V{right}",
+        uploadedAt: "Uploaded on {date}",
+      },
       controls: {
         enterFullscreen: "Full screen",
         exitFullscreen: "Exit full screen",
@@ -1676,6 +1696,26 @@ const fr: Messages = {
     none: "Aucun",
     player: {
       back: "Retour à {project}",
+      compare: {
+        action: "Comparer",
+        audio: {
+          label: "Son",
+          off: "Son coupé",
+          version: "Son : V{number}",
+        },
+        back: "Retour à la V{number}",
+        emptyDescription:
+          "Ce livrable n'a qu'une version lisible. Publiez-en une nouvelle pour la comparer à celle-ci.",
+        emptyTitle: "Rien à comparer pour l'instant",
+        ended: "Fin de la V{number}",
+        leftLabel: "Version de gauche",
+        loadErrorTitle: "Impossible de charger la comparaison",
+        loading: "Chargement de la comparaison…",
+        rightLabel: "Version de droite",
+        swap: "Inverser les côtés",
+        title: "{deliverable} · V{left} vs V{right}",
+        uploadedAt: "Envoyée le {date}",
+      },
       controls: {
         enterFullscreen: "Plein écran",
         exitFullscreen: "Quitter le plein écran",
