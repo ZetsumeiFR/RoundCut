@@ -75,6 +75,7 @@ import {
 import { gridI18n } from "@/components/clients/clients-view";
 import { formatMessage, type Messages } from "@/i18n/messages";
 import { orpc } from "@/utils/orpc";
+import { CloseRoundDialog } from "./close-round-dialog";
 import { deliverableCountLabel, formatDuration } from "./deliverable-form";
 import { DeliverablesSheet } from "./deliverables-sheet";
 import { DuplicateProjectDialog } from "./duplicate-project-dialog";
@@ -480,6 +481,8 @@ function RoundItem({
   round: ProjectRound;
 }) {
   const { rounds } = messages;
+  const [closing, setClosing] = useState(false);
+  const openClose = useCallback(() => setClosing(true), []);
   const dates = [
     formatMessage(rounds.openedOn, {
       date: dateFormat.format(new Date(round.openedAt)),
@@ -496,11 +499,10 @@ function RoundItem({
     const closed = formatMessage(rounds.closedOn, {
       date: dateFormat.format(new Date(round.closedAt)),
     });
-    dates.push(
-      round.closedReason
-        ? `${closed} (${rounds.closedReasons[round.closedReason]})`
-        : closed
-    );
+    const reason = round.manualCloseReason
+      ? `${rounds.closedReasons.manual}, ${rounds.manualReasons[round.manualCloseReason]}`
+      : round.closedReason && rounds.closedReasons[round.closedReason];
+    dates.push(reason ? `${closed} (${reason})` : closed);
   }
   return (
     <li className="flex flex-col gap-1 px-4 py-3">
@@ -521,9 +523,34 @@ function RoundItem({
           {rounds.statuses[round.status]}
         </Badge>
       </div>
-      <p className="text-muted-foreground text-xs tabular-nums">
-        {dates.join(" · ")}
-      </p>
+      <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
+        <p className="text-muted-foreground text-xs tabular-nums">
+          {dates.join(" · ")}
+        </p>
+        {round.status === "open" ? (
+          <>
+            <Button
+              onClick={openClose}
+              size="sm"
+              type="button"
+              variant="outline"
+            >
+              {rounds.close.action}
+            </Button>
+            <CloseRoundDialog
+              messages={rounds}
+              onOpenChange={setClosing}
+              open={closing}
+              round={round}
+            />
+          </>
+        ) : null}
+      </div>
+      {round.closedNote ? (
+        <p className="whitespace-pre-line text-muted-foreground text-xs">
+          {formatMessage(rounds.closedNote, { note: round.closedNote })}
+        </p>
+      ) : null}
     </li>
   );
 }

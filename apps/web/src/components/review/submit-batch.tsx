@@ -2,7 +2,7 @@
 
 import { ORPCError } from "@orpc/client";
 import type { Locale } from "@roundcut/auth/locale";
-import type { RoundStatus } from "@roundcut/db/round";
+import type { ManualCloseReason, RoundStatus } from "@roundcut/db/round";
 import {
   AlertDialog,
   AlertDialogCancel,
@@ -36,9 +36,43 @@ import { client as api, orpc } from "@/utils/orpc";
 type SubmitMessages = Messages["review"]["submit"];
 
 interface BannerRound {
+  closedAt: Date | null;
+  closedNote: string | null;
+  manualCloseReason: ManualCloseReason | null;
   // Place in the counter, per deliverable or per project (ROUND-02).
   position: number;
   status: RoundStatus;
+}
+
+// How a closed round reads to the client: the editor's reason and note when
+// the editor closed it by hand (ROUND-03).
+function closedLines(
+  round: BannerRound,
+  closing: { locale: Locale; messages: SubmitMessages; workspaceName: string }
+) {
+  const { locale, messages, workspaceName } = closing;
+  if (!(round.manualCloseReason && round.closedAt)) {
+    return [formatMessage(messages.roundClosed, { round: round.position })];
+  }
+  const lines = [
+    formatMessage(messages.closedManually, {
+      date: new Intl.DateTimeFormat(locale, { dateStyle: "long" }).format(
+        round.closedAt
+      ),
+      round: round.position,
+      workspace: workspaceName,
+    }),
+    messages.manualReasons[round.manualCloseReason],
+  ];
+  if (round.closedNote) {
+    lines.push(
+      formatMessage(messages.closedNote, {
+        note: round.closedNote,
+        workspace: workspaceName,
+      })
+    );
+  }
+  return lines;
 }
 
 // What the permanent banner says about the round (REV-07): a round within
@@ -47,8 +81,9 @@ interface BannerRound {
 function bannerLines(
   round: BannerRound,
   includedRounds: number,
-  messages: SubmitMessages
+  closing: { locale: Locale; messages: SubmitMessages; workspaceName: string }
 ) {
+  const { messages } = closing;
   const extra = round.position > includedRounds;
   const lastIncluded = round.position === includedRounds;
   const exhausted = extra || (lastIncluded && round.status !== "open");
@@ -68,7 +103,7 @@ function bannerLines(
     lines.push(messages.lastIncluded);
   }
   if (round.status === "closed") {
-    lines.push(formatMessage(messages.roundClosed, { round: round.position }));
+    lines.push(...closedLines(round, closing));
   }
   return { exhausted, lines, title: exhausted ? messages.exhausted : label };
 }
@@ -81,12 +116,14 @@ function RoundBanner({
   locale,
   messages,
   round,
+  workspaceName,
 }: {
   approval: { approvedAt: Date; approverName: string } | null;
   includedRounds: number;
   locale: Locale;
   messages: SubmitMessages;
   round: BannerRound | null;
+  workspaceName: string;
 }) {
   if (approval) {
     return (
@@ -107,11 +144,11 @@ function RoundBanner({
   if (round === null) {
     return null;
   }
-  const { exhausted, lines, title } = bannerLines(
-    round,
-    includedRounds,
-    messages
-  );
+  const { exhausted, lines, title } = bannerLines(round, includedRounds, {
+    locale,
+    messages,
+    workspaceName,
+  });
   return (
     <Alert variant={exhausted ? "warning" : "info"}>
       {exhausted ? (
@@ -123,7 +160,9 @@ function RoundBanner({
       {lines.length > 0 ? (
         <AlertDescription>
           {lines.map((line) => (
-            <p key={line}>{line}</p>
+            <p className="whitespace-pre-line" key={line}>
+              {line}
+            </p>
           ))}
         </AlertDescription>
       ) : null}
@@ -258,6 +297,7 @@ export function SubmitBatch({
       locale={locale}
       messages={messages}
       round={round}
+      workspaceName={workspaceName}
     />
   );
   if (approval || round === null || round.status === "closed") {

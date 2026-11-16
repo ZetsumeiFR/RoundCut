@@ -21,6 +21,19 @@ export const ROUND_CLOSED_REASONS = [
 
 export type RoundClosedReason = (typeof ROUND_CLOSED_REASONS)[number];
 
+// Why the editor closed a round by hand (ROUND-03), shown to the client with
+// the editor's note. "other" needs the note to explain itself.
+export const MANUAL_CLOSE_REASONS = [
+  "feedback_elsewhere",
+  "approved_offline",
+  "no_response",
+  "other",
+] as const;
+
+export type ManualCloseReason = (typeof MANUAL_CLOSE_REASONS)[number];
+
+export const ROUND_CLOSE_NOTE_MAX_LENGTH = 500;
+
 interface RoundTransition {
   closedReason?: RoundClosedReason;
   from: readonly RoundStatus[];
