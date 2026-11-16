@@ -17,3 +17,17 @@ export function authErrorMessage(
   }
   return errors.generic;
 }
+
+// Codes Better-Auth appends as `?error=` when an OAuth sign-in fails.
+export function googleErrorMessage(
+  code: string,
+  errors: Messages["auth"]["errors"]
+) {
+  if (code === "access_denied") {
+    return errors.googleCancelled;
+  }
+  if (code === "account_not_linked") {
+    return errors.googleAccountNotLinked;
+  }
+  return errors.googleFailed;
+}

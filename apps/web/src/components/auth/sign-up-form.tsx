@@ -3,7 +3,7 @@
 import { MIN_PASSWORD_LENGTH } from "@roundcut/auth/password-policy";
 import { Button } from "@roundcut/ui/components/button";
 import { FieldGroup } from "@roundcut/ui/components/field";
-import { type FormEvent, useCallback, useState } from "react";
+import { type FormEvent, type ReactNode, useCallback, useState } from "react";
 import z from "zod";
 
 import { formatMessage, type Messages } from "@/i18n/messages";
@@ -18,10 +18,12 @@ export function SignUpForm({
   messages,
   onSignedUp,
   onSwitchToSignIn,
+  social,
 }: {
   messages: Messages["auth"];
   onSignedUp: (email: string) => void;
   onSwitchToSignIn: () => void;
+  social?: ReactNode;
 }) {
   const [submitError, setSubmitError] = useState<string | null>(null);
   const { fields, validation, signUp } = messages;
@@ -81,6 +83,7 @@ export function SignUpForm({
       }
       title={signUp.title}
     >
+      {social}
       <form className="flex flex-col gap-5" noValidate onSubmit={handleSubmit}>
         {submitError ? (
           <AuthErrorAlert message={submitError} title={messages.errors.title} />
