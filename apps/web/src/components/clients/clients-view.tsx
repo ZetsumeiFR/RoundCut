@@ -79,6 +79,7 @@ import {
 } from "react";
 import { toast } from "sonner";
 
+import type { TermsMessages } from "@/components/account/revision-terms-settings";
 import { formatMessage, type Messages } from "@/i18n/messages";
 import { client as api, orpc } from "@/utils/orpc";
 import {
@@ -560,9 +561,11 @@ function ClientsGrid({
 export function ClientsView({
   locale,
   messages,
+  terms,
 }: {
   locale: Locale;
   messages: ClientsMessages;
+  terms: TermsMessages;
 }) {
   const queryClient = useQueryClient();
   const { data, isError, refetch } = useQuery(orpc.client.list.queryOptions());
@@ -639,7 +642,9 @@ export function ClientsView({
   }
 
   let body = <ClientsSkeleton label={messages.grid.loading} />;
-  if (data && data.length === 0) {
+  // New clients start from the workspace plan terms, so adding one waits for
+  // the workspace too.
+  if (data && currency && data.length === 0) {
     body = <EmptyClients messages={messages} onAdd={openCreate} />;
   } else if (data && currency) {
     body = (
@@ -666,7 +671,12 @@ export function ClientsView({
               {summary}
             </FrameDescription>
           </div>
-          <Button className="shrink-0" onClick={openCreate} type="button">
+          <Button
+            className="shrink-0"
+            disabled={!workspace.data}
+            onClick={openCreate}
+            type="button"
+          >
             <PlusIcon aria-hidden="true" data-icon="inline-start" />
             {messages.add}
           </Button>
@@ -675,12 +685,15 @@ export function ClientsView({
       </Frame>
       <ClientSheet
         clients={data ?? []}
+        locale={locale}
         messages={messages}
         onArchive={setArchiving}
         onOpenChange={setSheetOpen}
         onStateChange={setSheetState}
         open={sheetOpen}
         state={sheetState}
+        terms={terms}
+        workspace={workspace.data}
       />
       <ArchiveDialog
         busy={archiveBusy}

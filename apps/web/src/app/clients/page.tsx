@@ -16,10 +16,15 @@ export default async function ClientsPage() {
   }
 
   const locale = await getLocale();
+  const messages = getMessages(locale);
 
   return (
     <main className="mx-auto flex w-full min-w-0 max-w-6xl flex-col gap-6 px-4 py-6 sm:px-8 sm:py-10">
-      <ClientsView locale={locale} messages={getMessages(locale).clients} />
+      <ClientsView
+        locale={locale}
+        messages={messages.clients}
+        terms={messages.account.terms}
+      />
     </main>
   );
 }

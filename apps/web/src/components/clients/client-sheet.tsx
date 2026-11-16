@@ -10,12 +10,16 @@ import {
   splitEmails,
 } from "@roundcut/api/client";
 import type { AppRouterClient } from "@roundcut/api/routers/index";
+import { EXTRA_ROUND_DELAY_MAX_DAYS } from "@roundcut/api/workspace";
+import type { Locale } from "@roundcut/auth/locale";
+import type { RevisionTerms } from "@roundcut/db/revision-terms";
 import { Button } from "@roundcut/ui/components/button";
 import {
   FieldGroup,
   FieldLegend,
   FieldSet,
 } from "@roundcut/ui/components/field";
+import { Badge } from "@roundcut/ui/components/reui/badge";
 import {
   Sheet,
   SheetClose,
@@ -31,6 +35,17 @@ import { ArchiveIcon, PencilIcon, XIcon } from "lucide-react";
 import { type ReactNode, useCallback, useMemo, useState } from "react";
 import { toast } from "sonner";
 import z from "zod";
+import {
+  formatPrice,
+  isDelay,
+  isPrice,
+  PRICE_MAX,
+  type TermsFormValues,
+  type TermsMessages,
+  toRevisionTerms,
+  toTermsFormValues,
+  useTermsOptions,
+} from "@/components/account/revision-terms-settings";
 import { AuthErrorAlert } from "@/components/auth/auth-error-alert";
 import { useAppForm } from "@/components/auth/auth-form";
 import { formatMessage, type Messages } from "@/i18n/messages";
@@ -45,6 +60,13 @@ export type Client = Awaited<
 // What create / update return: the client without the list counters.
 type SavedClient = Awaited<ReturnType<AppRouterClient["client"]["get"]>>;
 
+// What the sheet needs from the workspace: the default plan terms a client
+// follows unless it has its own (CLI-03), and the currency they are priced in.
+export interface WorkspaceTerms {
+  currency: string;
+  revisionTerms: RevisionTerms;
+}
+
 export type ClientSheetState =
   | { mode: "create" }
   | { clientId: string; mode: "view" }
@@ -58,60 +80,112 @@ const SIREN_GROUPS = /(\d{3})(?=\d)/g;
 export const formatSiren = (siren: string) =>
   siren.replace(SIREN_GROUPS, "$1 ");
 
-function clientFormSchema(errors: ClientsMessages["form"]["errors"]) {
+function clientFormSchema(
+  errors: ClientsMessages["form"]["errors"],
+  terms: TermsMessages,
+  locale: Locale
+) {
   const text = (max: number) =>
     z.string().trim().max(max, formatMessage(errors.tooLong, { max }));
 
-  return z.object({
-    address: text(CLIENT_ADDRESS_MAX_LENGTH),
-    deciderEmail: z.string().trim().refine(isEmail, errors.emailInvalid),
-    deciderName: text(CLIENT_NAME_MAX_LENGTH).min(
-      1,
-      errors.deciderNameRequired
-    ),
-    name: text(CLIENT_NAME_MAX_LENGTH).min(1, errors.nameRequired),
-    notes: text(CLIENT_NOTES_MAX_LENGTH),
-    reviewerEmails: z.string().superRefine((value, context) => {
-      const emails = splitEmails(value);
-      const invalid = emails.filter((email) => !isEmail(email));
-      if (invalid.length > 0) {
+  return z
+    .object({
+      address: text(CLIENT_ADDRESS_MAX_LENGTH),
+      customTerms: z.boolean(),
+      deciderEmail: z.string().trim().refine(isEmail, errors.emailInvalid),
+      deciderName: text(CLIENT_NAME_MAX_LENGTH).min(
+        1,
+        errors.deciderNameRequired
+      ),
+      name: text(CLIENT_NAME_MAX_LENGTH).min(1, errors.nameRequired),
+      notes: text(CLIENT_NOTES_MAX_LENGTH),
+      reviewerEmails: z.string().superRefine((value, context) => {
+        const emails = splitEmails(value);
+        const invalid = emails.filter((email) => !isEmail(email));
+        if (invalid.length > 0) {
+          context.addIssue({
+            code: "custom",
+            message: formatMessage(errors.reviewerEmailsInvalid, {
+              emails: invalid.join(", "),
+            }),
+          });
+        }
+        if (emails.length > CLIENT_REVIEWERS_MAX) {
+          context.addIssue({
+            code: "custom",
+            message: formatMessage(errors.reviewersMax, {
+              max: CLIENT_REVIEWERS_MAX,
+            }),
+          });
+        }
+      }),
+      siren: z.string().refine((value) => {
+        const siren = normalizeSiren(value);
+        return siren === "" || isSiren(siren);
+      }, errors.sirenInvalid),
+      terms: z.object({
+        extraRoundDelayDays: z.string(),
+        extraRoundPrice: z.string(),
+        includedRounds: z.string(),
+        requirePayment: z.boolean(),
+        scope: z.string(),
+      }),
+    })
+    .superRefine(({ customTerms, terms: values }, context) => {
+      // Hidden plan terms fields are ignored when the client follows the
+      // workspace defaults.
+      if (!customTerms) {
+        return;
+      }
+      if (!isPrice(values.extraRoundPrice)) {
         context.addIssue({
           code: "custom",
-          message: formatMessage(errors.reviewerEmailsInvalid, {
-            emails: invalid.join(", "),
+          message: formatMessage(terms.priceInvalid, {
+            max: new Intl.NumberFormat(locale).format(PRICE_MAX),
           }),
+          path: ["terms", "extraRoundPrice"],
         });
       }
-      if (emails.length > CLIENT_REVIEWERS_MAX) {
+      if (!isDelay(values.extraRoundDelayDays)) {
         context.addIssue({
           code: "custom",
-          message: formatMessage(errors.reviewersMax, {
-            max: CLIENT_REVIEWERS_MAX,
+          message: formatMessage(terms.delayInvalid, {
+            max: EXTRA_ROUND_DELAY_MAX_DAYS,
           }),
+          path: ["terms", "extraRoundDelayDays"],
         });
       }
-    }),
-    siren: z.string().refine((value) => {
-      const siren = normalizeSiren(value);
-      return siren === "" || isSiren(siren);
-    }, errors.sirenInvalid),
-  });
+    });
 }
 
-type ClientFormValues = z.input<ReturnType<typeof clientFormSchema>>;
+type ClientFormValues = z.input<ReturnType<typeof clientFormSchema>> & {
+  terms: TermsFormValues;
+};
 
-const formValuesOf = (client: Client | null): ClientFormValues => ({
+const formValuesOf = (
+  client: Client | null,
+  workspace: WorkspaceTerms,
+  locale: Locale
+): ClientFormValues => ({
   address: client?.address ?? "",
+  customTerms: Boolean(client?.revisionTerms),
   deciderEmail: client?.deciderEmail ?? "",
   deciderName: client?.deciderName ?? "",
   name: client?.name ?? "",
   notes: client?.notes ?? "",
   reviewerEmails: client?.reviewerEmails.join("\n") ?? "",
   siren: client?.siren ? formatSiren(client.siren) : "",
+  terms: toTermsFormValues(
+    client?.revisionTerms ?? workspace.revisionTerms,
+    locale
+  ),
 });
 
 const selectIsSubmitting = (state: { isSubmitting: boolean }) =>
   state.isSubmitting;
+
+const selectCustomTerms = (state: { values: ClientFormValues }) =>
+  state.values.customTerms;
 
 function SheetCloseButton({ label }: { label: string }) {
   return (
@@ -132,30 +206,40 @@ function SheetCloseButton({ label }: { label: string }) {
 
 function ClientForm({
   client,
+  locale,
   messages,
   onCancel,
   onSaved,
+  terms,
+  workspace,
 }: {
   client: Client | null;
+  locale: Locale;
   messages: ClientsMessages;
   onCancel: () => void;
   onSaved: (saved: SavedClient, created: boolean) => void;
+  terms: TermsMessages;
+  workspace: WorkspaceTerms;
 }) {
   const queryClient = useQueryClient();
   const [saveError, setSaveError] = useState(false);
   const { form: formMessages } = messages;
+  const termsOptions = useTermsOptions(terms);
   const schema = useMemo(
-    () => clientFormSchema(formMessages.errors),
-    [formMessages.errors]
+    () => clientFormSchema(formMessages.errors, terms, locale),
+    [formMessages.errors, locale, terms]
   );
 
   const form = useAppForm({
-    defaultValues: formValuesOf(client),
-    onSubmit: async ({ value }) => {
+    defaultValues: formValuesOf(client, workspace, locale),
+    onSubmit: async ({
+      value: { customTerms, reviewerEmails, terms: termsValues, ...contact },
+    }) => {
       setSaveError(false);
       const input = {
-        ...value,
-        reviewerEmails: splitEmails(value.reviewerEmails),
+        ...contact,
+        reviewerEmails: splitEmails(reviewerEmails),
+        revisionTerms: customTerms ? toRevisionTerms(termsValues) : null,
       };
       try {
         const saved = client
@@ -173,6 +257,7 @@ function ClientForm({
   });
 
   const isSubmitting = useStore(form.store, selectIsSubmitting);
+  const showTermsFields = useStore(form.store, selectCustomTerms);
 
   const handleSubmit = useCallback(
     (event: React.FormEvent<HTMLFormElement>) => {
@@ -259,6 +344,71 @@ function ClientForm({
             </form.AppField>
           </FieldGroup>
           <FieldSet className="gap-4">
+            <FieldLegend variant="label">{terms.title}</FieldLegend>
+            <form.AppField name="customTerms">
+              {(field) => (
+                <field.SwitchField
+                  description={formMessages.customTermsDescription}
+                  label={formMessages.customTerms}
+                />
+              )}
+            </form.AppField>
+            {showTermsFields ? (
+              <>
+                <form.AppField name="terms.includedRounds">
+                  {(field) => (
+                    <field.SelectField
+                      description={terms.includedRoundsDescription}
+                      label={terms.includedRounds}
+                      options={termsOptions.includedRounds}
+                    />
+                  )}
+                </form.AppField>
+                <form.AppField name="terms.extraRoundPrice">
+                  {(field) => (
+                    <field.TextField
+                      autoComplete="off"
+                      description={terms.priceDescription}
+                      inputMode="decimal"
+                      label={terms.price}
+                      suffix={formatMessage(terms.priceSuffix, {
+                        currency: workspace.currency,
+                      })}
+                    />
+                  )}
+                </form.AppField>
+                <form.AppField name="terms.extraRoundDelayDays">
+                  {(field) => (
+                    <field.TextField
+                      autoComplete="off"
+                      description={terms.delayDescription}
+                      inputMode="numeric"
+                      label={terms.delay}
+                      suffix={terms.delaySuffix}
+                    />
+                  )}
+                </form.AppField>
+                <form.AppField name="terms.requirePayment">
+                  {(field) => (
+                    <field.SwitchField
+                      description={terms.requirePaymentDescription}
+                      label={terms.requirePayment}
+                    />
+                  )}
+                </form.AppField>
+                <form.AppField name="terms.scope">
+                  {(field) => (
+                    <field.SelectField
+                      description={terms.scopeDescription}
+                      label={terms.scope}
+                      options={termsOptions.scopes}
+                    />
+                  )}
+                </form.AppField>
+              </>
+            ) : null}
+          </FieldSet>
+          <FieldSet className="gap-4">
             <FieldLegend variant="label">
               {formMessages.billingSection}
             </FieldLegend>
@@ -320,16 +470,89 @@ function OptionalText({ none, value }: { none: string; value: string | null }) {
   );
 }
 
+function PlanTerms({
+  client,
+  locale,
+  messages,
+  terms,
+  workspace,
+}: {
+  client: Client;
+  locale: Locale;
+  messages: ClientsMessages["details"];
+  terms: TermsMessages;
+  workspace: WorkspaceTerms;
+}) {
+  const custom = client.revisionTerms !== null;
+  const effective = client.revisionTerms ?? workspace.revisionTerms;
+  const rows = [
+    [terms.includedRounds, String(effective.includedRounds)],
+    [
+      terms.price,
+      `${formatPrice(effective.extraRoundPriceCents, locale)} ${formatMessage(
+        terms.priceSuffix,
+        { currency: workspace.currency }
+      )}`,
+    ],
+    [
+      terms.delay,
+      formatMessage(
+        new Intl.PluralRules(locale).select(effective.extraRoundDelayDays) ===
+          "one"
+          ? messages.delayOne
+          : messages.delayOther,
+        { count: effective.extraRoundDelayDays }
+      ),
+    ],
+    [
+      terms.requirePayment,
+      effective.requirePayment ? messages.yes : messages.no,
+    ],
+    [
+      terms.scope,
+      effective.scope === "project"
+        ? terms.scopeProject
+        : terms.scopeDeliverable,
+    ],
+  ] as const;
+
+  return (
+    <span className="flex flex-col gap-2">
+      <Badge
+        className="w-fit"
+        size="lg"
+        variant={custom ? "primary-light" : "outline"}
+      >
+        {custom ? messages.customTerms : messages.defaultTerms}
+      </Badge>
+      <span className="flex flex-col gap-1">
+        {rows.map(([label, value]) => (
+          <span className="flex justify-between gap-4" key={label}>
+            <span className="text-muted-foreground">{label}</span>
+            <span className="text-right tabular-nums">{value}</span>
+          </span>
+        ))}
+      </span>
+    </span>
+  );
+}
+
 function ClientDetails({
   client,
+  locale,
   messages,
   onArchive,
   onEdit,
+  terms,
+  workspace,
 }: {
   client: Client;
+  locale: Locale;
   messages: ClientsMessages;
   onArchive: (client: Client) => void;
   onEdit: () => void;
+  terms: TermsMessages;
+  workspace: WorkspaceTerms;
 }) {
   const { details } = messages;
   const handleArchive = useCallback(
@@ -370,6 +593,15 @@ function ClientDetails({
             <span className="text-muted-foreground">{messages.none}</span>
           )}
         </DetailRow>
+        <DetailRow label={terms.title}>
+          <PlanTerms
+            client={client}
+            locale={locale}
+            messages={details}
+            terms={terms}
+            workspace={workspace}
+          />
+        </DetailRow>
         <DetailRow label={details.notes}>
           <OptionalText none={messages.none} value={client.notes} />
         </DetailRow>
@@ -397,21 +629,29 @@ function ClientDetails({
   );
 }
 
+interface SheetContext {
+  locale: Locale;
+  messages: ClientsMessages;
+  terms: TermsMessages;
+  workspace: WorkspaceTerms;
+}
+
 function SheetBody({
   client,
-  messages,
+  context,
   onArchive,
   onOpenChange,
   onStateChange,
   state,
 }: {
   client: Client | null;
-  messages: ClientsMessages;
+  context: SheetContext;
   onArchive: (client: Client) => void;
   onOpenChange: (open: boolean) => void;
   onStateChange: (state: ClientSheetState) => void;
   state: ClientSheetState;
 }) {
+  const { messages } = context;
   const close = useCallback(() => onOpenChange(false), [onOpenChange]);
 
   const backOrClose = useCallback(() => {
@@ -443,7 +683,7 @@ function SheetBody({
     return (
       <ClientForm
         client={null}
-        messages={messages}
+        {...context}
         onCancel={close}
         onSaved={handleSaved}
       />
@@ -457,7 +697,7 @@ function SheetBody({
       <ClientForm
         client={client}
         key={client.id}
-        messages={messages}
+        {...context}
         onCancel={backOrClose}
         onSaved={handleSaved}
       />
@@ -466,7 +706,7 @@ function SheetBody({
   return (
     <ClientDetails
       client={client}
-      messages={messages}
+      {...context}
       onArchive={onArchive}
       onEdit={openEdit}
     />
@@ -475,25 +715,35 @@ function SheetBody({
 
 export function ClientSheet({
   clients,
+  locale,
   messages,
   onArchive,
   onOpenChange,
   onStateChange,
   open,
   state,
+  terms,
+  workspace,
 }: {
   clients: Client[];
+  locale: Locale;
   messages: ClientsMessages;
   onArchive: (client: Client) => void;
   onOpenChange: (open: boolean) => void;
   onStateChange: (state: ClientSheetState) => void;
   open: boolean;
   state: ClientSheetState | null;
+  terms: TermsMessages;
+  workspace: WorkspaceTerms | undefined;
 }) {
   const client =
     state && state.mode !== "create"
       ? (clients.find((candidate) => candidate.id === state.clientId) ?? null)
       : null;
+  const context = useMemo(
+    () => workspace && { locale, messages, terms, workspace },
+    [locale, messages, terms, workspace]
+  );
 
   return (
     <Sheet onOpenChange={onOpenChange} open={open}>
@@ -501,10 +751,10 @@ export function ClientSheet({
         className="w-full gap-0 sm:max-w-md"
         showCloseButton={false}
       >
-        {state ? (
+        {state && context ? (
           <SheetBody
             client={client}
-            messages={messages}
+            context={context}
             onArchive={onArchive}
             onOpenChange={onOpenChange}
             onStateChange={onStateChange}

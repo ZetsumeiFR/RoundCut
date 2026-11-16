@@ -1,5 +1,6 @@
-import { index, pgTable, text, timestamp } from "drizzle-orm/pg-core";
+import { index, jsonb, pgTable, text, timestamp } from "drizzle-orm/pg-core";
 
+import type { RevisionTerms } from "../revision-terms";
 import { workspace } from "./workspace";
 
 // A customer of the workspace (CLI-01). The decider is the only reviewer
@@ -21,6 +22,9 @@ export const client = pgTable(
     name: text("name").notNull(),
     notes: text("notes"),
     reviewerEmails: text("reviewer_emails").array().default([]).notNull(),
+    // Plan terms of this client (CLI-03). They take precedence over the
+    // workspace defaults; null means the client follows those defaults.
+    revisionTerms: jsonb("revision_terms").$type<RevisionTerms>(),
     siren: text("siren"),
     updatedAt: timestamp("updated_at")
       .defaultNow()

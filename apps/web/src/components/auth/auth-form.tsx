@@ -3,11 +3,27 @@
 import { Button } from "@roundcut/ui/components/button";
 import {
   Field,
+  FieldContent,
   FieldDescription,
   FieldError,
   FieldLabel,
 } from "@roundcut/ui/components/field";
 import { Input } from "@roundcut/ui/components/input";
+import {
+  InputGroup,
+  InputGroupAddon,
+  InputGroupInput,
+  InputGroupText,
+} from "@roundcut/ui/components/input-group";
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@roundcut/ui/components/select";
+import { Switch } from "@roundcut/ui/components/switch";
 import { Textarea } from "@roundcut/ui/components/textarea";
 import {
   createFormHook,
@@ -76,8 +92,9 @@ function FieldShell({
 function TextField({
   label,
   description,
+  suffix,
   ...props
-}: { label: string; description?: string } & Omit<
+}: { label: string; description?: string; suffix?: string } & Omit<
   ComponentProps<typeof Input>,
   ControlledInputProps
 >) {
@@ -90,8 +107,101 @@ function TextField({
       invalid={invalid}
       label={label}
     >
-      <Input aria-invalid={invalid} {...props} {...inputProps} />
+      {suffix ? (
+        <InputGroup>
+          <InputGroupInput aria-invalid={invalid} {...props} {...inputProps} />
+          <InputGroupAddon align="inline-end">
+            <InputGroupText>{suffix}</InputGroupText>
+          </InputGroupAddon>
+        </InputGroup>
+      ) : (
+        <Input aria-invalid={invalid} {...props} {...inputProps} />
+      )}
     </FieldShell>
+  );
+}
+
+function SelectField({
+  label,
+  description,
+  options,
+}: {
+  label: string;
+  description?: string;
+  options: Array<{ label: string; value: string }>;
+}) {
+  const field = useFieldContext<string>();
+  const { errors } = field.state.meta;
+  const { value } = field.state;
+  const handleValueChange = useCallback(
+    (next: string | null) => {
+      if (next !== null) {
+        field.handleChange(next);
+      }
+    },
+    [field]
+  );
+  const selected = options.find((option) => option.value === value);
+
+  return (
+    <FieldShell
+      description={description}
+      errors={errors}
+      htmlFor={field.name}
+      invalid={errors.length > 0}
+      label={label}
+    >
+      <Select onValueChange={handleValueChange} value={value}>
+        <SelectTrigger
+          aria-invalid={errors.length > 0}
+          className="w-full"
+          id={field.name}
+        >
+          <SelectValue>{selected?.label ?? value}</SelectValue>
+        </SelectTrigger>
+        <SelectContent>
+          <SelectGroup>
+            {options.map((option) => (
+              <SelectItem key={option.value} value={option.value}>
+                {option.label}
+              </SelectItem>
+            ))}
+          </SelectGroup>
+        </SelectContent>
+      </Select>
+    </FieldShell>
+  );
+}
+
+function SwitchField({
+  label,
+  description,
+}: {
+  label: string;
+  description?: string;
+}) {
+  const field = useFieldContext<boolean>();
+  const handleCheckedChange = useCallback(
+    (checked: boolean) => field.handleChange(checked),
+    [field]
+  );
+  return (
+    <Field className="gap-3" orientation="horizontal">
+      <FieldContent>
+        <FieldLabel htmlFor={field.name}>{label}</FieldLabel>
+        {description ? (
+          <FieldDescription>{description}</FieldDescription>
+        ) : null}
+      </FieldContent>
+      {/* Base UI puts the id on a hidden input, so name the switch itself. */}
+      <Switch
+        aria-label={label}
+        checked={field.state.value}
+        id={field.name}
+        name={field.name}
+        onCheckedChange={handleCheckedChange}
+      />
+    </Field>
   );
 }
 
@@ -158,7 +268,13 @@ function SubmitButton({
 }
 
 export const { useAppForm } = createFormHook({
-  fieldComponents: { PasswordField, TextareaField, TextField },
+  fieldComponents: {
+    PasswordField,
+    SelectField,
+    SwitchField,
+    TextareaField,
+    TextField,
+  },
   fieldContext,
   formComponents: { SubmitButton },
   formContext,

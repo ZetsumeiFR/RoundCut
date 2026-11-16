@@ -25,9 +25,9 @@ import {
 } from "./settings-form";
 import { SETTING_ROWS, SettingsSkeleton } from "./settings-skeleton";
 
-type TermsMessages = Messages["account"]["terms"];
+export type TermsMessages = Messages["account"]["terms"];
 
-interface FormValues {
+export interface TermsFormValues {
   extraRoundDelayDays: string;
   extraRoundPrice: string;
   includedRounds: string;
@@ -49,7 +49,7 @@ export const toPriceCents = (value: string) =>
 export const isPrice = (value: string) =>
   PRICE_PATTERN.test(value.trim()) && parsePrice(value) <= PRICE_MAX;
 
-const isDelay = (value: string) =>
+export const isDelay = (value: string) =>
   DAYS_PATTERN.test(value.trim()) &&
   Number(value) <= EXTRA_ROUND_DELAY_MAX_DAYS;
 
@@ -78,7 +78,10 @@ export const formatPrice = (cents: number, locale: Locale) =>
     useGrouping: false,
   }).format(cents / CENTS_PER_UNIT);
 
-const toFormValues = (terms: RevisionTerms, locale: Locale): FormValues => ({
+export const toTermsFormValues = (
+  terms: RevisionTerms,
+  locale: Locale
+): TermsFormValues => ({
   extraRoundDelayDays: String(terms.extraRoundDelayDays),
   extraRoundPrice: formatPrice(terms.extraRoundPriceCents, locale),
   includedRounds: String(terms.includedRounds),
@@ -86,7 +89,7 @@ const toFormValues = (terms: RevisionTerms, locale: Locale): FormValues => ({
   scope: terms.scope,
 });
 
-const toRevisionTerms = (value: FormValues) =>
+export const toRevisionTerms = (value: TermsFormValues) =>
   revisionTermsSchema.parse({
     extraRoundDelayDays: Number(value.extraRoundDelayDays.trim()),
     extraRoundPriceCents: toPriceCents(value.extraRoundPrice),
@@ -95,7 +98,7 @@ const toRevisionTerms = (value: FormValues) =>
     scope: value.scope,
   });
 
-function useTermsOptions(messages: TermsMessages) {
+export function useTermsOptions(messages: TermsMessages) {
   return useMemo(
     () => ({
       includedRounds: Array.from(
@@ -134,12 +137,12 @@ function RevisionTermsForm({
   );
 
   const form = useSettingsForm({
-    defaultValues: toFormValues(terms, locale),
+    defaultValues: toTermsFormValues(terms, locale),
     onSubmit: async ({ value }) => {
       setSaveError(false);
       try {
         const saved = await mutateAsync(toRevisionTerms(value));
-        form.reset(toFormValues(saved.revisionTerms, locale));
+        form.reset(toTermsFormValues(saved.revisionTerms, locale));
         toast.success(messages.saved);
       } catch {
         setSaveError(true);

@@ -18,6 +18,7 @@ const toClient = (row: ClientRow) => ({
   name: row.name,
   notes: row.notes,
   reviewerEmails: row.reviewerEmails,
+  revisionTerms: row.revisionTerms,
   siren: row.siren,
   updatedAt: row.updatedAt,
 });
