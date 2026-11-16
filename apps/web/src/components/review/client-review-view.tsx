@@ -22,6 +22,7 @@ import { formatMessage, type Messages } from "@/i18n/messages";
 import { client as api, orpc } from "@/utils/orpc";
 import { CommentComposer } from "./comment-composer";
 import { CommentThread, type ReplyHandler, toMarkers } from "./comment-thread";
+import { PasteFeedback } from "./paste-feedback";
 import { ReviewState } from "./review-view";
 import { ReviewerIdentityForm } from "./reviewer-identity-form";
 import { SubmitBatch } from "./submit-batch";
@@ -261,6 +262,15 @@ function LinkedReview({
             locale={locale}
             messages={messages.comments}
             playerRef={playerRef}
+            token={token}
+            versionId={version.id}
+          />
+          <PasteFeedback
+            durationMs={version.durationMs}
+            frameRate={version.frameRate}
+            key={`paste-${version.id}`}
+            locale={locale}
+            messages={messages.comments.paste}
             token={token}
             versionId={version.id}
           />

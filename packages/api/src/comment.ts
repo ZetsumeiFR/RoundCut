@@ -1,5 +1,7 @@
 import z from "zod";
 
+import { type FrameRate, parseTimecode } from "./timecode";
+
 // Timestamped feedback shared by the API and the review pages (REV-03,
 // REV-04). Client-safe: no node or drizzle import.
 export const COMMENT_BODY_MAX_LENGTH = 2000;
@@ -42,6 +44,69 @@ export const commentSchema = z
   );
 
 export type CommentInput = z.input<typeof commentSchema>;
+
+// Pasted feedback (REV-09) creates at most this many comments at once.
+export const PASTED_COMMENTS_MAX = 50;
+
+export const commentBatchSchema = z.object({
+  comments: z
+    .array(
+      z.object({
+        body: z.string().trim().min(1).max(COMMENT_BODY_MAX_LENGTH),
+        timecodeMs,
+      })
+    )
+    .min(1)
+    .max(PASTED_COMMENTS_MAX),
+  versionId: z.string().min(1),
+});
+
+export type PastedLine =
+  | { body: string; kind: "comment"; line: number; timecodeMs: number }
+  | {
+      kind: "ignored";
+      line: number;
+      reason: "format" | "late" | "long";
+      text: string;
+    };
+
+// A timecode first (optionally bulleted or bracketed), then a separator
+// (-, –, —, :, |) or just a space, then the comment: "00:41 - musique moins
+// forte", "• [01:02:03] Titre plus gros".
+const LINE_BREAK = /\r?\n/u;
+
+const PASTED_LINE_PATTERN =
+  /^(?:[-*•]\s+)?\[?(\d{1,2}(?::\d{1,2}){1,3})\]?(?:\s*[-–—:|]\s*|\s+)(.+)$/u;
+
+// Reads feedback written elsewhere (an email, a chat) line by line. Blank
+// lines are skipped; every other line becomes a comment or is reported with
+// why it can't be one.
+export function parsePastedFeedback(
+  text: string,
+  { durationMs, frameRate }: { durationMs: number | null; frameRate: FrameRate }
+): PastedLine[] {
+  const lines: PastedLine[] = [];
+  for (const [index, raw] of text.split(LINE_BREAK).entries()) {
+    const trimmed = raw.trim();
+    if (!trimmed) {
+      continue;
+    }
+    const line = index + 1;
+    const match = PASTED_LINE_PATTERN.exec(trimmed);
+    const position = match?.[1] ? parseTimecode(match[1], frameRate) : null;
+    const body = match?.[2]?.trim() ?? "";
+    if (position === null || !body) {
+      lines.push({ kind: "ignored", line, reason: "format", text: trimmed });
+    } else if (durationMs !== null && position > durationMs) {
+      lines.push({ kind: "ignored", line, reason: "late", text: trimmed });
+    } else if (body.length > COMMENT_BODY_MAX_LENGTH) {
+      lines.push({ kind: "ignored", line, reason: "long", text: trimmed });
+    } else {
+      lines.push({ body, kind: "comment", line, timecodeMs: position });
+    }
+  }
+  return lines;
+}
 
 // A reply joins the thread of a top-level comment (REV-04).
 export const commentReplySchema = z.object({
