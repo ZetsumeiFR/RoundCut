@@ -659,6 +659,58 @@ const en = {
       moveTo: "Mark as “{status}”",
     },
     title: "Projects",
+    view: {
+      columns: {
+        deliverable: "Deliverable",
+        openComments: "Open feedback",
+        round: "Round",
+        status: "Status",
+        version: "Latest version",
+      },
+      deliverableStatus: {
+        approved: "Approved",
+        draft: "Draft",
+        in_review: "In review",
+      },
+      history: {
+        description:
+          "Uploads, rounds, submissions and approvals on this project will appear here.",
+        title: "No activity yet",
+      },
+      loadErrorTitle: "Couldn't load this project",
+      loading: "Loading the project…",
+      notFound: {
+        action: "Back to projects",
+        description:
+          "This project doesn't exist or belongs to another workspace.",
+        title: "Project not found",
+      },
+      noVersion: "No version yet",
+      openCommentsLabel: "Open feedback: {count}",
+      round: "Round {current}/{included}",
+      roundLabel: "Rounds used: {used} of {included} included",
+      settings: {
+        client: "Client",
+        createdAt: "Created on",
+        delayOne: "{count} day",
+        delayOther: "{count} days",
+        description:
+          "Terms copied when the project was created. Later changes to the client or your defaults don't affect them.",
+        details: "Project",
+        flatFee: "Flat fee",
+        no: "No",
+        targetDate: "Target date",
+        terms: "Plan terms",
+        yes: "Yes",
+      },
+      tabs: {
+        deliverables: "Deliverables",
+        history: "History",
+        label: "Project sections",
+        settings: "Settings",
+      },
+      version: "V{number}",
+    },
   },
 };
 
@@ -1340,6 +1392,58 @@ const fr: Messages = {
       moveTo: "Passer en « {status} »",
     },
     title: "Projets",
+    view: {
+      columns: {
+        deliverable: "Livrable",
+        openComments: "Retours ouverts",
+        round: "Tour",
+        status: "Statut",
+        version: "Dernière version",
+      },
+      deliverableStatus: {
+        approved: "Validé",
+        draft: "Brouillon",
+        in_review: "En revue",
+      },
+      history: {
+        description:
+          "Les uploads, tours, soumissions et validations de ce projet apparaîtront ici.",
+        title: "Aucune activité pour l'instant",
+      },
+      loadErrorTitle: "Impossible de charger ce projet",
+      loading: "Chargement du projet…",
+      notFound: {
+        action: "Retour aux projets",
+        description:
+          "Ce projet n'existe pas ou appartient à un autre espace de travail.",
+        title: "Projet introuvable",
+      },
+      noVersion: "Aucune version",
+      openCommentsLabel: "Retours ouverts : {count}",
+      round: "Tour {current}/{included}",
+      roundLabel: "Tours utilisés : {used} sur {included} inclus",
+      settings: {
+        client: "Client",
+        createdAt: "Créé le",
+        delayOne: "{count} jour",
+        delayOther: "{count} jours",
+        description:
+          "Conditions figées à la création du projet. Les changements ultérieurs du client ou de vos valeurs par défaut ne les modifient pas.",
+        details: "Projet",
+        flatFee: "Forfait",
+        no: "Non",
+        targetDate: "Date cible",
+        terms: "Conditions de forfait",
+        yes: "Oui",
+      },
+      tabs: {
+        deliverables: "Livrables",
+        history: "Historique",
+        label: "Sections du projet",
+        settings: "Réglages",
+      },
+      version: "V{number}",
+    },
   },
 };
 

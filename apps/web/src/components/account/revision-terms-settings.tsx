@@ -114,6 +114,66 @@ export const formatPrice = (cents: number, locale: Locale) =>
     useGrouping: false,
   }).format(cents / CENTS_PER_UNIT);
 
+export interface TermsListLabels {
+  delayOne: string;
+  delayOther: string;
+  no: string;
+  yes: string;
+}
+
+// Read-only summary of plan terms, one label/value line per term.
+export function RevisionTermsList({
+  currency,
+  labels,
+  locale,
+  messages,
+  terms,
+}: {
+  currency: string;
+  labels: TermsListLabels;
+  locale: Locale;
+  messages: TermsMessages;
+  terms: RevisionTerms;
+}) {
+  const rows = [
+    [messages.includedRounds, String(terms.includedRounds)],
+    [
+      messages.price,
+      `${formatPrice(terms.extraRoundPriceCents, locale)} ${formatMessage(
+        messages.priceSuffix,
+        { currency }
+      )}`,
+    ],
+    [
+      messages.delay,
+      formatMessage(
+        new Intl.PluralRules(locale).select(terms.extraRoundDelayDays) === "one"
+          ? labels.delayOne
+          : labels.delayOther,
+        { count: terms.extraRoundDelayDays }
+      ),
+    ],
+    [messages.requirePayment, terms.requirePayment ? labels.yes : labels.no],
+    [
+      messages.scope,
+      terms.scope === "project"
+        ? messages.scopeProject
+        : messages.scopeDeliverable,
+    ],
+  ] as const;
+
+  return (
+    <span className="flex flex-col gap-1">
+      {rows.map(([label, value]) => (
+        <span className="flex justify-between gap-4" key={label}>
+          <span className="text-muted-foreground">{label}</span>
+          <span className="text-right tabular-nums">{value}</span>
+        </span>
+      ))}
+    </span>
+  );
+}
+
 export const toTermsFormValues = (
   terms: RevisionTerms,
   locale: Locale
