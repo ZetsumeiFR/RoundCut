@@ -4,6 +4,8 @@ import { protectedProcedure, publicProcedure } from "../index";
 import { clientRouter } from "./client";
 import { deliverableRouter } from "./deliverable";
 import { projectRouter } from "./project";
+import { reviewRouter } from "./review";
+import { reviewLinkRouter } from "./review-link";
 import { teamRouter } from "./team";
 import { uploadRouter } from "./upload";
 import { versionRouter } from "./version";
@@ -18,6 +20,8 @@ export const appRouter = {
     user: context.session?.user,
   })),
   project: projectRouter,
+  review: reviewRouter,
+  reviewLink: reviewLinkRouter,
   team: teamRouter,
   upload: uploadRouter,
   version: versionRouter,

@@ -1,0 +1,274 @@
+"use client";
+
+import { ORPCError } from "@orpc/client";
+import type { AppRouterClient } from "@roundcut/api/routers/index";
+import type { Locale } from "@roundcut/auth/locale";
+import { Button } from "@roundcut/ui/components/button";
+import { Badge } from "@roundcut/ui/components/reui/badge";
+import { Skeleton } from "@roundcut/ui/components/skeleton";
+import { cn } from "@roundcut/ui/lib/utils";
+import { useQuery } from "@tanstack/react-query";
+import {
+  CircleAlertIcon,
+  ClapperboardIcon,
+  ClockAlertIcon,
+  LinkIcon,
+  PlayIcon,
+} from "lucide-react";
+import { useCallback, useState } from "react";
+
+import { VersionThumbnail } from "@/components/projects/version-thumbnail";
+import { formatMessage, type Messages } from "@/i18n/messages";
+import { orpc } from "@/utils/orpc";
+import { ReviewState } from "./review-view";
+import { type PlayerMarker, VideoPlayer } from "./video-player";
+
+type ReviewMessages = Messages["review"];
+type PlayerMessages = Messages["projects"]["player"];
+type LinkedProject = Awaited<
+  ReturnType<AppRouterClient["review"]["resolveLink"]>
+>;
+type LinkedDeliverable = LinkedProject["deliverables"][number];
+
+const MAX_RETRIES = 3;
+// Feedback comments arrive with REV-03; until then no version has markers.
+const NO_MARKERS: PlayerMarker[] = [];
+
+// Unknown, revoked and malformed tokens all read as an invalid link.
+const isInvalidLink = (error: unknown) =>
+  error instanceof ORPCError &&
+  (error.code === "NOT_FOUND" || error.code === "BAD_REQUEST");
+
+const isExpiredLink = (error: unknown) =>
+  error instanceof ORPCError && error.code === "LINK_EXPIRED";
+
+const retryTransient = (failures: number, error: unknown) =>
+  !(isInvalidLink(error) || isExpiredLink(error)) && failures < MAX_RETRIES;
+
+export function ClientReviewSkeleton({ label }: { label?: string }) {
+  return (
+    <div aria-label={label} className="flex flex-col gap-4" role="status">
+      <div className="flex flex-col gap-2">
+        <Skeleton className="h-3 w-40" />
+        <Skeleton className="h-6 w-64 max-w-full" />
+      </div>
+      <Skeleton className="aspect-video w-full" />
+      <Skeleton className="h-16 w-full" />
+    </div>
+  );
+}
+
+function DeliverableItem({
+  deliverable,
+  messages,
+  onSelect,
+  selected,
+}: {
+  deliverable: LinkedDeliverable;
+  messages: ReviewMessages;
+  onSelect: (id: string) => void;
+  selected: boolean;
+}) {
+  const version = deliverable.latestVersion;
+  const handleClick = useCallback(
+    () => onSelect(deliverable.id),
+    [deliverable.id, onSelect]
+  );
+  return (
+    <li>
+      <button
+        aria-current={selected ? "true" : undefined}
+        aria-label={formatMessage(messages.play, { title: deliverable.title })}
+        className={cn(
+          "flex w-full items-center gap-3 border p-2 text-left transition-colors hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:bg-transparent",
+          selected && "border-primary bg-muted"
+        )}
+        disabled={!version}
+        onClick={handleClick}
+        type="button"
+      >
+        <VersionThumbnail
+          alt=""
+          className="aspect-video w-20 shrink-0 border object-cover"
+          fallback={<PlayIcon aria-hidden="true" className="size-4" />}
+          src={version?.thumbnailUrl ?? null}
+        />
+        <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+          <span className="truncate font-medium text-sm">
+            {deliverable.title}
+          </span>
+          <span className="text-muted-foreground text-xs">
+            {version
+              ? formatMessage(messages.version, { number: version.number })
+              : messages.noVersion}
+          </span>
+        </span>
+      </button>
+    </li>
+  );
+}
+
+function LinkedReview({
+  locale,
+  messages,
+  onSourceError,
+  player,
+  project,
+}: {
+  locale: Locale;
+  messages: ReviewMessages;
+  onSourceError: () => void;
+  player: PlayerMessages;
+  project: LinkedProject;
+}) {
+  const playable = project.deliverables.filter((item) => item.latestVersion);
+  const [selectedId, setSelectedId] = useState(playable[0]?.id);
+  const selected =
+    playable.find((item) => item.id === selectedId) ?? playable[0];
+  const version = selected?.latestVersion;
+
+  return (
+    <>
+      <header className="flex flex-col gap-1">
+        <p className="text-muted-foreground text-xs">
+          {formatMessage(messages.sharedBy, {
+            client: project.clientName,
+            workspace: project.workspaceName,
+          })}
+        </p>
+        <h1 className="break-words font-semibold text-lg">{project.name}</h1>
+        {project.expiresAt ? (
+          <p className="text-muted-foreground text-xs">
+            {formatMessage(messages.expiresAt, {
+              date: new Intl.DateTimeFormat(locale, {
+                dateStyle: "long",
+              }).format(project.expiresAt),
+            })}
+          </p>
+        ) : null}
+      </header>
+      {selected && version ? (
+        <section className="flex flex-col gap-2">
+          <div className="flex items-center justify-between gap-2">
+            <h2 className="min-w-0 truncate font-medium text-sm">
+              {formatMessage(messages.title, {
+                deliverable: selected.title,
+                number: version.number,
+              })}
+            </h2>
+            <Badge variant="info-light">
+              {formatMessage(messages.version, { number: version.number })}
+            </Badge>
+          </div>
+          <div className="min-w-0 border">
+            <VideoPlayer
+              durationMs={version.durationMs}
+              frameRate={version.frameRate}
+              key={version.id}
+              locale={locale}
+              markers={NO_MARKERS}
+              messages={player}
+              onSourceError={onSourceError}
+              poster={version.thumbnailUrl}
+              src={version.playbackUrl}
+            />
+          </div>
+        </section>
+      ) : (
+        <div className="border">
+          <ReviewState
+            description={messages.emptyDescription}
+            icon={<ClapperboardIcon aria-hidden="true" />}
+            title={messages.emptyTitle}
+          />
+        </div>
+      )}
+      {project.deliverables.length > 0 ? (
+        <section className="flex flex-col gap-2">
+          <h2 className="font-medium text-sm">{messages.videos}</h2>
+          <ul className="grid gap-2 sm:grid-cols-2">
+            {project.deliverables.map((item) => (
+              <DeliverableItem
+                deliverable={item}
+                key={item.id}
+                messages={messages}
+                onSelect={setSelectedId}
+                selected={item.id === selected?.id}
+              />
+            ))}
+          </ul>
+        </section>
+      ) : null}
+    </>
+  );
+}
+
+export function ClientReviewView({
+  locale,
+  messages,
+  player,
+  token,
+}: {
+  locale: Locale;
+  messages: ReviewMessages;
+  player: PlayerMessages;
+  token: string;
+}) {
+  const project = useQuery(
+    orpc.review.resolveLink.queryOptions({
+      input: { token },
+      meta: { inlineError: true },
+      retry: retryTransient,
+      // Refetching signs new playback URLs, which would restart the video:
+      // only the player's error handler asks for fresh ones.
+      staleTime: Number.POSITIVE_INFINITY,
+    })
+  );
+  const { refetch } = project;
+  const handleRetry = useCallback(() => refetch(), [refetch]);
+
+  if (isExpiredLink(project.error)) {
+    return (
+      <ReviewState
+        description={messages.expired.description}
+        icon={<ClockAlertIcon aria-hidden="true" />}
+        title={messages.expired.title}
+      />
+    );
+  }
+  if (isInvalidLink(project.error)) {
+    return (
+      <ReviewState
+        description={messages.invalid.description}
+        icon={<LinkIcon aria-hidden="true" />}
+        title={messages.invalid.title}
+      />
+    );
+  }
+  if (project.isError) {
+    return (
+      <ReviewState
+        action={
+          <Button onClick={handleRetry} type="button" variant="outline">
+            {messages.retry}
+          </Button>
+        }
+        description={messages.loadErrorDescription}
+        icon={<CircleAlertIcon aria-hidden="true" />}
+        title={messages.loadErrorTitle}
+      />
+    );
+  }
+  if (!project.data) {
+    return <ClientReviewSkeleton label={messages.loading} />;
+  }
+  return (
+    <LinkedReview
+      locale={locale}
+      messages={messages}
+      onSourceError={handleRetry}
+      player={player}
+      project={project.data}
+    />
+  );
+}
