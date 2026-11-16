@@ -49,7 +49,7 @@ export function ResetPasswordForm({
         setSubmitError(
           error.code === "PASSWORD_TOO_SHORT"
             ? passwordMin
-            : authErrorMessage(error.code, messages.errors)
+            : authErrorMessage(error, messages.errors)
         );
         return;
       }
