@@ -42,6 +42,9 @@ export type Client = Awaited<
   ReturnType<AppRouterClient["client"]["list"]>
 >[number];
 
+// What create / update return: the client without the list counters.
+type SavedClient = Awaited<ReturnType<AppRouterClient["client"]["get"]>>;
+
 export type ClientSheetState =
   | { mode: "create" }
   | { clientId: string; mode: "view" }
@@ -136,7 +139,7 @@ function ClientForm({
   client: Client | null;
   messages: ClientsMessages;
   onCancel: () => void;
-  onSaved: (saved: Client, created: boolean) => void;
+  onSaved: (saved: SavedClient, created: boolean) => void;
 }) {
   const queryClient = useQueryClient();
   const [saveError, setSaveError] = useState(false);
@@ -420,7 +423,7 @@ function SheetBody({
   }, [close, onStateChange, state]);
 
   const handleSaved = useCallback(
-    (saved: Client, created: boolean) => {
+    (saved: SavedClient, created: boolean) => {
       const template = created
         ? messages.saved.created
         : messages.saved.updated;

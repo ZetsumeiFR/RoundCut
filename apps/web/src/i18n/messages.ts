@@ -337,10 +337,11 @@ const en = {
     cancel: "Cancel",
     close: "Close",
     columns: {
-      added: "Added",
+      activeProjects: "Active projects",
+      amount: "Amount",
       client: "Client",
       decider: "Decider",
-      reviewers: "Other reviewers",
+      extraRounds: "Extra rounds accepted",
     },
     countOne: "{count} client",
     countOther: "{count} clients",
@@ -415,6 +416,12 @@ const en = {
     saved: {
       created: "{name} added",
       updated: "{name} updated",
+    },
+    search: {
+      clear: "Clear search",
+      label: "Search clients",
+      noResults: "No client matches “{query}”",
+      placeholder: "Search a client, decider or email…",
     },
     title: "Clients",
     view: "View details",
@@ -860,10 +867,11 @@ const fr: Messages = {
     cancel: "Annuler",
     close: "Fermer",
     columns: {
-      added: "Ajouté le",
+      activeProjects: "Projets actifs",
+      amount: "Montant",
       client: "Client",
       decider: "Décideur",
-      reviewers: "Autres relecteurs",
+      extraRounds: "Tours sup. acceptés",
     },
     countOne: "{count} client",
     countOther: "{count} clients",
@@ -940,6 +948,12 @@ const fr: Messages = {
     saved: {
       created: "{name} ajouté",
       updated: "{name} mis à jour",
+    },
+    search: {
+      clear: "Effacer la recherche",
+      label: "Rechercher un client",
+      noResults: "Aucun client ne correspond à « {query} »",
+      placeholder: "Client, décideur ou email…",
     },
     title: "Clients",
     view: "Voir la fiche",

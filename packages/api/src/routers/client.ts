@@ -22,6 +22,15 @@ const toClient = (row: ClientRow) => ({
   updatedAt: row.updatedAt,
 });
 
+// List counters (CLI-02). Projects (PRJ-01) and extra round offers (EXTRA)
+// have no tables yet, so every client honestly has none; aggregate them here
+// once those tables land.
+const NO_ACTIVITY = {
+  acceptedExtraRounds: 0,
+  acceptedExtraRoundsAmountCents: 0,
+  activeProjects: 0,
+};
+
 async function workspaceIdOf(
   db: Database,
   owner: { id: string; name: string }
@@ -93,7 +102,7 @@ export const clientRouter = {
         and(eq(client.workspaceId, workspaceId), isNull(client.archivedAt))
       )
       .orderBy(asc(sql`lower(${client.name})`), asc(client.createdAt));
-    return rows.map(toClient);
+    return rows.map((row) => ({ ...toClient(row), ...NO_ACTIVITY }));
   }),
   update: protectedProcedure
     .input(clientUpdateSchema)
