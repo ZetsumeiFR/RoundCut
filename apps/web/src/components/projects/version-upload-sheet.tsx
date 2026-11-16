@@ -87,11 +87,16 @@ import { toast } from "sonner";
 
 import { formatMessage, type Messages } from "@/i18n/messages";
 import { client as api, orpc } from "@/utils/orpc";
-import { sendFile, type UploadPlan } from "./version-upload";
+import { captureThumbnail } from "./thumbnail-capture";
+import { VersionThumbnail } from "./version-thumbnail";
+import { sendFile, sendThumbnail, type UploadPlan } from "./version-upload";
 
 type ProjectsMessages = Messages["projects"];
 type VersionMessages = ProjectsMessages["versions"];
-type Version = Awaited<ReturnType<AppRouterClient["version"]["list"]>>[number];
+// What uploads carry; listed versions add their thumbnail.
+type Version = Awaited<
+  ReturnType<AppRouterClient["upload"]["createUpload"]>
+>["version"];
 // A finished upload is published: it carries the round it opened (VER-04).
 type Published = Awaited<
   ReturnType<AppRouterClient["upload"]["completeUpload"]>
@@ -106,6 +111,8 @@ export interface UploadTarget {
 interface Picked {
   file: File;
   frameRate: FrameRate | null;
+  // Drawn as soon as the file is picked (VER-06); null when it can't be.
+  thumbnail: Blob | null;
   video: VideoInfo;
 }
 
@@ -566,6 +573,20 @@ function InterruptedRow({
   );
 }
 
+function useObjectUrl(blob: Blob | null) {
+  const [url, setUrl] = useState<string>();
+  useEffect(() => {
+    if (!blob) {
+      setUrl(undefined);
+      return;
+    }
+    const objectUrl = URL.createObjectURL(blob);
+    setUrl(objectUrl);
+    return () => URL.revokeObjectURL(objectUrl);
+  }, [blob]);
+  return url;
+}
+
 function PickedFile({
   locale,
   messages,
@@ -584,7 +605,8 @@ function PickedFile({
   sending: boolean;
 }) {
   const selectId = useId();
-  const { file, frameRate, video } = picked;
+  const { file, frameRate, thumbnail, video } = picked;
+  const preview = useObjectUrl(thumbnail);
   const measured = video.frameRate;
   const detected = detectFrameRate(measured);
   const rateLabel = (rate: number) =>
@@ -613,8 +635,12 @@ function PickedFile({
   return (
     <div className="flex flex-col gap-4">
       <Attachment className="w-full" state="idle">
-        <AttachmentMedia>
-          <FileVideoIcon aria-hidden="true" />
+        <AttachmentMedia variant={preview ? "image" : "icon"}>
+          <VersionThumbnail
+            alt={formatMessage(messages.thumbnail.alt, { name: file.name })}
+            fallback={<FileVideoIcon aria-hidden="true" />}
+            src={preview}
+          />
         </AttachmentMedia>
         <AttachmentContent>
           <AttachmentTitle>{file.name}</AttachmentTitle>
@@ -625,6 +651,9 @@ function PickedFile({
               width: video.width,
             })}{" "}
             · {formatBytes(file.size, locale)}
+          </AttachmentDescription>
+          <AttachmentDescription className="whitespace-normal">
+            {thumbnail ? messages.thumbnail.taken : messages.thumbnail.missing}
           </AttachmentDescription>
         </AttachmentContent>
         <AttachmentActions>
@@ -774,8 +803,12 @@ function VersionList({
         return (
           <li key={item.id}>
             <Attachment className="w-full" state="done">
-              <AttachmentMedia>
-                <CheckIcon aria-hidden="true" />
+              <AttachmentMedia variant={item.thumbnailUrl ? "image" : "icon"}>
+                <VersionThumbnail
+                  alt=""
+                  fallback={<CheckIcon aria-hidden="true" />}
+                  src={item.thumbnailUrl}
+                />
               </AttachmentMedia>
               <AttachmentContent>
                 <AttachmentTitle>
@@ -862,11 +895,21 @@ function VersionUploadPanel({
       file: File,
       version: Version,
       plan: UploadPlan,
-      uploadedParts: number[]
+      uploadedParts: number[],
+      thumbnail?: Blob | null
     ) => {
       const abort = new AbortController();
       controller.current = abort;
       setUpload({ file, phase: "uploading", progress: 0, version });
+      // Sent alongside the video; a resumed upload draws it again. Without
+      // a thumbnail the version still publishes and shows an icon.
+      const thumbnailSent = (
+        thumbnail === undefined
+          ? captureThumbnail(file)
+          : Promise.resolve(thumbnail)
+      )
+        .then((blob) => blob && sendThumbnail(blob, version.id, abort.signal))
+        .catch(() => undefined);
       try {
         await sendFile({
           file,
@@ -881,6 +924,7 @@ function VersionUploadPanel({
           uploadedParts,
           versionId: version.id,
         });
+        await thumbnailSent;
         const ready = await api.upload.completeUpload({
           versionId: version.id,
         });
@@ -950,6 +994,7 @@ function VersionUploadPanel({
         setPicked({
           file,
           frameRate: detectFrameRate(inspected.video.frameRate),
+          thumbnail: await captureThumbnail(file),
           video: inspected.video,
         });
       } catch {
@@ -971,7 +1016,7 @@ function VersionUploadPanel({
     if (!picked?.frameRate) {
       return;
     }
-    const { file, frameRate } = picked;
+    const { file, frameRate, thumbnail } = picked;
     setProblem(undefined);
     setStarting(true);
     try {
@@ -983,7 +1028,7 @@ function VersionUploadPanel({
       });
       setStarting(false);
       setPicked(undefined);
-      await run(file, created.version, created.upload, []);
+      await run(file, created.version, created.upload, [], thumbnail);
     } catch (error) {
       setStarting(false);
       setProblem(

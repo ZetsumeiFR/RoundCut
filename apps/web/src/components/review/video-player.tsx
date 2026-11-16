@@ -397,6 +397,7 @@ export function VideoPlayer({
   markers,
   messages,
   onSourceError,
+  poster,
   src,
 }: {
   durationMs: number | null;
@@ -406,6 +407,8 @@ export function VideoPlayer({
   messages: PlayerMessages;
   // The signed URL expired or the file failed: fetch a fresh URL.
   onSourceError: () => void;
+  // The version's thumbnail (VER-06), shown until playback starts.
+  poster: string | null;
   src: string;
 }) {
   const frameRate = declaredFrameRate ?? FALLBACK_FRAME_RATE;
@@ -691,6 +694,7 @@ export function VideoPlayer({
             onSeeked={handleSeeked}
             onWaiting={handleWaiting}
             playsInline
+            poster={poster ?? undefined}
             preload="auto"
             ref={videoRef}
             src={src}

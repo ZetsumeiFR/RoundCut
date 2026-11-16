@@ -7,6 +7,7 @@ import { and, desc, eq } from "drizzle-orm";
 import z from "zod";
 
 import { protectedProcedure } from "../index";
+import type { Storage } from "../storage";
 import type { FrameRate } from "../timecode";
 import { getOrCreateWorkspace } from "./workspace";
 
@@ -26,6 +27,15 @@ export const toVersion = (row: VersionRow) => ({
   sizeBytes: row.sizeBytes,
   status: row.status,
   width: row.width,
+});
+
+// Thumbnails are private like videos: short-lived signed URLs (VER-06).
+export const thumbnailUrl = (storage: Storage, thumbnailKey: string | null) =>
+  thumbnailKey ? storage.signGet(thumbnailKey) : null;
+
+export const withThumbnail = async (storage: Storage, row: VersionRow) => ({
+  ...toVersion(row),
+  thumbnailUrl: await thumbnailUrl(storage, row.thumbnailKey),
 });
 
 // Deliverables and versions of other workspaces read as missing so their ids
@@ -78,7 +88,10 @@ export const versionRouter = {
         context.db,
         context.session.user
       );
-      return toVersion(await findOwnedVersion(context.db, workspace.id, id));
+      return await withThumbnail(
+        context.storage,
+        await findOwnedVersion(context.db, workspace.id, id)
+      );
     }),
   list: protectedProcedure
     .input(z.object({ deliverableId: z.string().min(1) }))
@@ -97,7 +110,9 @@ export const versionRouter = {
         .from(version)
         .where(eq(version.deliverableId, owned.id))
         .orderBy(desc(version.number));
-      return rows.map(toVersion);
+      return await Promise.all(
+        rows.map((row) => withThumbnail(context.storage, row))
+      );
     }),
   // Short-lived read URL (at most one hour), regenerated on demand.
   playbackUrl: protectedProcedure

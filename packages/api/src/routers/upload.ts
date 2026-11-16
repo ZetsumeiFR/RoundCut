@@ -7,16 +7,25 @@ import z from "zod";
 
 import { protectedProcedure } from "../index";
 import { isSupportedMedia, readMedia } from "../media";
+import type { Storage } from "../storage";
 import {
   createUploadSchema,
   MULTIPART_THRESHOLD_BYTES,
   PART_SIZE_BYTES,
   partCount,
   signPartsSchema,
+  THUMBNAIL_CONTENT_TYPE,
+  THUMBNAIL_MAX_BYTES,
+  thumbnailKeyOf,
   UPLOAD_FORMATS,
   uploadFormat,
 } from "../upload";
-import { findOwnedDeliverable, findOwnedVersion, toVersion } from "./version";
+import {
+  findOwnedDeliverable,
+  findOwnedVersion,
+  toVersion,
+  withThumbnail,
+} from "./version";
 import { getOrCreateWorkspace } from "./workspace";
 
 type VersionRow = typeof version.$inferSelect;
@@ -36,6 +45,28 @@ const requireUploading = (row: VersionRow) => {
   }
   return row;
 };
+
+// JPEG files start with the SOI marker followed by another marker.
+const JPEG_SIGNATURE = [0xff, 0xd8, 0xff];
+
+// The thumbnail is written by the browser through a presigned URL, so the
+// stored object is only kept when it is a reasonably sized JPEG. A version
+// without one still publishes: the interface falls back to an icon.
+async function storedThumbnail(storage: Storage, r2Key: string) {
+  const key = thumbnailKeyOf(r2Key);
+  const size = await storage.objectSize(key);
+  if (size === null) {
+    return null;
+  }
+  if (size >= JPEG_SIGNATURE.length && size <= THUMBNAIL_MAX_BYTES) {
+    const head = await storage.readRange(key, 0, JPEG_SIGNATURE.length);
+    if (JPEG_SIGNATURE.every((byte, index) => head[index] === byte)) {
+      return key;
+    }
+  }
+  await storage.deleteObject(key);
+  return null;
+}
 
 const multipartPlan = (row: VersionRow) => ({
   kind: "multipart" as const,
@@ -59,6 +90,7 @@ export const uploadRouter = {
       } else {
         await context.storage.deleteObject(row.r2Key);
       }
+      await context.storage.deleteObject(thumbnailKeyOf(row.r2Key));
       await context.db.delete(version).where(eq(version.id, row.id));
       return { id: row.id };
     }),
@@ -102,6 +134,7 @@ export const uploadRouter = {
       );
       if (!(format && media?.video && isSupportedMedia(format, media.tracks))) {
         await context.storage.deleteObject(row.r2Key);
+        await context.storage.deleteObject(thumbnailKeyOf(row.r2Key));
         await context.db.delete(version).where(eq(version.id, row.id));
         throw new ORPCError("UNSUPPORTED_MEDIA_TYPE", {
           data: { tracks: media?.tracks ?? null },
@@ -110,9 +143,10 @@ export const uploadRouter = {
         });
       }
       const { video } = media;
+      const thumbnailKey = await storedThumbnail(context.storage, row.r2Key);
       // Publishing the version opens the next round and closes the running
       // one (§7.2): all or nothing, so a version never lacks its round.
-      return await context.db.transaction(async (tx) => {
+      const published = await context.db.transaction(async (tx) => {
         const [ready] = await tx
           .update(version)
           // The stored file's own header is the record, whatever the browser
@@ -121,6 +155,7 @@ export const uploadRouter = {
             durationMs: video.durationMs,
             height: video.height,
             status: "ready",
+            thumbnailKey,
             uploadId: null,
             width: video.width,
           })
@@ -159,8 +194,12 @@ export const uploadRouter = {
         if (!opened) {
           throw new Error("Round insert returned no row");
         }
-        return { ...toVersion(ready), round: opened };
+        return { ready, round: opened };
       });
+      return {
+        ...(await withThumbnail(context.storage, published.ready)),
+        round: published.round,
+      };
     }),
   createUpload: protectedProcedure
     .input(createUploadSchema)
@@ -310,5 +349,24 @@ export const uploadRouter = {
           url: await context.storage.signPart(row.r2Key, uploadId, partNumber),
         }))
       );
+    }),
+  // Where the browser stores the thumbnail it drew (VER-06); completeUpload
+  // checks what was stored.
+  signThumbnail: protectedProcedure
+    .input(versionInput)
+    .handler(async ({ context, input: { versionId } }) => {
+      const workspace = await getOrCreateWorkspace(
+        context.db,
+        context.session.user
+      );
+      const row = requireUploading(
+        await findOwnedVersion(context.db, workspace.id, versionId)
+      );
+      return {
+        url: await context.storage.signPut(
+          thumbnailKeyOf(row.r2Key),
+          THUMBNAIL_CONTENT_TYPE
+        ),
+      };
     }),
 };
