@@ -12,9 +12,17 @@ export interface Notifications {
   email: EmailConfig;
 }
 
+// Where a request came from, kept in agreement records (EXTRA-03). Null when
+// unknown, as for in-process calls from Server Components.
+export interface RequestOrigin {
+  ip: string | null;
+  userAgent: string | null;
+}
+
 export interface Context {
   db: Database;
   notifications: Notifications;
+  request: RequestOrigin;
   // Headers merged into the response by oRPC's ResponseHeadersPlugin.
   resHeaders?: Headers;
   reviewerCookies: ReviewerCookies;

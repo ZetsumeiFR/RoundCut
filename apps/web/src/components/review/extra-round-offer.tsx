@@ -121,6 +121,32 @@ export function ExtraRoundOffer({
     style: "percent",
   }).format(current.vatRateBps / BASIS_POINTS);
   const title = formatMessage(messages.title, { round: current.round });
+  const description = formatMessage(messages.description, {
+    workspace: workspaceName,
+  });
+  const vatLabel = formatMessage(messages.vat, { rate });
+  const vat = amount(current.vatCents);
+  const agreement = formatMessage(messages.agreement, {
+    delay,
+    gross,
+    net,
+    round: current.round,
+    workspace: workspaceName,
+  });
+  const payment = current.requirePayment
+    ? messages.paymentRequired
+    : formatMessage(messages.paymentNotRequired, { workspace: workspaceName });
+  // The offer as displayed, kept in the agreement record (EXTRA-03).
+  const shownLines = [
+    title,
+    description,
+    `${messages.net}: ${net}`,
+    `${vatLabel}: ${vat}`,
+    `${messages.total}: ${gross}`,
+    `${messages.delay}: +${delay}`,
+    agreement,
+    payment,
+  ];
 
   return (
     <section aria-label={title}>
@@ -134,36 +160,17 @@ export function ExtraRoundOffer({
           )}
         </FrameHeader>
         <FramePanel className="flex flex-col gap-3">
-          <p className="text-sm">
-            {formatMessage(messages.description, { workspace: workspaceName })}
-          </p>
+          <p className="text-sm">{description}</p>
           <dl className="flex flex-col gap-1.5 text-sm">
             <AmountRow label={messages.net} value={net} />
-            <AmountRow
-              label={formatMessage(messages.vat, { rate })}
-              value={amount(current.vatCents)}
-            />
+            <AmountRow label={vatLabel} value={vat} />
             <AmountRow label={messages.total} strong value={gross} />
             <AmountRow label={messages.delay} value={`+${delay}`} />
           </dl>
         </FramePanel>
         <FrameFooter className="flex flex-col gap-1 text-muted-foreground text-xs">
-          <p>
-            {formatMessage(messages.agreement, {
-              delay,
-              gross,
-              net,
-              round: current.round,
-              workspace: workspaceName,
-            })}
-          </p>
-          <p>
-            {current.requirePayment
-              ? messages.paymentRequired
-              : formatMessage(messages.paymentNotRequired, {
-                  workspace: workspaceName,
-                })}
-          </p>
+          <p>{agreement}</p>
+          <p>{payment}</p>
           {current.status === "proposed" ? <p>{messages.kept}</p> : null}
           <p>
             {formatMessage(messages.validUntil, {
@@ -179,6 +186,7 @@ export function ExtraRoundOffer({
             locale={locale}
             messages={messages.answer}
             offer={current}
+            shownLines={shownLines}
             token={token}
             versionId={versionId}
           />

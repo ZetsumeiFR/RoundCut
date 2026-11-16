@@ -29,6 +29,7 @@ import { client as api, orpc } from "@/utils/orpc";
 
 type AnswerMessages = Messages["review"]["extraRound"]["answer"];
 type Offer = NonNullable<Awaited<ReturnType<typeof api.extraRound.getOffer>>>;
+type Consent = NonNullable<Offer["consent"]>;
 type Step = "idle" | "onlyDecider" | "code";
 
 const DIGITS_ONLY = "^\\d+$";
@@ -67,6 +68,51 @@ function errorMessage(
   }
 }
 
+function RecordRow({ children, label }: { children: string; label: string }) {
+  return (
+    <div className="flex flex-col gap-0.5 sm:flex-row sm:gap-3">
+      <dt className="shrink-0 text-muted-foreground sm:w-36">{label}</dt>
+      <dd className="min-w-0 break-all">{children}</dd>
+    </div>
+  );
+}
+
+// The immutable agreement record (EXTRA-03): who agreed, when in UTC, and
+// the SHA-256 fingerprint sealing what was shown.
+function ConsentRecord({
+  consent,
+  locale,
+  messages,
+}: {
+  consent: Consent;
+  locale: Locale;
+  messages: AnswerMessages["record"];
+}) {
+  const utc = new Intl.DateTimeFormat(locale, {
+    dateStyle: "long",
+    timeStyle: "long",
+    timeZone: "UTC",
+  });
+  return (
+    <section
+      aria-label={messages.title}
+      className="flex flex-col gap-2 rounded-md border p-3 text-xs"
+    >
+      <h3 className="font-medium text-sm">{messages.title}</h3>
+      <dl className="flex flex-col gap-1.5">
+        <RecordRow label={messages.email}>{consent.email}</RecordRow>
+        <RecordRow label={messages.time}>
+          {utc.format(consent.createdAt)}
+        </RecordRow>
+        <RecordRow label={messages.fingerprint}>
+          {consent.snapshotHash}
+        </RecordRow>
+      </dl>
+      <p className="text-muted-foreground">{messages.sealed}</p>
+    </section>
+  );
+}
+
 // The decider's answer to the extra round offer (EXTRA-02, E12): "Accept"
 // emails them a 6-digit code, then they tick the agreement and type the code.
 // Any other reviewer is told only the decider can accept, and can forward the
@@ -75,12 +121,15 @@ export function ExtraRoundAgreement({
   locale,
   messages,
   offer,
+  shownLines,
   token,
   versionId,
 }: {
   locale: Locale;
   messages: AnswerMessages;
   offer: Offer;
+  // The offer's text and amounts as displayed, for the agreement record.
+  shownLines: string[];
   token: string;
   versionId: string;
 }) {
@@ -163,6 +212,7 @@ export function ExtraRoundAgreement({
           agreed: true,
           code,
           offerId: offer.id,
+          shown: { lines: [...shownLines, messages.consent], locale },
           token,
           versionId,
         });
@@ -177,21 +227,40 @@ export function ExtraRoundAgreement({
         setBusy(false);
       }
     },
-    [code, consent, locale, messages, offer.id, refreshOffer, token, versionId]
+    [
+      code,
+      consent,
+      locale,
+      messages,
+      offer.id,
+      refreshOffer,
+      shownLines,
+      token,
+      versionId,
+    ]
   );
 
   if (offer.status === "accepted" && offer.acceptedAt) {
     return (
-      <Alert variant="success">
-        <CircleCheckIcon aria-hidden="true" />
-        <AlertDescription>
-          {formatMessage(messages.accepted, {
-            date: dateTime.format(offer.acceptedAt),
-            name: offer.acceptedByName ?? offer.deciderName,
-            round: offer.round,
-          })}
-        </AlertDescription>
-      </Alert>
+      <div className="flex flex-col gap-3">
+        <Alert variant="success">
+          <CircleCheckIcon aria-hidden="true" />
+          <AlertDescription>
+            {formatMessage(messages.accepted, {
+              date: dateTime.format(offer.acceptedAt),
+              name: offer.acceptedByName ?? offer.deciderName,
+              round: offer.round,
+            })}
+          </AlertDescription>
+        </Alert>
+        {offer.consent ? (
+          <ConsentRecord
+            consent={offer.consent}
+            locale={locale}
+            messages={messages.record}
+          />
+        ) : null}
+      </div>
     );
   }
 

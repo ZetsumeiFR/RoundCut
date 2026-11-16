@@ -1,6 +1,7 @@
 export * from "./auth";
 export * from "./client";
 export * from "./comment";
+export * from "./consent-record";
 export * from "./deliverable";
 export * from "./extra-round-offer";
 export * from "./project";
