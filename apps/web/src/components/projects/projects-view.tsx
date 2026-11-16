@@ -68,6 +68,7 @@ import {
   PlusIcon,
 } from "lucide-react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useCallback, useMemo, useState } from "react";
 import { toast } from "sonner";
 
@@ -77,6 +78,7 @@ import { formatMessage, type Messages } from "@/i18n/messages";
 import { client as api, orpc } from "@/utils/orpc";
 import { deliverableCountLabel } from "./deliverable-form";
 import { DeliverablesSheet } from "./deliverables-sheet";
+import type { PlanTemplateId } from "./plan-templates";
 import { formatTargetDate, type Project, ProjectSheet } from "./project-sheet";
 
 type ProjectsMessages = Messages["projects"];
@@ -515,20 +517,35 @@ function ProjectsGrid({
 }
 
 export function ProjectsView({
+  initialTemplate,
   locale,
   messages,
   terms,
 }: {
+  initialTemplate: PlanTemplateId | null;
   locale: Locale;
   messages: ProjectsMessages;
   terms: TermsMessages;
 }) {
+  const router = useRouter();
   const queryClient = useQueryClient();
   const projects = useQuery(orpc.project.list.queryOptions());
   const clients = useQuery(orpc.client.list.queryOptions());
   const workspace = useQuery(orpc.workspace.get.queryOptions());
-  const [sheetOpen, setSheetOpen] = useState(false);
+  // A plan template picked from the dashboard opens the creation sheet.
+  const [template, setTemplate] = useState(initialTemplate);
+  const [sheetOpen, setSheetOpen] = useState(initialTemplate !== null);
   const openCreate = useCallback(() => setSheetOpen(true), []);
+  const handleSheetOpenChange = useCallback(
+    (open: boolean) => {
+      setSheetOpen(open);
+      if (!open && template) {
+        setTemplate(null);
+        router.replace("/projects", { scroll: false });
+      }
+    },
+    [router, template]
+  );
   const [deliverablesProjectId, setDeliverablesProjectId] = useState<
     string | null
   >(null);
@@ -695,8 +712,9 @@ export function ProjectsView({
           clients={clients.data}
           locale={locale}
           messages={messages}
-          onOpenChange={setSheetOpen}
+          onOpenChange={handleSheetOpenChange}
           open={sheetOpen}
+          template={template}
           terms={terms}
           workspace={workspace.data}
         />

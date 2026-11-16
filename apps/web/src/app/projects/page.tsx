@@ -1,12 +1,15 @@
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 
+import { parsePlanTemplate } from "@/components/projects/plan-templates";
 import { ProjectsView } from "@/components/projects/projects-view";
 import { getLocale } from "@/i18n/get-locale";
 import { getMessages } from "@/i18n/messages";
 import { auth } from "@/services";
 
-export default async function ProjectsPage() {
+export default async function ProjectsPage({
+  searchParams,
+}: PageProps<"/projects">) {
   const session = await auth.api.getSession({ headers: await headers() });
   if (!session?.user) {
     redirect("/login?view=sign-in");
@@ -15,12 +18,13 @@ export default async function ProjectsPage() {
     redirect("/onboarding");
   }
 
-  const locale = await getLocale();
+  const [locale, { template }] = await Promise.all([getLocale(), searchParams]);
   const messages = getMessages(locale);
 
   return (
     <main className="mx-auto flex w-full min-w-0 max-w-6xl flex-col gap-6 px-4 py-6 sm:px-8 sm:py-10">
       <ProjectsView
+        initialTemplate={parsePlanTemplate(template)}
         locale={locale}
         messages={messages.projects}
         terms={messages.account.terms}

@@ -78,6 +78,11 @@ import {
   type DeliverableItem,
   DeliverableList,
 } from "./deliverable-form";
+import {
+  isPresetPlanTemplate,
+  type PlanTemplateId,
+  PRESET_PLAN_TEMPLATES,
+} from "./plan-templates";
 
 type ProjectsMessages = Messages["projects"];
 type FormMessages = ProjectsMessages["form"];
@@ -501,6 +506,7 @@ function ProjectForm({
   messages,
   onCancel,
   onCreated,
+  template,
   terms,
   workspace,
 }: {
@@ -509,6 +515,7 @@ function ProjectForm({
   messages: ProjectsMessages;
   onCancel: () => void;
   onCreated: (project: Project) => void;
+  template: PlanTemplateId | null;
   terms: TermsMessages;
   workspace: WorkspaceTerms;
 }) {
@@ -521,14 +528,21 @@ function ProjectForm({
     [formMessages.errors, locale, terms]
   );
 
+  const presetTemplate =
+    template && isPresetPlanTemplate(template) ? template : null;
   const defaultValues: ProjectFormValues = {
     clientId: clients.length === 1 ? (clients[0]?.id ?? "") : "",
-    customTerms: false,
+    customTerms: presetTemplate !== null,
     deliverables: [],
     flatFee: "",
     name: "",
     targetDate: "",
-    terms: toTermsFormValues(workspace.revisionTerms, locale),
+    terms: toTermsFormValues(
+      presetTemplate
+        ? PRESET_PLAN_TEMPLATES[presetTemplate]
+        : workspace.revisionTerms,
+      locale
+    ),
   };
 
   const form = useAppForm({
@@ -619,11 +633,16 @@ function ProjectForm({
     [form]
   );
 
-  const inheritanceHint = selectedClient?.revisionTerms
+  let inheritanceHint = selectedClient?.revisionTerms
     ? formatMessage(formMessages.customTermsClient, {
         client: selectedClient.name,
       })
     : formMessages.customTermsWorkspace;
+  if (presetTemplate) {
+    inheritanceHint = formatMessage(formMessages.templateApplied, {
+      template: messages.templates[presetTemplate].name,
+    });
+  }
 
   return (
     <form
@@ -805,6 +824,7 @@ export function ProjectSheet({
   messages,
   onOpenChange,
   open,
+  template = null,
   terms,
   workspace,
 }: {
@@ -813,6 +833,7 @@ export function ProjectSheet({
   messages: ProjectsMessages;
   onOpenChange: (open: boolean) => void;
   open: boolean;
+  template?: PlanTemplateId | null;
   terms: TermsMessages;
   workspace: WorkspaceTerms;
 }) {
@@ -838,6 +859,7 @@ export function ProjectSheet({
             messages={messages}
             onCancel={close}
             onCreated={handleCreated}
+            template={template}
             terms={terms}
             workspace={workspace}
           />
