@@ -1,5 +1,6 @@
 import z from "zod";
 
+import { deliverableSchema, PROJECT_MAX_DELIVERABLES } from "./deliverable";
 import { revisionTermsSchema } from "./workspace";
 
 export const PROJECT_NAME_MAX_LENGTH = 120;
@@ -7,6 +8,11 @@ export const PROJECT_FLAT_FEE_MAX_CENTS = 100_000_000;
 
 export const projectSchema = z.object({
   clientId: z.string().min(1),
+  // Deliverables added from the creation sheet, kept in this order.
+  deliverables: z
+    .array(deliverableSchema)
+    .max(PROJECT_MAX_DELIVERABLES)
+    .default([]),
   // Optional, only used by the billing export.
   flatFeeCents: z.int().min(0).max(PROJECT_FLAT_FEE_MAX_CENTS).nullable(),
   name: z.string().trim().min(1).max(PROJECT_NAME_MAX_LENGTH),

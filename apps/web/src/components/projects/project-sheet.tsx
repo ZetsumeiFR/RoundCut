@@ -1,6 +1,10 @@
 "use client";
 
 import {
+  type DeliverableInput,
+  PROJECT_MAX_DELIVERABLES,
+} from "@roundcut/api/deliverable";
+import {
   PROJECT_FLAT_FEE_MAX_CENTS,
   PROJECT_NAME_MAX_LENGTH,
 } from "@roundcut/api/project";
@@ -29,6 +33,7 @@ import {
 } from "@roundcut/ui/components/dialog";
 import {
   Field,
+  FieldDescription,
   FieldError,
   FieldGroup,
   FieldLabel,
@@ -68,6 +73,11 @@ import { useAppForm } from "@/components/auth/auth-form";
 import type { Client, WorkspaceTerms } from "@/components/clients/client-sheet";
 import { formatMessage, type Messages } from "@/i18n/messages";
 import { client as api, orpc } from "@/utils/orpc";
+import {
+  DeliverableForm,
+  type DeliverableItem,
+  DeliverableList,
+} from "./deliverable-form";
 
 type ProjectsMessages = Messages["projects"];
 type FormMessages = ProjectsMessages["form"];
@@ -143,6 +153,8 @@ function projectFormSchema(
     .object({
       clientId: z.string().min(1, errors.clientRequired),
       customTerms: z.boolean(),
+      // Each deliverable is validated by its own form when it's added.
+      deliverables: z.array(z.custom<DeliverableItem>()),
       flatFee: z.string().refine(
         isFlatFee,
         formatMessage(errors.flatFeeInvalid, {
@@ -185,6 +197,8 @@ const selectCustomTerms = (state: { values: ProjectFormValues }) =>
   state.values.customTerms;
 const selectClientId = (state: { values: ProjectFormValues }) =>
   state.values.clientId;
+const selectDeliverables = (state: { values: ProjectFormValues }) =>
+  state.values.deliverables;
 
 const clientSearchText = (client: Client) =>
   `${client.name} ${client.deciderName}`;
@@ -510,6 +524,7 @@ function ProjectForm({
   const defaultValues: ProjectFormValues = {
     clientId: clients.length === 1 ? (clients[0]?.id ?? "") : "",
     customTerms: false,
+    deliverables: [],
     flatFee: "",
     name: "",
     targetDate: "",
@@ -522,6 +537,7 @@ function ProjectForm({
       value: {
         clientId: ownerId,
         customTerms,
+        deliverables,
         flatFee,
         name,
         targetDate,
@@ -532,6 +548,7 @@ function ProjectForm({
       try {
         const created = await api.project.create({
           clientId: ownerId,
+          deliverables: deliverables.map(({ id: _id, ...item }) => item),
           flatFeeCents: flatFee.trim() ? toPriceCents(flatFee) : null,
           name,
           revisionTerms: customTerms ? toRevisionTerms(values) : null,
@@ -552,6 +569,26 @@ function ProjectForm({
   const showTermsFields = useStore(form.store, selectCustomTerms);
   const clientId = useStore(form.store, selectClientId);
   const selectedClient = clients.find((client) => client.id === clientId);
+  const addedDeliverables = useStore(form.store, selectDeliverables);
+  const { deliverables: deliverableMessages } = messages;
+
+  const handleAddDeliverable = useCallback(
+    (values: DeliverableInput) => {
+      form.pushFieldValue("deliverables", {
+        ...values,
+        id: crypto.randomUUID(),
+      });
+      return true;
+    },
+    [form]
+  );
+  const handleRemoveDeliverable = useCallback(
+    (id: string) =>
+      form.setFieldValue("deliverables", (items) =>
+        items.filter((item) => item.id !== id)
+      ),
+    [form]
+  );
 
   // Turning custom terms on starts from what the project would inherit.
   const handleCustomTermsChange = useCallback(
@@ -657,6 +694,32 @@ function ProjectForm({
               )}
             </form.AppField>
           </FieldGroup>
+          <FieldSet className="gap-3">
+            <FieldLegend className="mb-0" variant="label">
+              {deliverableMessages.legend}
+            </FieldLegend>
+            <FieldDescription>
+              {deliverableMessages.createDescription}
+            </FieldDescription>
+            {addedDeliverables.length > 0 ? (
+              <DeliverableList
+                deliverables={addedDeliverables}
+                messages={deliverableMessages}
+                onRemove={handleRemoveDeliverable}
+              />
+            ) : null}
+            <DeliverableForm
+              limitMessage={
+                addedDeliverables.length >= PROJECT_MAX_DELIVERABLES
+                  ? formatMessage(deliverableMessages.errors.limit, {
+                      max: PROJECT_MAX_DELIVERABLES,
+                    })
+                  : undefined
+              }
+              messages={deliverableMessages}
+              onAdd={handleAddDeliverable}
+            />
+          </FieldSet>
           <FieldSet className="gap-4">
             <FieldLegend variant="label">{terms.title}</FieldLegend>
             <form.AppField listeners={customTermsListeners} name="customTerms">
