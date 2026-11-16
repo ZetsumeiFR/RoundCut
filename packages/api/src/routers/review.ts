@@ -243,8 +243,9 @@ export const reviewRouter = {
     };
   }),
   // The review round of a version with the size of its batch, the comments
-  // waiting for the next round (REV-06) and the project's included rounds,
-  // for the reviewer's submit button and banner (REV-05).
+  // waiting for the next round (REV-06), the project's included rounds and
+  // the decider's approval, for the reviewer's submit button (REV-05) and
+  // permanent round banner (REV-07).
   round: publicProcedure
     .input(versionInput)
     .use(requireReviewLink)
@@ -258,6 +259,8 @@ export const reviewRouter = {
         .where(eq(project.id, projectId));
       const current = await findVersionRound(context.db, target.id);
       return {
+        // Final approval (date and decider) is recorded by APPR-01 (#54).
+        approval: null as { approvedAt: Date; approverName: string } | null,
         includedRounds: terms?.termsSnapshot.includedRounds ?? 0,
         pendingCount: await pendingSize(context.db, target.id),
         round: current
