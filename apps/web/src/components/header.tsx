@@ -1,5 +1,6 @@
 "use client";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 
 import type { Messages } from "@/i18n/messages";
 
@@ -11,6 +12,12 @@ export default function Header({
 }: {
   menuMessages: Messages["account"]["menu"];
 }) {
+  const pathname = usePathname();
+  // Client review pages (/r/[token]) stand alone, without the app shell.
+  if (pathname.startsWith("/r/")) {
+    return null;
+  }
+
   const links = [
     { label: "Home", to: "/" },
     { label: "Dashboard", to: "/dashboard" },

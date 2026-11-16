@@ -798,6 +798,51 @@ const en = {
       },
     },
     retry: "Try again",
+    reviewLink: {
+      action: "Review link",
+      active: "Active",
+      close: "Close",
+      copied: "Link copied",
+      copy: "Copy the link",
+      copyError: "Couldn't copy the link. Select it and copy it manually.",
+      createdAt: "Created on {date}",
+      description:
+        "Your client opens this private link to watch the latest versions, without an account.",
+      emptyDescription:
+        "Generate a private link to share this project with your client.",
+      emptyTitle: "No review link yet",
+      error: "Couldn't update the review link. Try again.",
+      expired: "Expired",
+      expiredOn: "Expired on {date}",
+      expiresAt: "Expires on {date}",
+      expiry: {
+        days: "Expires in {count} days",
+        label: "Expiry",
+        never: "No expiry",
+        saved: "Expiry updated",
+      },
+      generate: "Generate the link",
+      hiddenDescription:
+        "For security, the full link is only shown when it's generated. Regenerate it to get a new one: the current link will stop working.",
+      loadError: "Couldn't load the review link.",
+      loading: "Loading the review link…",
+      newLinkHint: "Copy it now: it won't be shown again.",
+      regenerate: "Regenerate",
+      regenerateConfirm: {
+        description:
+          "The current link stops working at once. Send the new one to your client.",
+        title: "Regenerate the review link?",
+      },
+      revoke: "Revoke",
+      revokeConfirm: {
+        description:
+          "Your client won't be able to open it anymore. You can generate a new link at any time.",
+        title: "Revoke the review link?",
+      },
+      revoked: "Review link revoked",
+      title: "Review link",
+      urlLabel: "Review link address",
+    },
     saved: "{name} created",
     status: {
       approved: "Approved",
@@ -968,6 +1013,31 @@ const en = {
       upload: "Upload a version of {title}",
       version: "V{number}",
     },
+  },
+  review: {
+    emptyDescription:
+      "Your editor hasn't published a version yet. Come back once you've been told it's ready.",
+    emptyTitle: "Nothing to review yet",
+    expired: {
+      description: "Ask your editor for a new review link.",
+      title: "This link has expired",
+    },
+    expiresAt: "Link valid until {date}",
+    invalid: {
+      description:
+        "It may be mistyped or have been replaced. Ask your editor for the current review link.",
+      title: "This link isn't valid",
+    },
+    loadErrorDescription: "Check your connection and try again.",
+    loadErrorTitle: "Couldn't load the review",
+    loading: "Loading the review…",
+    noVersion: "No version yet",
+    play: "Watch {title}",
+    retry: "Try again",
+    sharedBy: "Shared by {workspace} · {client}",
+    title: "{deliverable} · V{number}",
+    version: "V{number}",
+    videos: "Videos",
   },
 };
 
@@ -1791,6 +1861,52 @@ const fr: Messages = {
       },
     },
     retry: "Réessayer",
+    reviewLink: {
+      action: "Lien de revue",
+      active: "Actif",
+      close: "Fermer",
+      copied: "Lien copié",
+      copy: "Copier le lien",
+      copyError:
+        "Impossible de copier le lien. Sélectionnez-le et copiez-le à la main.",
+      createdAt: "Créé le {date}",
+      description:
+        "Votre client ouvre ce lien privé pour regarder les dernières versions, sans créer de compte.",
+      emptyDescription:
+        "Générez un lien privé pour partager ce projet avec votre client.",
+      emptyTitle: "Aucun lien de revue",
+      error: "Impossible de mettre à jour le lien de revue. Réessayez.",
+      expired: "Expiré",
+      expiredOn: "Expiré le {date}",
+      expiresAt: "Expire le {date}",
+      expiry: {
+        days: "Expire dans {count} jours",
+        label: "Expiration",
+        never: "Sans expiration",
+        saved: "Expiration mise à jour",
+      },
+      generate: "Générer le lien",
+      hiddenDescription:
+        "Par sécurité, le lien complet n'est affiché qu'à sa création. Régénérez-le pour en obtenir un nouveau : le lien actuel cessera de fonctionner.",
+      loadError: "Impossible de charger le lien de revue.",
+      loading: "Chargement du lien de revue…",
+      newLinkHint: "Copiez-le maintenant : il ne sera plus affiché.",
+      regenerate: "Régénérer",
+      regenerateConfirm: {
+        description:
+          "Le lien actuel cesse de fonctionner immédiatement. Envoyez le nouveau à votre client.",
+        title: "Régénérer le lien de revue ?",
+      },
+      revoke: "Révoquer",
+      revokeConfirm: {
+        description:
+          "Votre client ne pourra plus l'ouvrir. Vous pourrez générer un nouveau lien à tout moment.",
+        title: "Révoquer le lien de revue ?",
+      },
+      revoked: "Lien de revue révoqué",
+      title: "Lien de revue",
+      urlLabel: "Adresse du lien de revue",
+    },
     saved: "{name} créé",
     status: {
       approved: "Validé",
@@ -1964,6 +2080,31 @@ const fr: Messages = {
       upload: "Uploader une version de {title}",
       version: "V{number}",
     },
+  },
+  review: {
+    emptyDescription:
+      "Votre monteur n'a pas encore publié de version. Revenez lorsqu'il vous aura prévenu.",
+    emptyTitle: "Rien à revoir pour l'instant",
+    expired: {
+      description: "Demandez un nouveau lien de revue à votre monteur.",
+      title: "Ce lien a expiré",
+    },
+    expiresAt: "Lien valable jusqu'au {date}",
+    invalid: {
+      description:
+        "Il est peut-être mal saisi ou a été remplacé. Demandez le lien de revue actuel à votre monteur.",
+      title: "Ce lien n'est pas valide",
+    },
+    loadErrorDescription: "Vérifiez votre connexion et réessayez.",
+    loadErrorTitle: "Impossible de charger la revue",
+    loading: "Chargement de la revue…",
+    noVersion: "Pas encore de version",
+    play: "Regarder {title}",
+    retry: "Réessayer",
+    sharedBy: "Partagé par {workspace} · {client}",
+    title: "{deliverable} · V{number}",
+    version: "V{number}",
+    videos: "Vidéos",
   },
 };
 

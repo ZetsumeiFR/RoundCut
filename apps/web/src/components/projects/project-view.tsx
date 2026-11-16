@@ -58,6 +58,7 @@ import {
   CopyIcon,
   FolderIcon,
   HistoryIcon,
+  LinkIcon,
   PlayIcon,
   PlusIcon,
   SearchXIcon,
@@ -78,6 +79,7 @@ import { DeliverablesSheet } from "./deliverables-sheet";
 import { DuplicateProjectDialog } from "./duplicate-project-dialog";
 import { formatTargetDate } from "./project-sheet";
 import { STATUS_BADGES } from "./projects-view";
+import { ReviewLinkDialog } from "./review-link-dialog";
 import { VersionThumbnail } from "./version-thumbnail";
 import { type UploadTarget, VersionUploadSheet } from "./version-upload-sheet";
 
@@ -530,11 +532,13 @@ function ProjectHeader({
   locale,
   messages,
   onDuplicate,
+  onReviewLink,
   project,
 }: {
   locale: Locale;
   messages: ProjectsMessages;
   onDuplicate: () => void;
+  onReviewLink: () => void;
   project: ProjectDetails;
 }) {
   return (
@@ -563,15 +567,16 @@ function ProjectHeader({
         <Badge size="lg" variant={STATUS_BADGES[project.status]}>
           {messages.status[project.status]}
         </Badge>
-        <Button
-          className="ms-auto"
-          onClick={onDuplicate}
-          type="button"
-          variant="outline"
-        >
-          <CopyIcon aria-hidden="true" data-icon="inline-start" />
-          {messages.duplicate.action}
-        </Button>
+        <div className="ms-auto flex flex-wrap gap-2">
+          <Button onClick={onDuplicate} type="button" variant="outline">
+            <CopyIcon aria-hidden="true" data-icon="inline-start" />
+            {messages.duplicate.action}
+          </Button>
+          <Button onClick={onReviewLink} type="button">
+            <LinkIcon aria-hidden="true" data-icon="inline-start" />
+            {messages.reviewLink.action}
+          </Button>
+        </div>
       </div>
       <p className="text-muted-foreground text-sm">
         {project.client.name}
@@ -632,6 +637,8 @@ export function ProjectView({
   const openDeliverables = useCallback(() => setDeliverablesOpen(true), []);
   const [duplicateOpen, setDuplicateOpen] = useState(false);
   const openDuplicate = useCallback(() => setDuplicateOpen(true), []);
+  const [reviewLinkOpen, setReviewLinkOpen] = useState(false);
+  const openReviewLink = useCallback(() => setReviewLinkOpen(true), []);
   const [uploadTarget, setUploadTarget] = useState<UploadTarget>();
   const closeUpload = useCallback((open: boolean) => {
     if (!open) {
@@ -685,6 +692,7 @@ export function ProjectView({
         locale={locale}
         messages={messages}
         onDuplicate={openDuplicate}
+        onReviewLink={openReviewLink}
         project={project.data}
       />
       <Tabs defaultValue="deliverables">
@@ -743,6 +751,15 @@ export function ProjectView({
         onOpenChange={setDuplicateOpen}
         open={duplicateOpen}
         source={project.data}
+      />
+      <ReviewLinkDialog
+        cancel={messages.cancel}
+        locale={locale}
+        messages={messages.reviewLink}
+        onOpenChange={setReviewLinkOpen}
+        open={reviewLinkOpen}
+        projectId={project.data.id}
+        retry={messages.retry}
       />
     </>
   );
