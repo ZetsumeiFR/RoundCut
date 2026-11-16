@@ -1,5 +1,8 @@
+import { ORPCError } from "@orpc/server";
 import type { Database } from "@roundcut/db";
 import {
+  MANUAL_CLOSE_REASONS,
+  ROUND_CLOSE_NOTE_MAX_LENGTH,
   ROUND_TRANSITIONS,
   type RoundEvent,
   roundPositions,
@@ -8,7 +11,7 @@ import { deliverable } from "@roundcut/db/schema/deliverable";
 import { project } from "@roundcut/db/schema/project";
 import { round } from "@roundcut/db/schema/round";
 import { version } from "@roundcut/db/schema/version";
-import { asc, desc, eq, inArray } from "drizzle-orm";
+import { and, asc, desc, eq, inArray } from "drizzle-orm";
 import z from "zod";
 
 import { protectedProcedure } from "../index";
@@ -51,7 +54,64 @@ export async function projectRoundPositions(db: Database, projectId: string) {
   return roundPositions(rounds, owner.termsSnapshot.scope);
 }
 
+// The editor's manual closing (ROUND-03): a reason, and a note shown to the
+// client, required when the reason is "other".
+const closeRoundSchema = z
+  .object({
+    note: z.string().trim().max(ROUND_CLOSE_NOTE_MAX_LENGTH),
+    reason: z.enum(MANUAL_CLOSE_REASONS),
+    roundId: z.string().min(1),
+  })
+  .refine((value) => value.reason !== "other" || value.note.length > 0, {
+    message: "Explain why the round is closed",
+    path: ["note"],
+  });
+
 export const roundRouter = {
+  // The editor closes an open round by hand (ROUND-03, §7.2: open -> closed).
+  // A submitted round waits for the next version or the approval instead.
+  closeManually: protectedProcedure
+    .input(closeRoundSchema)
+    .handler(async ({ context, input: { note, reason, roundId } }) => {
+      const [target] = await context.db
+        .select({ projectId: deliverable.projectId })
+        .from(round)
+        .innerJoin(deliverable, eq(round.deliverableId, deliverable.id))
+        .where(eq(round.id, roundId));
+      if (!target) {
+        throw new ORPCError("NOT_FOUND", { message: "Round not found" });
+      }
+      // Other workspaces' rounds read as missing too.
+      await findOwnedProject(
+        context.db,
+        context.session.user,
+        target.projectId
+      );
+      const closing = roundTransition("closeManually");
+      const [saved] = await context.db
+        .update(round)
+        .set({
+          ...closing.set,
+          closedNote: note || null,
+          manualCloseReason: reason,
+        })
+        .where(and(eq(round.id, roundId), closing.guard))
+        .returning({
+          closedAt: round.closedAt,
+          closedNote: round.closedNote,
+          closedReason: round.closedReason,
+          id: round.id,
+          manualCloseReason: round.manualCloseReason,
+          status: round.status,
+        });
+      if (!saved) {
+        throw new ORPCError("CONFLICT", {
+          message: "Only an open round can be closed",
+        });
+      }
+      return saved;
+    }),
+
   // Every round of the project's deliverables with its version and dates,
   // latest first within each deliverable.
   list: protectedProcedure
@@ -65,10 +125,12 @@ export const roundRouter = {
       const rounds = await context.db
         .select({
           closedAt: round.closedAt,
+          closedNote: round.closedNote,
           closedReason: round.closedReason,
           deliverable: { id: deliverable.id, title: deliverable.title },
           id: round.id,
           kind: round.kind,
+          manualCloseReason: round.manualCloseReason,
           number: round.number,
           openedAt: round.openedAt,
           status: round.status,

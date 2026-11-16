@@ -8,7 +8,12 @@ import {
   uniqueIndex,
 } from "drizzle-orm/pg-core";
 
-import type { RoundClosedReason, RoundKind, RoundStatus } from "../round";
+import type {
+  ManualCloseReason,
+  RoundClosedReason,
+  RoundKind,
+  RoundStatus,
+} from "../round";
 import { deliverable } from "./deliverable";
 import { version } from "./version";
 
@@ -19,6 +24,8 @@ export const round = pgTable(
   "round",
   {
     closedAt: timestamp("closed_at"),
+    // Editor's note to the client when closing by hand (ROUND-03).
+    closedNote: text("closed_note"),
     closedReason: text("closed_reason").$type<RoundClosedReason>(),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     deliverableId: text("deliverable_id")
@@ -28,6 +35,8 @@ export const round = pgTable(
       .primaryKey()
       .$defaultFn(() => crypto.randomUUID()),
     kind: text("kind").$type<RoundKind>().default("included").notNull(),
+    // Set only when the editor closed the round (closedReason "manual").
+    manualCloseReason: text("manual_close_reason").$type<ManualCloseReason>(),
     number: integer("number").notNull(),
     openedAt: timestamp("opened_at").defaultNow().notNull(),
     status: text("status").$type<RoundStatus>().default("open").notNull(),

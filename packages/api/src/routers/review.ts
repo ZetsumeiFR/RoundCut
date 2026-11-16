@@ -34,7 +34,11 @@ const versionInput = z.object({
 });
 
 const roundColumns = {
+  closedAt: round.closedAt,
+  closedNote: round.closedNote,
+  closedReason: round.closedReason,
   id: round.id,
+  manualCloseReason: round.manualCloseReason,
   number: round.number,
   status: round.status,
   submittedAt: round.submittedAt,
