@@ -13,19 +13,32 @@ import {
 } from "@roundcut/ui/components/reui/frame";
 import { Skeleton } from "@roundcut/ui/components/skeleton";
 import { cn } from "@roundcut/ui/lib/utils";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { TriangleAlertIcon } from "lucide-react";
-import { useCallback } from "react";
+import { useSearchParams } from "next/navigation";
+import { useCallback, useEffect } from "react";
 
 import { formatMessage, type Messages } from "@/i18n/messages";
 import { orpc } from "@/utils/orpc";
 
 import { ExtraRoundAgreement } from "./extra-round-agreement";
+import {
+  ExtraRoundPayment,
+  isAwaitingPayment,
+  type PaymentReturn,
+} from "./extra-round-payment";
 
 type OfferMessages = Messages["review"]["extraRound"];
 
 const CENTS_PER_UNIT = 100;
 const BASIS_POINTS = 10_000;
+
+// How often the offer is re-read after Stripe Checkout, until the webhook
+// has confirmed the payment.
+const PAYMENT_POLL_MS = 3000;
+
+const toPaymentReturn = (value: string | null): PaymentReturn =>
+  value === "success" || value === "cancelled" ? value : null;
 
 function AmountRow({
   label,
@@ -62,12 +75,26 @@ export function ExtraRoundOffer({
   versionId: string;
   workspaceName: string;
 }) {
+  const queryClient = useQueryClient();
+  const paymentReturn = toPaymentReturn(useSearchParams().get("payment"));
   const offer = useQuery(
     orpc.extraRound.getOffer.queryOptions({
       input: { token, versionId },
       meta: { inlineError: true },
+      refetchInterval: (query) =>
+        paymentReturn === "success" && isAwaitingPayment(query.state.data)
+          ? PAYMENT_POLL_MS
+          : false,
     })
   );
+  // Once paid, the round may have opened: the banner and submit button
+  // follow it.
+  const settled = offer.data === null || Boolean(offer.data?.paidAt);
+  useEffect(() => {
+    if (paymentReturn === "success" && settled) {
+      queryClient.invalidateQueries({ queryKey: orpc.review.round.key() });
+    }
+  }, [paymentReturn, queryClient, settled]);
   const { refetch } = offer;
   const handleRetry = useCallback(() => refetch(), [refetch]);
 
@@ -180,7 +207,7 @@ export function ExtraRoundOffer({
             })}
           </p>
         </FrameFooter>
-        <FramePanel>
+        <FramePanel className="flex flex-col gap-3">
           <ExtraRoundAgreement
             key={current.id}
             locale={locale}
@@ -190,6 +217,18 @@ export function ExtraRoundOffer({
             token={token}
             versionId={versionId}
           />
+          {current.status === "accepted" ? (
+            <ExtraRoundPayment
+              gross={gross}
+              locale={locale}
+              messages={messages.payment}
+              offer={current}
+              paymentReturn={paymentReturn}
+              token={token}
+              versionId={versionId}
+              workspaceName={workspaceName}
+            />
+          ) : null}
         </FramePanel>
       </Frame>
     </section>

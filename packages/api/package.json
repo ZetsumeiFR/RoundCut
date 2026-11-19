@@ -19,6 +19,7 @@
     "@roundcut/auth": "workspace:*",
     "@roundcut/db": "workspace:*",
     "drizzle-orm": "catalog:",
+    "stripe": "23.2.0",
     "zod": "catalog:"
   },
   "devDependencies": {

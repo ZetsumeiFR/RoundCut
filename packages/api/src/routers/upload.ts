@@ -7,6 +7,7 @@ import { version } from "@roundcut/db/schema/version";
 import { and, eq, inArray, isNull, max } from "drizzle-orm";
 import z from "zod";
 
+import { grantPaidOfferOnNewRound } from "../extra-round-payment";
 import { protectedProcedure } from "../index";
 import { isSupportedMedia, readMedia } from "../media";
 import type { Storage } from "../storage";
@@ -191,6 +192,12 @@ export const uploadRouter = {
         if (!opened) {
           throw new Error("Round insert returned no row");
         }
+        // An extra round the client paid while no round was open (EXTRA-04)
+        // is this one.
+        await grantPaidOfferOnNewRound(tx, {
+          deliverableId: ready.deliverableId,
+          roundId: opened.id,
+        });
         // Comments written after a batch was submitted waited for this round
         // (REV-06): they join its batch.
         await tx

@@ -38,6 +38,9 @@ export const extraRoundOffer = pgTable(
     id: text("id")
       .primaryKey()
       .$defaultFn(() => crypto.randomUUID()),
+    // When the client's payment of the offer was confirmed by Stripe
+    // (EXTRA-04, checkout.session.completed); null while unpaid.
+    paidAt: timestamp("paid_at"),
     // Excluding VAT, in cents.
     priceCents: integer("price_cents").notNull(),
     requirePayment: boolean("require_payment").notNull(),
@@ -50,6 +53,9 @@ export const extraRoundOffer = pgTable(
       .$type<ExtraRoundOfferStatus>()
       .default("proposed")
       .notNull(),
+    // The latest Checkout Session opened on the editor's Stripe account to
+    // pay the offer, reused while it is still open.
+    stripeCheckoutSessionId: text("stripe_checkout_session_id"),
     updatedAt: timestamp("updated_at")
       .defaultNow()
       .$onUpdate(() => /* @__PURE__ */ new Date())

@@ -25,6 +25,11 @@ import {
 } from "../consent";
 import type { Notifications, RequestOrigin } from "../context";
 import { publicProcedure, requireReviewLink } from "../index";
+import {
+  canTakeRoundPayments,
+  fetchPaymentsActive,
+  type StripeClient,
+} from "../payments";
 import { reviewTokenSchema } from "../review-link";
 import { isDeciderEmail } from "../reviewer";
 import { consumeReviewerCode, reviewerCodeSchema } from "../reviewer-code";
@@ -119,6 +124,7 @@ async function offerConsent(db: Database, offerId: string) {
 // with its amounts, delay, payment rule and the decider's answer.
 async function currentOffer(
   db: Database,
+  stripe: StripeClient | null,
   projectId: string,
   versionId: string
 ) {
@@ -128,6 +134,9 @@ async function currentOffer(
     .select({
       currency: workspace.currency,
       deciderName: client.deciderName,
+      plan: workspace.plan,
+      stripeAccountId: workspace.stripeAccountId,
+      stripePaymentsActive: workspace.stripePaymentsActive,
       termsSnapshot: project.termsSnapshot,
       vatRateBps: workspace.defaultVatRateBps,
     })
@@ -160,7 +169,10 @@ async function currentOffer(
       currency: owner.currency,
       delayDays: terms.extraRoundDelayDays,
       priceCents: terms.extraRoundPriceCents,
-      requirePayment: terms.requirePayment,
+      // Online payment needs the editor's connected Stripe account
+      // (EXTRA-04); without it the editor invoices the round.
+      requirePayment:
+        terms.requirePayment && canTakeRoundPayments(stripe, owner),
       vatRateBps: owner.vatRateBps,
     }));
   if (!offer) {
@@ -185,6 +197,7 @@ async function currentOffer(
     expiresAt: offer.expiresAt,
     forwardedAt: offer.forwardedAt,
     id: offer.id,
+    paidAt: offer.paidAt,
     requirePayment: offer.requirePayment,
     // The round the agreement grants: the open one, or the next.
     round: opensBatch ? position : position + 1,
@@ -196,11 +209,16 @@ async function currentOffer(
 type Offer = NonNullable<Awaited<ReturnType<typeof currentOffer>>>;
 
 async function openOffer(
-  db: Database,
+  context: { db: Database; stripe: StripeClient | null },
   projectId: string,
   input: { offerId: string; versionId: string }
 ) {
-  const offer = await currentOffer(db, projectId, input.versionId);
+  const offer = await currentOffer(
+    context.db,
+    context.stripe,
+    projectId,
+    input.versionId
+  );
   if (offer?.id !== input.offerId || offer.status !== "proposed") {
     throw new ORPCError("CONFLICT", {
       message: "This offer is no longer waiting for an answer",
@@ -310,6 +328,60 @@ async function agreementSnapshot(
   };
 }
 
+// The editor's connected account an offer is paid on, checked with Stripe
+// right before taking the payment (EXTRA-04), and the line's label in the
+// workspace language.
+async function paymentAccount(
+  context: { db: Database; stripe: StripeClient | null },
+  offer: Offer
+) {
+  const [row] = await context.db
+    .select({
+      deliverableTitle: deliverable.title,
+      locale: workspace.locale,
+      plan: workspace.plan,
+      projectName: project.name,
+      stripeAccountId: workspace.stripeAccountId,
+      stripePaymentsActive: workspace.stripePaymentsActive,
+      workspaceId: workspace.id,
+    })
+    .from(deliverable)
+    .innerJoin(project, eq(deliverable.projectId, project.id))
+    .innerJoin(workspace, eq(project.workspaceId, workspace.id))
+    .where(eq(deliverable.id, offer.deliverableId));
+  const { stripe } = context;
+  const active =
+    stripe !== null &&
+    row !== undefined &&
+    canTakeRoundPayments(stripe, row) &&
+    row.stripeAccountId !== null &&
+    (await fetchPaymentsActive(stripe, row.stripeAccountId));
+  if (!(active && row?.stripeAccountId)) {
+    if (row?.stripePaymentsActive) {
+      await context.db
+        .update(workspace)
+        .set({ stripePaymentsActive: false })
+        .where(eq(workspace.id, row.workspaceId));
+    }
+    throw new ORPCError("PRECONDITION_FAILED", {
+      message: "Online payment is unavailable for this offer",
+    });
+  }
+  const locale = resolveLocale(row.locale);
+  const round =
+    locale === "fr"
+      ? `Tour supplémentaire ${offer.round}`
+      : `Extra round ${offer.round}`;
+  return {
+    account: {
+      id: row.stripeAccountId,
+      label: `${round} · ${row.projectName} · ${row.deliverableTitle}`,
+      locale,
+    },
+    stripe,
+  };
+}
+
 export const extraRoundRouter = {
   // The decider accepts the offer on screen (EXTRA-02): they tick the
   // agreement and type the code emailed by review.requestOtp. The answer is
@@ -327,7 +399,7 @@ export const extraRoundRouter = {
     .handler(async ({ context, input }) => {
       const decider = requireDecider(context.reviewer, context.reviewerClient);
       const { projectId } = context.reviewLink;
-      const offer = await openOffer(context.db, projectId, input);
+      const offer = await openOffer(context, projectId, input);
       await consumeReviewerCode(
         context.db,
         decider.id,
@@ -400,6 +472,84 @@ export const extraRoundRouter = {
       };
     }),
 
+  // The decider pays an accepted offer that asks for it (EXTRA-04): a
+  // Checkout Session on the editor's connected account (direct charge),
+  // reusing the one still open so a client can't pay twice. Only the
+  // webhook confirms the payment.
+  checkoutUrl: publicProcedure
+    .input(offerInput)
+    .use(requireReviewLink)
+    .handler(async ({ context, input }) => {
+      const decider = requireDecider(context.reviewer, context.reviewerClient);
+      const { projectId } = context.reviewLink;
+      const offer = await currentOffer(
+        context.db,
+        context.stripe,
+        projectId,
+        input.versionId
+      );
+      if (
+        offer?.id !== input.offerId ||
+        offer.status !== "accepted" ||
+        !offer.requirePayment ||
+        offer.paidAt
+      ) {
+        throw new ORPCError("CONFLICT", {
+          message: "This offer isn't waiting for a payment",
+        });
+      }
+      const { account, stripe } = await paymentAccount(context, offer);
+      const [saved] = await context.db
+        .select({ sessionId: extraRoundOffer.stripeCheckoutSessionId })
+        .from(extraRoundOffer)
+        .where(eq(extraRoundOffer.id, offer.id));
+      if (saved?.sessionId) {
+        const open = await stripe.checkout.sessions.retrieve(
+          saved.sessionId,
+          {},
+          { stripeAccount: account.id }
+        );
+        if (open.status === "open" && open.url) {
+          return { url: open.url };
+        }
+      }
+      const reviewUrl = `${context.notifications.appUrl}/r/${input.token}`;
+      const session = await stripe.checkout.sessions.create(
+        {
+          // The offer is agreed and invoiced in the workspace currency: no
+          // conversion to the client's local currency.
+          adaptive_pricing: { enabled: false },
+          cancel_url: `${reviewUrl}?payment=cancelled`,
+          client_reference_id: offer.id,
+          customer_email: decider.email,
+          line_items: [
+            {
+              price_data: {
+                currency: offer.currency.toLowerCase(),
+                product_data: { name: account.label },
+                unit_amount: offer.grossCents,
+              },
+              quantity: 1,
+            },
+          ],
+          locale: account.locale,
+          metadata: { offerId: offer.id },
+          mode: "payment",
+          payment_intent_data: { metadata: { offerId: offer.id } },
+          success_url: `${reviewUrl}?payment=success`,
+        },
+        { stripeAccount: account.id }
+      );
+      await context.db
+        .update(extraRoundOffer)
+        .set({ stripeCheckoutSessionId: session.id })
+        .where(eq(extraRoundOffer.id, offer.id));
+      if (!session.url) {
+        throw new Error(`Checkout session ${session.id} has no URL`);
+      }
+      return { url: session.url };
+    }),
+
   // A reviewer who isn't the decider can't accept (EXTRA-02): they forward
   // the offer to the decider by email, at most once an hour per offer.
   forward: publicProcedure
@@ -413,7 +563,7 @@ export const extraRoundRouter = {
         });
       }
       const { projectId } = context.reviewLink;
-      const offer = await openOffer(context.db, projectId, input);
+      const offer = await openOffer(context, projectId, input);
       const now = new Date();
       const [claimed] = await context.db
         .update(extraRoundOffer)
@@ -462,6 +612,7 @@ export const extraRoundRouter = {
       const viewer = requireReviewer(context.reviewer);
       const offer = await currentOffer(
         context.db,
+        context.stripe,
         context.reviewLink.projectId,
         versionId
       );

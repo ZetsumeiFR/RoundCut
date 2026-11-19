@@ -11,6 +11,7 @@ import {
   notifications,
   reviewerCookieOptions,
   storage,
+  stripe,
 } from "./services";
 
 // The client's address as forwarded by the proxy in front of the app (the
@@ -40,6 +41,7 @@ export async function createContext(req: NextRequest): Promise<ApiContext> {
     ),
     session,
     storage,
+    stripe,
   };
 }
 
