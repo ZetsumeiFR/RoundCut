@@ -1,4 +1,5 @@
 import type { Notifications } from "@roundcut/api/context";
+import { createStripe } from "@roundcut/api/payments";
 import type { ReviewerCookieOptions } from "@roundcut/api/reviewer";
 import { createStorage } from "@roundcut/api/storage";
 import { createAuth } from "@roundcut/auth";
@@ -9,6 +10,7 @@ import { ENV } from "./env.server";
 export const db = createDb(ENV);
 export const auth = createAuth(ENV, db);
 export const storage = createStorage(ENV);
+export const stripe = createStripe(ENV);
 export const notifications = {
   appUrl: ENV.BETTER_AUTH_URL,
   email: ENV,

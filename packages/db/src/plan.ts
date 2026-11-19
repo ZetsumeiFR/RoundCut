@@ -17,3 +17,6 @@ export const PLAN_MAX_FILE_BYTES: Record<Plan, number> = {
 
 // White-labelled review links (REV-10): the editor's logo and accent color.
 export const hasWhiteLabel = (plan: Plan) => plan !== "solo";
+
+// Online payment of extra rounds on the editor's Stripe account (EXTRA-04).
+export const hasRoundPayments = (plan: Plan) => plan !== "solo";

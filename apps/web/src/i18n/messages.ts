@@ -174,6 +174,32 @@ const en = {
       includedRoundsDescription: "Revision rounds covered by the flat fee.",
       loadErrorDescription: "Check your connection and try again.",
       loadErrorTitle: "Couldn't load your plan terms",
+      payments: {
+        account: "Stripe account",
+        active: "Active",
+        activeDescription:
+          "Clients pay extra rounds online, directly to your Stripe account.",
+        connect: "Connect Stripe",
+        connectDescription:
+          "Create or link your Stripe account to take extra round payments online. Stripe charges its fees to your account.",
+        connecting: "Opening Stripe…",
+        dashboard: "Open Stripe",
+        description:
+          "Payment of extra rounds before they open, when your terms ask for it.",
+        error: "Couldn't open Stripe. Try again.",
+        finish: "Finish setting up",
+        loadError: "Couldn't load your Stripe status.",
+        locked: "Available with Pro and Studio",
+        lockedDescription:
+          "Upgrade to have clients pay extra rounds online. Until then, you invoice them yourself.",
+        pending: "Setup to finish",
+        pendingDescription:
+          "Stripe needs more information before your account can take payments. Meanwhile, extra rounds open without online payment.",
+        retry: "Try again",
+        title: "Online payment",
+        unavailable:
+          "Online payment isn't available on this RoundCut instance.",
+      },
       price: "Extra round price",
       priceDescription:
         "Excluding VAT. Enter 0 to offer extra rounds for free.",
@@ -1276,6 +1302,21 @@ const en = {
       loadError: "Couldn't load the extra round offer.",
       loading: "Loading the extra round offer…",
       net: "Price excl. VAT",
+      payment: {
+        cancelled: "Payment cancelled. You can try again.",
+        confirming: "Payment received, confirming with Stripe…",
+        error: "Couldn't open the payment. Try again.",
+        paid: "Paid on {date}.",
+        paidNextVersion:
+          "Paid on {date}. Round {round} opens when {workspace} publishes the next version.",
+        pay: "Pay {gross}",
+        paying: "Opening the payment…",
+        prompt: "Pay {gross} to open round {round}.",
+        secure: "Secure payment by Stripe, paid directly to {workspace}.",
+        unavailable:
+          "Online payment is unavailable for now. Contact {workspace}.",
+        waiting: "Waiting for {decider} to pay.",
+      },
       paymentNotRequired:
         "The round opens as soon as it is agreed; {workspace} will invoice it.",
       paymentRequired: "Online payment is requested before the round opens.",
@@ -1333,6 +1374,9 @@ const en = {
       exhausted: "Included rounds used up",
       exhaustedDescription:
         "Any further changes will need an extra round, beyond the {included} included.",
+      extraGranted: "Extra round {current}",
+      extraGrantedDescription:
+        "This round was granted on top of your included rounds.",
       extraRound: "Round {current}, beyond the {included} included",
       gift: "Round offered by {workspace}",
       giftDescription:
@@ -1543,6 +1587,32 @@ const fr: Messages = {
         "Nombre de tours de révision couverts par le forfait.",
       loadErrorDescription: "Vérifiez votre connexion et réessayez.",
       loadErrorTitle: "Impossible de charger vos conditions de forfait",
+      payments: {
+        account: "Compte Stripe",
+        active: "Actif",
+        activeDescription:
+          "Vos clients paient les tours supplémentaires en ligne, directement sur votre compte Stripe.",
+        connect: "Connecter Stripe",
+        connectDescription:
+          "Créez ou reliez votre compte Stripe pour encaisser les tours supplémentaires en ligne. Stripe prélève ses frais sur votre compte.",
+        connecting: "Ouverture de Stripe…",
+        dashboard: "Ouvrir Stripe",
+        description:
+          "Paiement des tours supplémentaires avant leur ouverture, si vos conditions l'exigent.",
+        error: "Impossible d'ouvrir Stripe. Réessayez.",
+        finish: "Terminer la configuration",
+        loadError: "Impossible de charger votre statut Stripe.",
+        locked: "Disponible avec Pro et Studio",
+        lockedDescription:
+          "Passez à un plan supérieur pour faire payer les tours supplémentaires en ligne. D'ici là, vous les facturez vous-même.",
+        pending: "Configuration à terminer",
+        pendingDescription:
+          "Stripe a besoin d'informations complémentaires avant que votre compte puisse encaisser. En attendant, les tours supplémentaires s'ouvrent sans paiement en ligne.",
+        retry: "Réessayer",
+        title: "Paiement en ligne",
+        unavailable:
+          "Le paiement en ligne n'est pas disponible sur cette instance RoundCut.",
+      },
       price: "Prix du tour supplémentaire",
       priceDescription:
         "Hors taxes. Saisissez 0 pour offrir les tours supplémentaires.",
@@ -2669,6 +2739,22 @@ const fr: Messages = {
       loadError: "Impossible de charger la proposition de tour supplémentaire.",
       loading: "Chargement de la proposition de tour supplémentaire…",
       net: "Prix HT",
+      payment: {
+        cancelled: "Paiement annulé. Vous pouvez réessayer.",
+        confirming: "Paiement reçu, confirmation par Stripe en cours…",
+        error: "Impossible d'ouvrir le paiement. Réessayez.",
+        paid: "Payé le {date}.",
+        paidNextVersion:
+          "Payé le {date}. Le tour {round} s'ouvre dès que {workspace} publie la prochaine version.",
+        pay: "Payer {gross}",
+        paying: "Ouverture du paiement…",
+        prompt: "Réglez {gross} pour ouvrir le tour {round}.",
+        secure:
+          "Paiement sécurisé par Stripe, versé directement à {workspace}.",
+        unavailable:
+          "Le paiement en ligne est indisponible pour le moment. Contactez {workspace}.",
+        waiting: "En attente du paiement par {decider}.",
+      },
       paymentNotRequired:
         "Le tour s'ouvre dès votre accord ; {workspace} le facturera.",
       paymentRequired:
@@ -2727,6 +2813,9 @@ const fr: Messages = {
       exhausted: "Tours inclus épuisés",
       exhaustedDescription:
         "Toute nouvelle modification demandera un tour supplémentaire, au-delà des {included} inclus.",
+      extraGranted: "Tour supplémentaire {current}",
+      extraGrantedDescription:
+        "Ce tour vous a été accordé en plus de vos tours inclus.",
       extraRound: "Tour {current}, au-delà des {included} inclus",
       gift: "Tour offert par {workspace}",
       giftDescription:

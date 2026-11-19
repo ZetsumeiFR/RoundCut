@@ -52,6 +52,13 @@ export const workspace = pgTable("workspace", {
     .$type<RevisionTerms>()
     .default(DEFAULT_REVISION_TERMS)
     .notNull(),
+  // The editor's own Stripe account (EXTRA-04, Connect, Pro and Studio),
+  // where clients pay extra rounds, and whether it can take card payments
+  // yet (last known status of its card_payments capability).
+  stripeAccountId: text("stripe_account_id"),
+  stripePaymentsActive: boolean("stripe_payments_active")
+    .default(false)
+    .notNull(),
   timezone: text("timezone").default("Europe/Paris").notNull(),
   updatedAt: timestamp("updated_at")
     .defaultNow()

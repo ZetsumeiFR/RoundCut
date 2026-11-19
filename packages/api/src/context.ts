@@ -2,6 +2,7 @@ import type { Session } from "@roundcut/auth";
 import type { EmailConfig } from "@roundcut/auth/email";
 import type { Database } from "@roundcut/db";
 
+import type { StripeClient } from "./payments";
 import type { ReviewerCookies } from "./reviewer";
 import type { Storage } from "./storage";
 
@@ -28,4 +29,6 @@ export interface Context {
   reviewerCookies: ReviewerCookies;
   session: Session | null;
   storage: Storage;
+  // The Stripe Connect platform (EXTRA-04); null when payments are off.
+  stripe: StripeClient | null;
 }

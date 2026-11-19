@@ -28,6 +28,7 @@ import {
   useSubmitHandler,
 } from "./settings-form";
 import { SETTING_ROWS, SettingsSkeleton } from "./settings-skeleton";
+import { StripePaymentsSettings } from "./stripe-payments-settings";
 
 export type TermsMessages = Messages["account"]["terms"];
 
@@ -346,6 +347,7 @@ export function RevisionTermsSettings({
           messages={messages}
           reminders={data.deciderReminders}
         />
+        <StripePaymentsSettings messages={messages.payments} />
       </div>
     );
   }

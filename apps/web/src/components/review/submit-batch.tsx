@@ -117,6 +117,20 @@ function bannerLines(
       warning: false,
     };
   }
+  // An extra round the client agreed to (and paid, EXTRA-04) is granted:
+  // the included rounds running out no longer applies to it.
+  if (round.kind === "extra") {
+    const lines = [messages.extraGrantedDescription];
+    if (round.status === "closed") {
+      lines.push(...closedLines(round, closing));
+    }
+    return {
+      gift: false,
+      lines,
+      title: formatMessage(messages.extraGranted, { current: round.position }),
+      warning: false,
+    };
+  }
   const extra = round.position > includedRounds;
   const lastIncluded = round.position === includedRounds;
   const exhausted = extra || (lastIncluded && round.status !== "open");
