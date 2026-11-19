@@ -6,7 +6,13 @@ export interface EmailConfig {
   RESEND_API_KEY?: string;
 }
 
+export interface EmailAttachment {
+  content: Uint8Array;
+  filename: string;
+}
+
 interface EmailMessage {
+  attachments?: EmailAttachment[];
   // Where the recipient's reply goes, when not to the sender.
   replyTo?: string;
   subject: string;
@@ -24,14 +30,24 @@ export async function sendEmail(config: EmailConfig, message: EmailMessage) {
       );
     }
     // Without a Resend key, development prints the email so its links stay usable.
+    const attached = (message.attachments ?? [])
+      .map(
+        (attachment) =>
+          `\n[attachment] ${attachment.filename} (${attachment.content.byteLength} bytes)`
+      )
+      .join("");
     console.info(
-      `[email] to=${message.to}${message.replyTo ? ` reply-to=${message.replyTo}` : ""} subject="${message.subject}"\n${message.text}`
+      `[email] to=${message.to}${message.replyTo ? ` reply-to=${message.replyTo}` : ""} subject="${message.subject}"\n${message.text}${attached}`
     );
     return;
   }
 
   const response = await fetch(RESEND_ENDPOINT, {
     body: JSON.stringify({
+      attachments: message.attachments?.map((attachment) => ({
+        content: Buffer.from(attachment.content).toString("base64"),
+        filename: attachment.filename,
+      })),
       from: config.EMAIL_FROM,
       reply_to: message.replyTo,
       subject: message.subject,
@@ -334,6 +350,54 @@ export function extraRoundForwardEmail(
   details: ExtraRoundForwardDetails
 ): EmailMessage {
   return { to, ...extraRoundForwardEmails[locale](details) };
+}
+
+export interface AgreementReceiptDetails {
+  deliverableTitle: string;
+  // "paid" re-sends the receipt once the online payment is confirmed
+  // (EXTRA-04); "agreed" sends it when the decider accepts.
+  event: "agreed" | "paid";
+  projectName: string;
+  roundNumber: number;
+  signerName: string;
+  studioName: string;
+}
+
+const agreementReceiptEmails = {
+  en: (details: AgreementReceiptDetails) =>
+    details.event === "paid"
+      ? {
+          subject: `${details.projectName}: extra round ${details.roundNumber} paid, your receipt`,
+          text: `Hello,\n\nThe payment of extra round ${details.roundNumber} on ${details.deliverableTitle} (${details.projectName}), accepted by ${details.signerName}, is confirmed.\n\nThe updated agreement receipt is attached as a PDF.`,
+        }
+      : {
+          subject: `${details.projectName}: agreement receipt for extra round ${details.roundNumber}`,
+          text: `Hello,\n\n${details.signerName} accepted extra round ${details.roundNumber} on ${details.deliverableTitle} (${details.projectName}) with ${details.studioName}.\n\nThe agreement receipt is attached as a PDF: it shows the amounts, who agreed, when, and the fingerprint that seals the agreement record.`,
+        },
+  fr: (details: AgreementReceiptDetails) =>
+    details.event === "paid"
+      ? {
+          subject: `${details.projectName} : tour supplémentaire ${details.roundNumber} payé, votre reçu`,
+          text: `Bonjour,\n\nLe paiement du tour supplémentaire ${details.roundNumber} sur ${details.deliverableTitle} (${details.projectName}), accepté par ${details.signerName}, est confirmé.\n\nLe reçu d'accord à jour est joint en PDF.`,
+        }
+      : {
+          subject: `${details.projectName} : reçu d'accord du tour supplémentaire ${details.roundNumber}`,
+          text: `Bonjour,\n\n${details.signerName} a accepté le tour supplémentaire ${details.roundNumber} sur ${details.deliverableTitle} (${details.projectName}) avec ${details.studioName}.\n\nLe reçu d'accord est joint en PDF : il reprend les montants, qui a donné son accord, quand, et l'empreinte qui scelle le journal d'accord.`,
+        },
+} satisfies Record<
+  Locale,
+  (details: AgreementReceiptDetails) => Omit<EmailMessage, "to">
+>;
+
+// The extra round agreement receipt (EXTRA-07), sent to the editor and the
+// decider with the PDF attached.
+export function agreementReceiptEmail(
+  locale: Locale,
+  to: string,
+  details: AgreementReceiptDetails,
+  pdf: EmailAttachment
+): EmailMessage {
+  return { attachments: [pdf], to, ...agreementReceiptEmails[locale](details) };
 }
 
 export function resetPasswordEmail(

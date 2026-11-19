@@ -41,6 +41,7 @@ import {
 
 import { formatMessage, type Messages } from "@/i18n/messages";
 import { client as api, orpc } from "@/utils/orpc";
+import { ReceiptDownloadButton } from "./receipt-download-button";
 
 type AnswerMessages = Messages["review"]["extraRound"]["answer"];
 export type Offer = NonNullable<
@@ -97,10 +98,12 @@ function RecordRow({ children, label }: { children: string; label: string }) {
 // The immutable agreement record (EXTRA-03): who agreed, when in UTC, and
 // the SHA-256 fingerprint sealing what was shown.
 function ConsentRecord({
+  action,
   consent,
   locale,
   messages,
 }: {
+  action: ReactNode;
   consent: Consent;
   locale: Locale;
   messages: AnswerMessages["record"];
@@ -126,6 +129,7 @@ function ConsentRecord({
         </RecordRow>
       </dl>
       <p className="text-muted-foreground">{messages.sealed}</p>
+      <div>{action}</div>
     </section>
   );
 }
@@ -440,6 +444,10 @@ export function ExtraRoundAgreement({
       versionId,
     ]
   );
+  const fetchReceipt = useCallback(
+    () => api.extraRound.receipt({ locale, offerId: offer.id, token }),
+    [locale, offer.id, token]
+  );
 
   if (offer.status === "accepted" && offer.acceptedAt) {
     return (
@@ -456,6 +464,12 @@ export function ExtraRoundAgreement({
         </Alert>
         {offer.consent ? (
           <ConsentRecord
+            action={
+              <ReceiptDownloadButton
+                fetchReceipt={fetchReceipt}
+                messages={messages.record}
+              />
+            }
             consent={offer.consent}
             locale={locale}
             messages={messages.record}

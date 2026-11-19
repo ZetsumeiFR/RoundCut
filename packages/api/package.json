@@ -19,6 +19,7 @@
     "@roundcut/auth": "workspace:*",
     "@roundcut/db": "workspace:*",
     "drizzle-orm": "catalog:",
+    "pdf-lib": "1.17.1",
     "stripe": "23.2.0",
     "zod": "catalog:"
   },
