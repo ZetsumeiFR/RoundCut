@@ -1,5 +1,6 @@
 import { ORPCError } from "@orpc/server";
 import {
+  approvalCodeEmail,
   batchSubmittedEmail,
   extraRoundCodeEmail,
   sendEmail,
@@ -15,6 +16,7 @@ import { canGiftRound } from "@roundcut/db/round";
 import { user } from "@roundcut/db/schema/auth";
 import { client } from "@roundcut/db/schema/client";
 import { comment } from "@roundcut/db/schema/comment";
+import { consentRecord } from "@roundcut/db/schema/consent-record";
 import { deliverable } from "@roundcut/db/schema/deliverable";
 import { project } from "@roundcut/db/schema/project";
 import { reviewer } from "@roundcut/db/schema/reviewer";
@@ -24,6 +26,7 @@ import { workspace } from "@roundcut/db/schema/workspace";
 import { and, asc, count, desc, eq, isNull, ne } from "drizzle-orm";
 import z from "zod";
 
+import { consentShownSchema, snapshotHash } from "../consent";
 import type { Notifications } from "../context";
 import {
   publicProcedure,
@@ -36,7 +39,11 @@ import {
   isDeciderEmail,
   reviewerIdentitySchema,
 } from "../reviewer";
-import { issueReviewerCode } from "../reviewer-code";
+import {
+  consumeReviewerCode,
+  issueReviewerCode,
+  reviewerCodeSchema,
+} from "../reviewer-code";
 import type { FrameRate } from "../timecode";
 import { findReviewVersion, requireDecider, requireReviewer } from "./comment";
 import { projectRoundPositions, roundTransition } from "./round";
@@ -70,6 +77,40 @@ export async function findVersionRound(db: Database, versionId: string) {
     .orderBy(desc(round.number))
     .limit(1);
   return current ?? null;
+}
+
+// The decider's approval of a version (EXTRA-06), from its agreement record.
+async function versionApproval(db: Database, versionId: string) {
+  const [record] = await db
+    .select({
+      approvedAt: consentRecord.createdAt,
+      approverName: consentRecord.name,
+    })
+    .from(consentRecord)
+    .where(
+      and(
+        eq(consentRecord.versionId, versionId),
+        eq(consentRecord.kind, "approval")
+      )
+    );
+  return record ?? null;
+}
+
+// The deliverable's latest published version: the one the client reviews
+// and the only one they can approve.
+async function latestVersionNumber(db: Database, deliverableId: string) {
+  const [latest] = await db
+    .select({ number: version.number })
+    .from(version)
+    .where(
+      and(
+        eq(version.deliverableId, deliverableId),
+        ne(version.status, "uploading")
+      )
+    )
+    .orderBy(desc(version.number))
+    .limit(1);
+  return latest?.number ?? null;
 }
 
 // A round's batch is its top-level comments; replies follow their thread.
@@ -147,6 +188,133 @@ async function notifyBatchSubmitted(
 }
 
 export const reviewRouter = {
+  // The decider approves the version they review with an email code
+  // (EXTRA-06, after declining an extra round; APPR-01 extends it): the
+  // version and its deliverable turn approved, the version's round closes
+  // as approved, and the agreement record (kind "approval", one per
+  // version) seals who approved what, when and from where, with the text
+  // shown.
+  approveVersion: publicProcedure
+    .input(
+      versionInput.extend({
+        agreed: z.literal(true),
+        code: reviewerCodeSchema,
+        shown: consentShownSchema,
+      })
+    )
+    .use(requireReviewLink)
+    .handler(async ({ context, input }) => {
+      const decider = requireDecider(context.reviewer, context.reviewerClient);
+      const { projectId } = context.reviewLink;
+      const target = await findReviewVersion(
+        context.db,
+        projectId,
+        input.versionId
+      );
+      const conflict = new ORPCError("CONFLICT", {
+        message: "Only the latest version, not yet approved, can be approved",
+      });
+      if (
+        target.status !== "ready" ||
+        (await latestVersionNumber(context.db, target.deliverableId)) !==
+          target.number
+      ) {
+        throw conflict;
+      }
+      await consumeReviewerCode(context.db, decider.id, "approval", input.code);
+      const [row] = await context.db
+        .select({
+          deliverableTitle: deliverable.title,
+          projectName: project.name,
+          workspaceName: workspace.name,
+        })
+        .from(deliverable)
+        .innerJoin(project, eq(deliverable.projectId, project.id))
+        .innerJoin(workspace, eq(project.workspaceId, workspace.id))
+        .where(eq(deliverable.id, target.deliverableId));
+      if (!row) {
+        throw new ORPCError("NOT_FOUND", { message: "Version not found" });
+      }
+      const now = new Date();
+      const snapshot = {
+        approvedAt: now.toISOString(),
+        kind: "approval",
+        project: {
+          deliverable: {
+            id: target.deliverableId,
+            title: row.deliverableTitle,
+          },
+          id: projectId,
+          name: row.projectName,
+          version: {
+            fileName: target.fileName,
+            id: target.id,
+            number: target.number,
+            sizeBytes: target.sizeBytes,
+          },
+          workspace: row.workspaceName,
+        },
+        request: {
+          ip: context.request.ip,
+          userAgent: context.request.userAgent,
+        },
+        shown: input.shown,
+        signer: {
+          email: decider.email,
+          name: decider.name,
+          reviewerId: decider.id,
+        },
+        snapshotVersion: 1,
+      };
+      const approving = roundTransition("approve", now);
+      const record = await context.db.transaction(async (tx) => {
+        const [approved] = await tx
+          .update(version)
+          .set({ status: "approved" })
+          .where(and(eq(version.id, target.id), eq(version.status, "ready")))
+          .returning({ id: version.id });
+        if (!approved) {
+          throw conflict;
+        }
+        const [saved] = await tx
+          .insert(consentRecord)
+          .values({
+            createdAt: now,
+            email: decider.email,
+            ip: context.request.ip,
+            kind: "approval",
+            name: decider.name,
+            projectId,
+            reviewerId: decider.id,
+            snapshot,
+            snapshotHash: snapshotHash(snapshot),
+            userAgent: context.request.userAgent,
+            versionId: target.id,
+          })
+          .returning({
+            approvedAt: consentRecord.createdAt,
+            approverName: consentRecord.name,
+            snapshotHash: consentRecord.snapshotHash,
+          });
+        await tx
+          .update(round)
+          .set(approving.set)
+          .where(and(eq(round.versionId, target.id), approving.guard));
+        await tx
+          .update(deliverable)
+          .set({ status: "approved" })
+          .where(eq(deliverable.id, target.deliverableId));
+        await tx
+          .update(reviewer)
+          .set({ verifiedAt: now })
+          .where(eq(reviewer.id, decider.id));
+        return saved;
+      });
+      if (!record) {
+        throw conflict;
+      }
+      return record;
+    }),
   // Clears the identity cookie so someone else can identify on this device.
   forgetIdentity: reviewerProcedure.handler(({ context }) => {
     context.reviewerCookies.clear(context.reviewLink.projectId);
@@ -212,9 +380,11 @@ export const reviewRouter = {
         throw new ORPCError("NOT_FOUND", { message: "Review link not found" });
       }
       const code = await issueReviewerCode(context.db, decider.id, purpose);
+      const codeEmail =
+        purpose === "approval" ? approvalCodeEmail : extraRoundCodeEmail;
       await sendEmail(
         context.notifications.email,
-        extraRoundCodeEmail(resolveLocale(row.locale), decider.email, {
+        codeEmail(resolveLocale(row.locale), decider.email, {
           code,
           projectName: row.projectName,
           reviewerName: decider.name,
@@ -328,8 +498,7 @@ export const reviewRouter = {
       const current = await findVersionRound(context.db, target.id);
       const positions = await projectRoundPositions(context.db, projectId);
       return {
-        // Final approval (date and decider) is recorded by APPR-01 (#54).
-        approval: null as { approvedAt: Date; approverName: string } | null,
+        approval: await versionApproval(context.db, target.id),
         includedRounds: terms?.termsSnapshot.includedRounds ?? 0,
         pendingCount: await pendingSize(context.db, target.id),
         round: current

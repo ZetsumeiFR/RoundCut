@@ -10,6 +10,7 @@ import {
 import type { ConsentKind } from "../consent";
 import { extraRoundOffer } from "./extra-round-offer";
 import { project } from "./project";
+import { version } from "./version";
 
 // The immutable record of an agreement (EXTRA-03): who agreed (identity and
 // email, copied rather than linked so removing the reviewer never rewrites
@@ -40,9 +41,14 @@ export const consentRecord = pgTable(
     // Hex SHA-256 of the snapshot's canonical JSON (sorted keys).
     snapshotHash: text("snapshot_hash").notNull(),
     userAgent: text("user_agent"),
+    // The version approved (kind "approval", one record per version).
+    versionId: text("version_id").references(() => version.id, {
+      onDelete: "cascade",
+    }),
   },
   (table) => [
     uniqueIndex("consent_record_offer_id_idx").on(table.offerId),
+    uniqueIndex("consent_record_version_id_idx").on(table.versionId),
     index("consent_record_project_id_idx").on(table.projectId),
   ]
 );

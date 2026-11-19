@@ -6,6 +6,15 @@ import {
   REVIEWER_CODE_LENGTH,
   REVIEWER_CODE_VALIDITY_MINUTES,
 } from "@roundcut/db/reviewer-code";
+import {
+  AlertDialog,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@roundcut/ui/components/alert-dialog";
 import { Button } from "@roundcut/ui/components/button";
 import { Checkbox } from "@roundcut/ui/components/checkbox";
 import { Field, FieldLabel } from "@roundcut/ui/components/field";
@@ -22,13 +31,21 @@ import {
   SendIcon,
   TriangleAlertIcon,
 } from "lucide-react";
-import { type FormEvent, useCallback, useId, useState } from "react";
+import {
+  type FormEvent,
+  type ReactNode,
+  useCallback,
+  useId,
+  useState,
+} from "react";
 
 import { formatMessage, type Messages } from "@/i18n/messages";
 import { client as api, orpc } from "@/utils/orpc";
 
 type AnswerMessages = Messages["review"]["extraRound"]["answer"];
-type Offer = NonNullable<Awaited<ReturnType<typeof api.extraRound.getOffer>>>;
+export type Offer = NonNullable<
+  Awaited<ReturnType<typeof api.extraRound.getOffer>>
+>;
 type Consent = NonNullable<Offer["consent"]>;
 type Step = "idle" | "onlyDecider" | "code";
 
@@ -39,7 +56,7 @@ const CODE_SLOTS = Array.from(
   (_, slot) => slot
 );
 
-function errorMessage(
+export function errorMessage(
   error: unknown,
   messages: AnswerMessages,
   locale: Locale
@@ -113,10 +130,162 @@ function ConsentRecord({
   );
 }
 
+// The emailed code the decider types, and the agreement they tick, before
+// an answer that needs both: accepting an extra round (EXTRA-02) or
+// approving a version (EXTRA-06).
+export function CodeConsentForm({
+  busy,
+  code,
+  confirmLabel,
+  consent,
+  consentLabel,
+  error,
+  messages,
+  onCancel,
+  onCodeChange,
+  onConsentChange,
+  onResend,
+  onSubmit,
+  sentTo,
+}: {
+  busy: boolean;
+  code: string;
+  confirmLabel: string;
+  consent: boolean;
+  consentLabel: string;
+  error: ReactNode;
+  messages: AnswerMessages;
+  onCancel?: () => void;
+  onCodeChange: (code: string) => void;
+  onConsentChange: (consent: boolean) => void;
+  onResend: () => void;
+  onSubmit: (event: FormEvent<HTMLFormElement>) => void;
+  sentTo: string;
+}) {
+  const codeId = useId();
+  const consentId = useId();
+  const submitLabel = busy ? messages.confirming : confirmLabel;
+  return (
+    <form className="flex flex-col gap-3" onSubmit={onSubmit}>
+      {error}
+      <p className="text-sm">
+        {formatMessage(messages.codeSent, {
+          email: sentTo,
+          minutes: REVIEWER_CODE_VALIDITY_MINUTES,
+        })}
+      </p>
+      <Field>
+        <FieldLabel htmlFor={codeId}>{messages.codeLabel}</FieldLabel>
+        <InputOTP
+          autoComplete="one-time-code"
+          disabled={busy}
+          id={codeId}
+          maxLength={REVIEWER_CODE_LENGTH}
+          onChange={onCodeChange}
+          pattern={DIGITS_ONLY}
+          value={code}
+        >
+          <InputOTPGroup>
+            {CODE_SLOTS.map((slot) => (
+              <InputOTPSlot index={slot} key={slot} />
+            ))}
+          </InputOTPGroup>
+        </InputOTP>
+      </Field>
+      <Field orientation="horizontal">
+        <Checkbox
+          checked={consent}
+          id={consentId}
+          onCheckedChange={onConsentChange}
+        />
+        <FieldLabel className="font-normal" htmlFor={consentId}>
+          {consentLabel}
+        </FieldLabel>
+      </Field>
+      <div className="flex flex-wrap items-center justify-end gap-2">
+        {onCancel ? (
+          <Button
+            disabled={busy}
+            onClick={onCancel}
+            size="sm"
+            type="button"
+            variant="ghost"
+          >
+            {messages.decline.cancel}
+          </Button>
+        ) : null}
+        <Button
+          disabled={busy}
+          onClick={onResend}
+          size="sm"
+          type="button"
+          variant="ghost"
+        >
+          {messages.resend}
+        </Button>
+        <Button
+          disabled={busy || !consent || code.length < REVIEWER_CODE_LENGTH}
+          size="sm"
+          type="submit"
+        >
+          {submitLabel}
+        </Button>
+      </div>
+    </form>
+  );
+}
+
+// Asking to decline (EXTRA-06): what declining does and what comes next.
+function ConfirmDeclineDialog({
+  busy,
+  messages,
+  onConfirm,
+  onOpenChange,
+  open,
+  round,
+  workspaceName,
+}: {
+  busy: boolean;
+  messages: AnswerMessages["decline"];
+  onConfirm: () => void;
+  onOpenChange: (open: boolean) => void;
+  open: boolean;
+  round: number;
+  workspaceName: string;
+}) {
+  return (
+    <AlertDialog onOpenChange={onOpenChange} open={open}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>
+            {formatMessage(messages.confirmTitle, { round })}
+          </AlertDialogTitle>
+          <AlertDialogDescription>
+            {formatMessage(messages.confirmDescription, {
+              workspace: workspaceName,
+            })}
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>{messages.cancel}</AlertDialogCancel>
+          <Button
+            disabled={busy}
+            onClick={onConfirm}
+            type="button"
+            variant="destructive"
+          >
+            {busy ? messages.declining : messages.confirm}
+          </Button>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+  );
+}
+
 // The decider's answer to the extra round offer (EXTRA-02, E12): "Accept"
 // emails them a 6-digit code, then they tick the agreement and type the code.
 // Any other reviewer is told only the decider can accept, and can forward the
-// request to them by email.
+// request to them by email. The decider can also decline (EXTRA-06).
 export function ExtraRoundAgreement({
   locale,
   messages,
@@ -124,6 +293,7 @@ export function ExtraRoundAgreement({
   shownLines,
   token,
   versionId,
+  workspaceName,
 }: {
   locale: Locale;
   messages: AnswerMessages;
@@ -132,11 +302,11 @@ export function ExtraRoundAgreement({
   shownLines: string[];
   token: string;
   versionId: string;
+  workspaceName: string;
 }) {
   const queryClient = useQueryClient();
-  const codeId = useId();
-  const consentId = useId();
   const [step, setStep] = useState<Step>("idle");
+  const [declining, setDeclining] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [code, setCode] = useState("");
@@ -181,6 +351,29 @@ export function ExtraRoundAgreement({
     setError(null);
     setStep("onlyDecider");
   }, [offer.canAccept, requestCode]);
+
+  const openDecline = useCallback(() => {
+    setError(null);
+    setDeclining(true);
+  }, []);
+
+  const handleDecline = useCallback(async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      await api.extraRound.decline({ offerId: offer.id, token, versionId });
+      setDeclining(false);
+      await refreshOffer();
+    } catch (failure) {
+      setDeclining(false);
+      setError(errorMessage(failure, messages, locale));
+      if (failure instanceof ORPCError && failure.code === "CONFLICT") {
+        await refreshOffer();
+      }
+    } finally {
+      setBusy(false);
+    }
+  }, [locale, messages, offer.id, refreshOffer, token, versionId]);
 
   const handleForward = useCallback(async () => {
     setBusy(true);
@@ -281,61 +474,20 @@ export function ExtraRoundAgreement({
 
   if (step === "code") {
     return (
-      <form className="flex flex-col gap-3" onSubmit={handleConfirm}>
-        {errorAlert}
-        <p className="text-sm">
-          {formatMessage(messages.codeSent, {
-            email: sentTo,
-            minutes: REVIEWER_CODE_VALIDITY_MINUTES,
-          })}
-        </p>
-        <Field>
-          <FieldLabel htmlFor={codeId}>{messages.codeLabel}</FieldLabel>
-          <InputOTP
-            autoComplete="one-time-code"
-            disabled={busy}
-            id={codeId}
-            maxLength={REVIEWER_CODE_LENGTH}
-            onChange={setCode}
-            pattern={DIGITS_ONLY}
-            value={code}
-          >
-            <InputOTPGroup>
-              {CODE_SLOTS.map((slot) => (
-                <InputOTPSlot index={slot} key={slot} />
-              ))}
-            </InputOTPGroup>
-          </InputOTP>
-        </Field>
-        <Field orientation="horizontal">
-          <Checkbox
-            checked={consent}
-            id={consentId}
-            onCheckedChange={setConsent}
-          />
-          <FieldLabel className="font-normal" htmlFor={consentId}>
-            {messages.consent}
-          </FieldLabel>
-        </Field>
-        <div className="flex flex-wrap items-center justify-end gap-2">
-          <Button
-            disabled={busy}
-            onClick={requestCode}
-            size="sm"
-            type="button"
-            variant="ghost"
-          >
-            {messages.resend}
-          </Button>
-          <Button
-            disabled={busy || !consent || code.length < REVIEWER_CODE_LENGTH}
-            size="sm"
-            type="submit"
-          >
-            {busy ? messages.confirming : messages.confirm}
-          </Button>
-        </div>
-      </form>
+      <CodeConsentForm
+        busy={busy}
+        code={code}
+        confirmLabel={messages.confirm}
+        consent={consent}
+        consentLabel={messages.consent}
+        error={errorAlert}
+        messages={messages}
+        onCodeChange={setCode}
+        onConsentChange={setConsent}
+        onResend={requestCode}
+        onSubmit={handleConfirm}
+        sentTo={sentTo}
+      />
     );
   }
 
@@ -382,11 +534,31 @@ export function ExtraRoundAgreement({
   return (
     <div className="flex flex-col gap-2">
       {errorAlert}
-      <div className="flex justify-end">
+      <div className="flex flex-wrap justify-end gap-2">
+        {offer.canAccept ? (
+          <Button
+            disabled={busy}
+            onClick={openDecline}
+            size="sm"
+            type="button"
+            variant="outline"
+          >
+            {messages.decline.action}
+          </Button>
+        ) : null}
         <Button disabled={busy} onClick={handleAccept} size="sm" type="button">
-          {busy ? messages.sendingCode : messages.accept}
+          {busy && !declining ? messages.sendingCode : messages.accept}
         </Button>
       </div>
+      <ConfirmDeclineDialog
+        busy={busy}
+        messages={messages.decline}
+        onConfirm={handleDecline}
+        onOpenChange={setDeclining}
+        open={declining}
+        round={offer.round}
+        workspaceName={workspaceName}
+      />
     </div>
   );
 }

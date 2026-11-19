@@ -1,6 +1,6 @@
-// Email codes proving a reviewer's address before an agreement (EXTRA-02).
-// Client-safe: no drizzle import.
-export const REVIEWER_CODE_PURPOSES = ["extra_round"] as const;
+// Email codes proving a reviewer's address before an agreement (EXTRA-02)
+// or a version approval (EXTRA-06). Client-safe: no drizzle import.
+export const REVIEWER_CODE_PURPOSES = ["extra_round", "approval"] as const;
 
 export type ReviewerCodePurpose = (typeof REVIEWER_CODE_PURPOSES)[number];
 

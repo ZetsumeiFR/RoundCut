@@ -14,6 +14,7 @@ import { consentRecord } from "@roundcut/db/schema/consent-record";
 import { deliverable } from "@roundcut/db/schema/deliverable";
 import { extraRoundOffer } from "@roundcut/db/schema/extra-round-offer";
 import { project } from "@roundcut/db/schema/project";
+import { reviewer } from "@roundcut/db/schema/reviewer";
 import { round } from "@roundcut/db/schema/round";
 import { version } from "@roundcut/db/schema/version";
 import { and, asc, desc, eq, inArray } from "drizzle-orm";
@@ -236,6 +237,36 @@ export const roundRouter = {
         .where(eq(deliverable.projectId, owned.id))
         .orderBy(asc(deliverable.position), desc(round.number));
       const positions = await projectRoundPositions(context.db, owned.id);
+      // Extra rounds the decider declined on a round, with the message they
+      // then wrote to the editor (EXTRA-06).
+      const declines =
+        rounds.length > 0
+          ? await context.db
+              .select({
+                contactedAt: extraRoundOffer.contactedAt,
+                contactMessage: extraRoundOffer.contactMessage,
+                declinedAt: extraRoundOffer.declinedAt,
+                declinedByName: reviewer.name,
+                roundId: extraRoundOffer.declinedRoundId,
+              })
+              .from(extraRoundOffer)
+              .leftJoin(
+                reviewer,
+                eq(extraRoundOffer.declinedByReviewerId, reviewer.id)
+              )
+              .where(
+                and(
+                  eq(extraRoundOffer.status, "declined"),
+                  inArray(
+                    extraRoundOffer.declinedRoundId,
+                    rounds.map((item) => item.id)
+                  )
+                )
+              )
+          : [];
+      const declinedOn = new Map(
+        declines.map(({ roundId, ...decline }) => [roundId, decline])
+      );
       return rounds.map(
         ({
           billingCurrency,
@@ -252,6 +283,7 @@ export const roundRouter = {
                   unitPriceCents: billingUnitPriceCents,
                 }
               : null,
+          declinedExtra: declinedOn.get(item.id) ?? null,
           position: positions.get(item.id) ?? item.number,
         })
       );

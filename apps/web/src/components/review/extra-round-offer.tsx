@@ -19,9 +19,10 @@ import { useSearchParams } from "next/navigation";
 import { useCallback, useEffect } from "react";
 
 import { formatMessage, type Messages } from "@/i18n/messages";
-import { orpc } from "@/utils/orpc";
+import { type client, orpc } from "@/utils/orpc";
 
 import { ExtraRoundAgreement } from "./extra-round-agreement";
+import { ExtraRoundDeclined } from "./extra-round-declined";
 import {
   ExtraRoundPayment,
   isAwaitingPayment,
@@ -36,6 +37,24 @@ const BASIS_POINTS = 10_000;
 // How often the offer is re-read after Stripe Checkout, until the webhook
 // has confirmed the payment.
 const PAYMENT_POLL_MS = 3000;
+
+type OfferStatus = NonNullable<
+  Awaited<ReturnType<typeof client.extraRound.getOffer>>
+>["status"];
+
+const STATUS_BADGES = {
+  accepted: "success-light",
+  declined: "destructive-light",
+  expired: "warning-light",
+  proposed: "warning-light",
+} as const satisfies Record<OfferStatus, string>;
+
+const statusBadge = (messages: OfferMessages, status: OfferStatus) => {
+  if (status === "accepted") {
+    return messages.acceptedBadge;
+  }
+  return status === "declined" ? messages.declinedBadge : messages.badge;
+};
 
 const toPaymentReturn = (value: string | null): PaymentReturn =>
   value === "success" || value === "cancelled" ? value : null;
@@ -180,11 +199,9 @@ export function ExtraRoundOffer({
       <Frame className="w-full" dense spacing="default" variant="default">
         <FrameHeader className="flex-row flex-wrap items-center justify-between gap-2">
           <FrameTitle className="font-medium text-sm">{title}</FrameTitle>
-          {current.status === "accepted" ? (
-            <Badge variant="success-light">{messages.acceptedBadge}</Badge>
-          ) : (
-            <Badge variant="warning-light">{messages.badge}</Badge>
-          )}
+          <Badge variant={STATUS_BADGES[current.status]}>
+            {statusBadge(messages, current.status)}
+          </Badge>
         </FrameHeader>
         <FramePanel className="flex flex-col gap-3">
           <p className="text-sm">{description}</p>
@@ -195,28 +212,43 @@ export function ExtraRoundOffer({
             <AmountRow label={messages.delay} value={`+${delay}`} />
           </dl>
         </FramePanel>
-        <FrameFooter className="flex flex-col gap-1 text-muted-foreground text-xs">
-          <p>{agreement}</p>
-          <p>{payment}</p>
-          {current.status === "proposed" ? <p>{messages.kept}</p> : null}
-          <p>
-            {formatMessage(messages.validUntil, {
-              date: new Intl.DateTimeFormat(locale, {
-                dateStyle: "long",
-              }).format(current.expiresAt),
-            })}
-          </p>
-        </FrameFooter>
+        {current.status === "declined" ? null : (
+          <FrameFooter className="flex flex-col gap-1 text-muted-foreground text-xs">
+            <p>{agreement}</p>
+            <p>{payment}</p>
+            {current.status === "proposed" ? <p>{messages.kept}</p> : null}
+            <p>
+              {formatMessage(messages.validUntil, {
+                date: new Intl.DateTimeFormat(locale, {
+                  dateStyle: "long",
+                }).format(current.expiresAt),
+              })}
+            </p>
+          </FrameFooter>
+        )}
         <FramePanel className="flex flex-col gap-3">
-          <ExtraRoundAgreement
-            key={current.id}
-            locale={locale}
-            messages={messages.answer}
-            offer={current}
-            shownLines={shownLines}
-            token={token}
-            versionId={versionId}
-          />
+          {current.status === "declined" ? (
+            <ExtraRoundDeclined
+              key={current.id}
+              locale={locale}
+              messages={messages.answer}
+              offer={current}
+              token={token}
+              versionId={versionId}
+              workspaceName={workspaceName}
+            />
+          ) : (
+            <ExtraRoundAgreement
+              key={current.id}
+              locale={locale}
+              messages={messages.answer}
+              offer={current}
+              shownLines={shownLines}
+              token={token}
+              versionId={versionId}
+              workspaceName={workspaceName}
+            />
+          )}
           {current.status === "accepted" && !current.requirePayment ? (
             <Alert variant="info">
               <InfoIcon aria-hidden="true" />

@@ -1137,6 +1137,9 @@ const en = {
           next_version: "next version published",
         },
         deciderReminded: "Decider reminded {count}/{max}",
+        declined: "Extra round declined by {name} on {date}",
+        declinedMessage: "Message from {name} ({date}): {message}",
+        declinedUnknown: "the decider",
         description:
           "Each round keeps its version and its opening, submission and closing dates.",
         emptyDescription:
@@ -1280,6 +1283,37 @@ const en = {
         confirm: "Confirm my agreement",
         confirming: "Confirming…",
         consent: "I accept this extra round on the terms shown",
+        decline: {
+          action: "Decline",
+          approve: "Approve the current version",
+          approveConfirm: "Approve the version",
+          approveConsent: "I approve the current version as final",
+          approveDescription:
+            "Approving makes this version final: {workspace} delivers it as it is, without another round.",
+          approving: "Sending the code…",
+          cancel: "Cancel",
+          choice:
+            "You can approve the current version as it is, or write to {workspace}.",
+          confirm: "Decline the round",
+          confirmDescription:
+            "No extra round opens and nothing is charged. Your comments are kept, and you can then approve the current version or write to {workspace}.",
+          confirmTitle: "Decline extra round {round}?",
+          contact: "Write to {workspace}",
+          contactDescription:
+            "{workspace} receives your message by email and can reply to you directly.",
+          contacted: "Message sent to {workspace} on {date}:",
+          contactLabel: "Your message",
+          contactPlaceholder:
+            "For example: what you expect from the next version…",
+          contactRequired: "Write a message.",
+          contactSend: "Send the message",
+          contactSending: "Sending…",
+          contactTooLong: "{max} characters maximum.",
+          declined: "Extra round {round} declined on {date} by {name}.",
+          declining: "Declining…",
+          onlyDecider:
+            "{decider} decides what comes next: approving the current version or writing to {workspace}.",
+        },
         error: "Something went wrong. Try again.",
         forward: "Send the request to {decider}",
         forwarded: "Request sent to {decider} on {date}.",
@@ -1300,6 +1334,7 @@ const en = {
         sendingCode: "Sending the code…",
       },
       badge: "Agreement needed",
+      declinedBadge: "Declined",
       delay: "Delivery delay",
       delayOne: "{count} day",
       delayOther: "{count} days",
@@ -2581,6 +2616,9 @@ const fr: Messages = {
           next_version: "version suivante publiée",
         },
         deciderReminded: "Décideur relancé {count}/{max}",
+        declined: "Tour supplémentaire refusé par {name} le {date}",
+        declinedMessage: "Message de {name} ({date}) : {message}",
+        declinedUnknown: "le décideur",
         description:
           "Chaque tour garde sa version et ses dates d'ouverture, de soumission et de clôture.",
         emptyDescription:
@@ -2725,6 +2763,37 @@ const fr: Messages = {
         confirm: "Confirmer mon accord",
         confirming: "Confirmation…",
         consent: "J'accepte ce tour supplémentaire aux conditions affichées",
+        decline: {
+          action: "Refuser",
+          approve: "Valider la version actuelle",
+          approveConfirm: "Valider la version",
+          approveConsent: "Je valide la version actuelle comme version finale",
+          approveDescription:
+            "Valider rend cette version définitive : {workspace} la livre telle quelle, sans nouveau tour.",
+          approving: "Envoi du code…",
+          cancel: "Annuler",
+          choice:
+            "Vous pouvez valider la version actuelle telle quelle, ou écrire à {workspace}.",
+          confirm: "Refuser le tour",
+          confirmDescription:
+            "Aucun tour supplémentaire ne s'ouvre et rien n'est facturé. Vos commentaires sont conservés, et vous pourrez ensuite valider la version actuelle ou écrire à {workspace}.",
+          confirmTitle: "Refuser le tour supplémentaire {round} ?",
+          contact: "Écrire à {workspace}",
+          contactDescription:
+            "{workspace} reçoit votre message par e-mail et peut vous répondre directement.",
+          contacted: "Message envoyé à {workspace} le {date} :",
+          contactLabel: "Votre message",
+          contactPlaceholder:
+            "Par exemple : ce que vous attendez de la prochaine version…",
+          contactRequired: "Écrivez un message.",
+          contactSend: "Envoyer le message",
+          contactSending: "Envoi…",
+          contactTooLong: "{max} caractères maximum.",
+          declined: "Tour supplémentaire {round} refusé le {date} par {name}.",
+          declining: "Refus…",
+          onlyDecider:
+            "{decider} décide de la suite : valider la version actuelle ou écrire à {workspace}.",
+        },
         error: "Une erreur est survenue. Réessayez.",
         forward: "Transmettre la demande à {decider}",
         forwarded: "Demande transmise à {decider} le {date}.",
@@ -2745,6 +2814,7 @@ const fr: Messages = {
         sendingCode: "Envoi du code…",
       },
       badge: "Accord requis",
+      declinedBadge: "Refusé",
       delay: "Délai de livraison",
       delayOne: "{count} jour",
       delayOther: "{count} jours",
