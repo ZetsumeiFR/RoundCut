@@ -26,8 +26,23 @@ export const extraRoundOffer = pgTable(
       () => reviewer.id,
       { onDelete: "set null" }
     ),
+    // The decider's message to the editor after declining (EXTRA-06), and
+    // when it was emailed; at most one per declined offer.
+    contactedAt: timestamp("contacted_at"),
+    contactMessage: text("contact_message"),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     currency: text("currency").notNull(),
+    // Trace of the decider declining the offer (EXTRA-06): when, by whom,
+    // and the round it was declined on, which keeps the answer standing
+    // until the next version opens a new round.
+    declinedAt: timestamp("declined_at"),
+    declinedByReviewerId: text("declined_by_reviewer_id").references(
+      () => reviewer.id,
+      { onDelete: "set null" }
+    ),
+    declinedRoundId: text("declined_round_id").references(() => round.id, {
+      onDelete: "set null",
+    }),
     delayDays: integer("delay_days").notNull(),
     deliverableId: text("deliverable_id")
       .notNull()

@@ -59,9 +59,14 @@ interface RoundTransition {
 
 // Every move a round can make (ROUND-01); closed is final. Publishing the
 // next version supersedes a round the client hasn't submitted yet, as the
-// editor closing it would.
+// editor closing it would; approving the version ends its round whether or
+// not feedback was submitted (EXTRA-06: approving instead of an extra round).
 export const ROUND_TRANSITIONS = {
-  approve: { closedReason: "approved", from: ["submitted"], to: "closed" },
+  approve: {
+    closedReason: "approved",
+    from: ["open", "submitted"],
+    to: "closed",
+  },
   closeManually: { closedReason: "manual", from: ["open"], to: "closed" },
   nextVersion: {
     closedReason: "next_version",

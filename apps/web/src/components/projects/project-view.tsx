@@ -472,6 +472,41 @@ function DeliverablesTab({
   );
 }
 
+// The extra round the decider declined on a round and the message they then
+// wrote (EXTRA-06).
+function DeclinedExtra({
+  dateFormat,
+  decline,
+  messages,
+}: {
+  dateFormat: Intl.DateTimeFormat;
+  decline: NonNullable<ProjectRound["declinedExtra"]>;
+  messages: ViewMessages["rounds"];
+}) {
+  const name = decline.declinedByName ?? messages.declinedUnknown;
+  return (
+    <>
+      {decline.declinedAt ? (
+        <p className="text-muted-foreground text-xs">
+          {formatMessage(messages.declined, {
+            date: dateFormat.format(new Date(decline.declinedAt)),
+            name,
+          })}
+        </p>
+      ) : null}
+      {decline.contactedAt && decline.contactMessage ? (
+        <p className="whitespace-pre-line break-words text-xs">
+          {formatMessage(messages.declinedMessage, {
+            date: dateFormat.format(new Date(decline.contactedAt)),
+            message: decline.contactMessage,
+            name,
+          })}
+        </p>
+      ) : null}
+    </>
+  );
+}
+
 function RoundItem({
   dateFormat,
   includedRounds,
@@ -599,6 +634,13 @@ function RoundItem({
         <p className="whitespace-pre-line text-muted-foreground text-xs">
           {formatMessage(rounds.closedNote, { note: round.closedNote })}
         </p>
+      ) : null}
+      {round.declinedExtra ? (
+        <DeclinedExtra
+          dateFormat={dateFormat}
+          decline={round.declinedExtra}
+          messages={rounds}
+        />
       ) : null}
       {round.billing ? (
         <p className="text-muted-foreground text-xs tabular-nums">

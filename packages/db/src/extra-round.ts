@@ -20,6 +20,9 @@ export type ExtraRoundOfferStatus = (typeof EXTRA_ROUND_OFFER_STATUSES)[number];
 
 export const EXTRA_ROUND_OFFER_VALIDITY_DAYS = 14;
 
+// The decider's message to the editor after declining an offer (EXTRA-06).
+export const EXTRA_ROUND_CONTACT_MAX_LENGTH = 2000;
+
 const BASIS_POINTS = 10_000;
 
 // Amounts shown to the client (§7.4): the price excludes VAT, the VAT is

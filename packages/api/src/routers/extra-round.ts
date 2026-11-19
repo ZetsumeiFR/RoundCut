@@ -1,12 +1,18 @@
 import { ORPCError } from "@orpc/server";
-import { extraRoundForwardEmail, sendEmail } from "@roundcut/auth/email";
+import {
+  extraRoundContactEmail,
+  extraRoundForwardEmail,
+  sendEmail,
+} from "@roundcut/auth/email";
 import { type Locale, resolveLocale } from "@roundcut/auth/locale";
 import type { Database } from "@roundcut/db";
 import {
+  EXTRA_ROUND_CONTACT_MAX_LENGTH,
   EXTRA_ROUND_OFFER_VALIDITY_DAYS,
   needsExtraRound,
   offerAmounts,
 } from "@roundcut/db/extra-round";
+import { user } from "@roundcut/db/schema/auth";
 import { billableLine } from "@roundcut/db/schema/billable-line";
 import { client } from "@roundcut/db/schema/client";
 import { consentRecord } from "@roundcut/db/schema/consent-record";
@@ -107,6 +113,35 @@ async function acceptedOffer(db: Database, deliverableId: string) {
   return offer ?? null;
 }
 
+// The offer the decider declined on the deliverable's current round
+// (EXTRA-06): their answer stands, and no new offer is made, until the next
+// version opens a new round.
+async function declinedOffer(db: Database, roundId: string) {
+  const [offer] = await db
+    .select()
+    .from(extraRoundOffer)
+    .where(
+      and(
+        eq(extraRoundOffer.declinedRoundId, roundId),
+        eq(extraRoundOffer.status, "declined")
+      )
+    )
+    .orderBy(desc(extraRoundOffer.declinedAt))
+    .limit(1);
+  return offer ?? null;
+}
+
+async function reviewerName(db: Database, reviewerId: string | null) {
+  if (!reviewerId) {
+    return null;
+  }
+  const [row] = await db
+    .select({ name: reviewer.name })
+    .from(reviewer)
+    .where(eq(reviewer.id, reviewerId));
+  return row?.name ?? null;
+}
+
 // The agreement record of an accepted offer (EXTRA-03), as shown on the page.
 async function offerConsent(db: Database, offerId: string) {
   const [record] = await db
@@ -146,7 +181,8 @@ async function currentOffer(
     .innerJoin(workspace, eq(project.workspaceId, workspace.id))
     .innerJoin(client, eq(project.clientId, client.id))
     .where(eq(project.id, projectId));
-  if (!(current && owner)) {
+  // An approved version takes no more rounds (EXTRA-06).
+  if (!(current && owner) || target.status === "approved") {
     return null;
   }
   const position =
@@ -167,6 +203,7 @@ async function currentOffer(
   }
   const offer =
     (await acceptedOffer(db, target.deliverableId)) ??
+    (await declinedOffer(db, current.id)) ??
     (await proposeOffer(db, target.deliverableId, {
       currency: owner.currency,
       delayDays: terms.extraRoundDelayDays,
@@ -180,20 +217,20 @@ async function currentOffer(
   if (!offer) {
     return null;
   }
-  const [acceptedBy] = offer.acceptedByReviewerId
-    ? await db
-        .select({ name: reviewer.name })
-        .from(reviewer)
-        .where(eq(reviewer.id, offer.acceptedByReviewerId))
-    : [];
   return {
     ...offerAmounts(offer.priceCents, offer.vatRateBps),
     acceptedAt: offer.acceptedAt,
-    acceptedByName: acceptedBy?.name ?? null,
+    acceptedByName: await reviewerName(db, offer.acceptedByReviewerId),
     consent:
       offer.status === "accepted" ? await offerConsent(db, offer.id) : null,
+    contactedAt: offer.contactedAt,
+    contactMessage: offer.contactMessage,
     currency: offer.currency,
+    // The round the offer is answered on (EXTRA-06 records a decline on it).
+    currentRoundId: current.id,
     deciderName: owner.deciderName,
+    declinedAt: offer.declinedAt,
+    declinedByName: await reviewerName(db, offer.declinedByReviewerId),
     delayDays: offer.delayDays,
     deliverableId: target.deliverableId,
     expiresAt: offer.expiresAt,
@@ -593,6 +630,133 @@ export const extraRoundRouter = {
         throw new Error(`Checkout session ${session.id} has no URL`);
       }
       return { url: session.url };
+    }),
+
+  // The decider then writes to the editor (EXTRA-06): the message is kept
+  // on the declined offer for the project history and emailed to the
+  // workspace owner, who replies straight to the decider. One message per
+  // declined offer; a failed email releases it so the decider can retry.
+  contactEditor: publicProcedure
+    .input(
+      offerInput.extend({
+        message: z.string().trim().min(1).max(EXTRA_ROUND_CONTACT_MAX_LENGTH),
+      })
+    )
+    .use(requireReviewLink)
+    .handler(async ({ context, input }) => {
+      const decider = requireDecider(context.reviewer, context.reviewerClient);
+      const { projectId } = context.reviewLink;
+      const offer = await currentOffer(
+        context.db,
+        context.stripe,
+        projectId,
+        input.versionId
+      );
+      const conflict = new ORPCError("CONFLICT", {
+        message: "The editor was already contacted about this offer",
+      });
+      if (offer?.id !== input.offerId || offer.status !== "declined") {
+        throw conflict;
+      }
+      const now = new Date();
+      const [claimed] = await context.db
+        .update(extraRoundOffer)
+        .set({ contactedAt: now, contactMessage: input.message })
+        .where(
+          and(
+            eq(extraRoundOffer.id, offer.id),
+            eq(extraRoundOffer.status, "declined"),
+            isNull(extraRoundOffer.contactedAt)
+          )
+        )
+        .returning({
+          contactedAt: extraRoundOffer.contactedAt,
+          contactMessage: extraRoundOffer.contactMessage,
+        });
+      if (!claimed) {
+        throw conflict;
+      }
+      try {
+        const [row] = await context.db
+          .select({
+            deliverableTitle: deliverable.title,
+            editorEmail: user.email,
+            locale: workspace.locale,
+            projectName: project.name,
+          })
+          .from(deliverable)
+          .innerJoin(project, eq(deliverable.projectId, project.id))
+          .innerJoin(workspace, eq(project.workspaceId, workspace.id))
+          .innerJoin(user, eq(workspace.ownerUserId, user.id))
+          .where(eq(deliverable.id, offer.deliverableId));
+        if (!row) {
+          throw new Error(`Deliverable ${offer.deliverableId} not found`);
+        }
+        await sendEmail(
+          context.notifications.email,
+          extraRoundContactEmail(resolveLocale(row.locale), row.editorEmail, {
+            deciderEmail: decider.email,
+            deciderName: decider.name,
+            deliverableTitle: row.deliverableTitle,
+            message: input.message,
+            projectName: row.projectName,
+            roundNumber: offer.round,
+            url: `${context.notifications.appUrl}/projects/${projectId}`,
+          })
+        );
+      } catch (error) {
+        await context.db
+          .update(extraRoundOffer)
+          .set({ contactedAt: null, contactMessage: null })
+          .where(eq(extraRoundOffer.id, offer.id));
+        console.error("Extra round contact email failed", error);
+        throw new ORPCError("INTERNAL_SERVER_ERROR", {
+          cause: error,
+          message: "Couldn't email the editor",
+        });
+      }
+      return claimed;
+    }),
+
+  // The decider declines the offer (EXTRA-06, §7.3 proposed -> declined):
+  // the batch's comments stay as they are, no round opens, and the decider
+  // goes on to approve the current version or write to the editor. The
+  // answer stands on the current round until the next version.
+  decline: publicProcedure
+    .input(offerInput)
+    .use(requireReviewLink)
+    .handler(async ({ context, input }) => {
+      const decider = requireDecider(context.reviewer, context.reviewerClient);
+      const { projectId } = context.reviewLink;
+      const offer = await openOffer(context, projectId, input);
+      const now = new Date();
+      const [declined] = await context.db
+        .update(extraRoundOffer)
+        .set({
+          declinedAt: now,
+          declinedByReviewerId: decider.id,
+          declinedRoundId: offer.currentRoundId,
+          status: "declined",
+        })
+        .where(
+          and(
+            eq(extraRoundOffer.id, offer.id),
+            eq(extraRoundOffer.status, "proposed"),
+            gt(extraRoundOffer.expiresAt, now)
+          )
+        )
+        .returning({ id: extraRoundOffer.id });
+      if (!declined) {
+        throw new ORPCError("CONFLICT", {
+          message: "This offer is no longer waiting for an answer",
+        });
+      }
+      return {
+        ...offer,
+        declinedAt: now,
+        declinedByName: decider.name,
+        status: "declined" as const,
+      };
     }),
 
   // A reviewer who isn't the decider can't accept (EXTRA-02): they forward

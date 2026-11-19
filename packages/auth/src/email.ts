@@ -7,6 +7,8 @@ export interface EmailConfig {
 }
 
 interface EmailMessage {
+  // Where the recipient's reply goes, when not to the sender.
+  replyTo?: string;
   subject: string;
   text: string;
   to: string;
@@ -23,13 +25,19 @@ export async function sendEmail(config: EmailConfig, message: EmailMessage) {
     }
     // Without a Resend key, development prints the email so its links stay usable.
     console.info(
-      `[email] to=${message.to} subject="${message.subject}"\n${message.text}`
+      `[email] to=${message.to}${message.replyTo ? ` reply-to=${message.replyTo}` : ""} subject="${message.subject}"\n${message.text}`
     );
     return;
   }
 
   const response = await fetch(RESEND_ENDPOINT, {
-    body: JSON.stringify({ from: config.EMAIL_FROM, ...message }),
+    body: JSON.stringify({
+      from: config.EMAIL_FROM,
+      reply_to: message.replyTo,
+      subject: message.subject,
+      text: message.text,
+      to: message.to,
+    }),
     headers: {
       Authorization: `Bearer ${config.RESEND_API_KEY}`,
       "Content-Type": "application/json",
@@ -231,6 +239,67 @@ export function extraRoundCodeEmail(
   details: ReviewerCodeDetails
 ): EmailMessage {
   return { to, ...extraRoundCodeEmails[locale](details) };
+}
+
+const approvalCodeEmails = {
+  en: (details: ReviewerCodeDetails) => ({
+    subject: `${details.code} is your code to approve the version`,
+    text: `Hello ${details.reviewerName},\n\nYour code to approve the current version of ${details.projectName}, delivered by ${details.studioName}:\n\n${details.code}\n\nIt is valid for ${details.validityMinutes} minutes. If you didn't ask for it, ignore this email: nothing is approved without the code.`,
+  }),
+  fr: (details: ReviewerCodeDetails) => ({
+    subject: `${details.code} est votre code pour valider la version`,
+    text: `Bonjour ${details.reviewerName},\n\nVotre code pour valider la version actuelle de ${details.projectName}, livrée par ${details.studioName} :\n\n${details.code}\n\nIl est valable ${details.validityMinutes} minutes. Si vous n'êtes pas à l'origine de cette demande, ignorez cet email : rien n'est validé sans le code.`,
+  }),
+} satisfies Record<
+  Locale,
+  (details: ReviewerCodeDetails) => Omit<EmailMessage, "to">
+>;
+
+// The code the decider types to approve a version (EXTRA-06).
+export function approvalCodeEmail(
+  locale: Locale,
+  to: string,
+  details: ReviewerCodeDetails
+): EmailMessage {
+  return { to, ...approvalCodeEmails[locale](details) };
+}
+
+export interface ExtraRoundContactDetails {
+  deciderEmail: string;
+  deciderName: string;
+  deliverableTitle: string;
+  message: string;
+  projectName: string;
+  roundNumber: number;
+  url: string;
+}
+
+const extraRoundContactEmails = {
+  en: (details: ExtraRoundContactDetails) => ({
+    subject: `${details.projectName}: ${details.deciderName} declined extra round ${details.roundNumber} and wrote to you`,
+    text: `${details.deciderName} (${details.deciderEmail}) declined extra round ${details.roundNumber} on ${details.deliverableTitle} (${details.projectName}) and sent you this message:\n\n${details.message}\n\nReply to this email to answer them. Project history:\n${details.url}`,
+  }),
+  fr: (details: ExtraRoundContactDetails) => ({
+    subject: `${details.projectName} : ${details.deciderName} a refusé le tour supplémentaire ${details.roundNumber} et vous écrit`,
+    text: `${details.deciderName} (${details.deciderEmail}) a refusé le tour supplémentaire ${details.roundNumber} sur ${details.deliverableTitle} (${details.projectName}) et vous a envoyé ce message :\n\n${details.message}\n\nRépondez à cet email pour lui répondre. Historique du projet :\n${details.url}`,
+  }),
+} satisfies Record<
+  Locale,
+  (details: ExtraRoundContactDetails) => Omit<EmailMessage, "to">
+>;
+
+// The decider's message to the editor after declining an extra round
+// (EXTRA-06); replies go straight to the decider.
+export function extraRoundContactEmail(
+  locale: Locale,
+  to: string,
+  details: ExtraRoundContactDetails
+): EmailMessage {
+  return {
+    replyTo: details.deciderEmail,
+    to,
+    ...extraRoundContactEmails[locale](details),
+  };
 }
 
 export interface ExtraRoundForwardDetails {

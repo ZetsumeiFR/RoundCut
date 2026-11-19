@@ -1,6 +1,6 @@
 // Agreement records (EXTRA-03, §8 consent_record). Client-safe: no drizzle
-// import. APPR-01 adds the "approval" kind for the final approval.
-export const CONSENT_KINDS = ["extra_round"] as const;
+// import. "approval" is the decider validating a version (EXTRA-06, APPR-01).
+export const CONSENT_KINDS = ["extra_round", "approval"] as const;
 
 export type ConsentKind = (typeof CONSENT_KINDS)[number];
 
