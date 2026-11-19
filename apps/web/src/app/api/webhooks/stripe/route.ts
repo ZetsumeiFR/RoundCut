@@ -1,7 +1,7 @@
 import { handleStripeEvent } from "@roundcut/api/extra-round-payment";
 
 import { ENV } from "@/env.server";
-import { db, stripe } from "@/services";
+import { db, notifications, stripe } from "@/services";
 
 // Stripe Connect events of the editors' accounts (EXTRA-04): the extra
 // round payment confirmations. Only events signed with the endpoint's secret
@@ -14,7 +14,7 @@ export async function POST(request: Request) {
   if (!signature) {
     return new Response("Missing signature", { status: 400 });
   }
-  let event: Parameters<typeof handleStripeEvent>[1];
+  let event: Parameters<typeof handleStripeEvent>[2];
   try {
     event = await stripe.webhooks.constructEventAsync(
       await request.text(),
@@ -24,6 +24,6 @@ export async function POST(request: Request) {
   } catch {
     return new Response("Invalid signature", { status: 400 });
   }
-  await handleStripeEvent(db, event);
+  await handleStripeEvent(db, notifications, event);
   return Response.json({ received: true });
 }

@@ -64,6 +64,7 @@ import {
   LinkIcon,
   PlayIcon,
   PlusIcon,
+  ReceiptTextIcon,
   SearchXIcon,
   UploadIcon,
 } from "lucide-react";
@@ -75,8 +76,9 @@ import {
   type TermsMessages,
 } from "@/components/account/revision-terms-settings";
 import { gridI18n } from "@/components/clients/clients-view";
+import { ReceiptDownloadButton } from "@/components/review/receipt-download-button";
 import { formatMessage, type Messages } from "@/i18n/messages";
-import { orpc } from "@/utils/orpc";
+import { client as api, orpc } from "@/utils/orpc";
 import { CloseRoundDialog } from "./close-round-dialog";
 import { deliverableCountLabel, formatDuration } from "./deliverable-form";
 import { DeliverablesSheet } from "./deliverables-sheet";
@@ -791,6 +793,160 @@ function RoundsTab({
   );
 }
 
+type ProjectReceipt = Awaited<
+  ReturnType<AppRouterClient["receipt"]["list"]>
+>[number];
+
+const RECEIPT_BADGES = {
+  awaiting_payment: "warning-light",
+  paid: "success-light",
+  to_invoice: "secondary",
+} as const satisfies Record<ProjectReceipt["status"], string>;
+
+function ReceiptItem({
+  dateFormat,
+  locale,
+  messages,
+  receipt,
+}: {
+  dateFormat: Intl.DateTimeFormat;
+  locale: Locale;
+  messages: ProjectsMessages["view"]["receipts"];
+  receipt: ProjectReceipt;
+}) {
+  const fetchReceipt = useCallback(
+    () => api.receipt.download({ id: receipt.id, locale }),
+    [locale, receipt.id]
+  );
+  const names = { deliverable: receipt.deliverableTitle, round: receipt.round };
+  return (
+    <li className="flex flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3">
+      <div className="flex min-w-0 flex-1 basis-64 flex-col gap-0.5">
+        <p className="font-medium text-sm">
+          {formatMessage(messages.item, names)}
+        </p>
+        <p className="break-words text-muted-foreground text-xs">
+          {formatMessage(messages.signed, {
+            date: dateFormat.format(new Date(receipt.createdAt)),
+            email: receipt.email,
+            name: receipt.name,
+            version: receipt.versionNumber,
+          })}
+        </p>
+      </div>
+      <div className="flex items-center gap-3">
+        <span className="font-medium text-sm tabular-nums">
+          {new Intl.NumberFormat(locale, {
+            currency: receipt.currency,
+            style: "currency",
+          }).format(receipt.grossCents / CENTS_PER_UNIT)}
+        </span>
+        <Badge radius="full" variant={RECEIPT_BADGES[receipt.status]}>
+          {messages.statuses[receipt.status]}
+        </Badge>
+        <ReceiptDownloadButton
+          fetchReceipt={fetchReceipt}
+          label={formatMessage(messages.downloadLabel, names)}
+          messages={messages}
+        />
+      </div>
+    </li>
+  );
+}
+
+// The agreement receipts of the project's extra rounds (EXTRA-07), also
+// those still waiting for the client's online payment.
+function ReceiptsHistory({
+  locale,
+  messages,
+  projectId,
+}: {
+  locale: Locale;
+  messages: ProjectsMessages;
+  projectId: string;
+}) {
+  const { receipts: receiptsMessages } = messages.view;
+  const receipts = useQuery(
+    orpc.receipt.list.queryOptions({
+      input: { projectId },
+      meta: { inlineError: true },
+    })
+  );
+  const dateFormat = useMemo(
+    () =>
+      new Intl.DateTimeFormat(locale, {
+        dateStyle: "medium",
+        timeStyle: "short",
+      }),
+    [locale]
+  );
+  const { refetch } = receipts;
+  const handleRetry = useCallback(() => refetch(), [refetch]);
+
+  let content: ReactNode;
+  if (receipts.isError) {
+    content = (
+      <ViewEmpty
+        action={
+          <Button onClick={handleRetry} type="button" variant="outline">
+            {messages.retry}
+          </Button>
+        }
+        description={messages.loadErrorDescription}
+        icon={<CircleAlertIcon aria-hidden="true" />}
+        title={receiptsMessages.loadError}
+      />
+    );
+  } else if (!receipts.data) {
+    content = (
+      <div
+        aria-label={receiptsMessages.loading}
+        className="flex flex-col gap-2 px-4 py-3"
+        role="status"
+      >
+        <Skeleton className="h-3.5 w-48" />
+        <Skeleton className="h-3 w-72 max-w-full" />
+      </div>
+    );
+  } else if (receipts.data.length === 0) {
+    content = (
+      <ViewEmpty
+        description={receiptsMessages.emptyDescription}
+        icon={<ReceiptTextIcon aria-hidden="true" />}
+        title={receiptsMessages.emptyTitle}
+      />
+    );
+  } else {
+    content = (
+      <ul className="divide-y">
+        {receipts.data.map((receipt) => (
+          <ReceiptItem
+            dateFormat={dateFormat}
+            key={receipt.id}
+            locale={locale}
+            messages={receiptsMessages}
+            receipt={receipt}
+          />
+        ))}
+      </ul>
+    );
+  }
+
+  return (
+    <Frame className="w-full" dense spacing="default" variant="default">
+      <FrameHeader>
+        <FrameTitle>
+          <h2 className="font-semibold text-sm">{receiptsMessages.title}</h2>
+        </FrameTitle>
+        <FrameDescription className="text-xs">
+          {receiptsMessages.description}
+        </FrameDescription>
+      </FrameHeader>
+      <FramePanel className="p-0">{content}</FramePanel>
+    </Frame>
+  );
+}
+
 function DetailRow({ label, value }: { label: string; value: ReactNode }) {
   return (
     <div className="flex justify-between gap-4">
@@ -1059,12 +1215,19 @@ export function ProjectView({
           />
         </TabsContent>
         <TabsContent className="pt-3" value="history">
-          <RoundsTab
-            includedRounds={project.data.termsSnapshot.includedRounds}
-            locale={locale}
-            messages={messages}
-            projectId={project.data.id}
-          />
+          <div className="flex flex-col gap-4">
+            <RoundsTab
+              includedRounds={project.data.termsSnapshot.includedRounds}
+              locale={locale}
+              messages={messages}
+              projectId={project.data.id}
+            />
+            <ReceiptsHistory
+              locale={locale}
+              messages={messages}
+              projectId={project.data.id}
+            />
+          </div>
         </TabsContent>
         <TabsContent className="pt-3" value="settings">
           <SettingsTab

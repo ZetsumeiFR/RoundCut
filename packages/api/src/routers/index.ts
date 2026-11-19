@@ -7,6 +7,7 @@ import { deliverableRouter } from "./deliverable";
 import { extraRoundRouter } from "./extra-round";
 import { paymentsRouter } from "./payments";
 import { projectRouter } from "./project";
+import { receiptRouter } from "./receipt";
 import { reviewRouter } from "./review";
 import { reviewLinkRouter } from "./review-link";
 import { roundRouter } from "./round";
@@ -27,6 +28,7 @@ export const appRouter = {
     user: context.session?.user,
   })),
   project: projectRouter,
+  receipt: receiptRouter,
   review: reviewRouter,
   reviewLink: reviewLinkRouter,
   round: roundRouter,

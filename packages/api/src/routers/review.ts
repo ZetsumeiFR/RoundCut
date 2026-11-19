@@ -18,6 +18,7 @@ import { client } from "@roundcut/db/schema/client";
 import { comment } from "@roundcut/db/schema/comment";
 import { consentRecord } from "@roundcut/db/schema/consent-record";
 import { deliverable } from "@roundcut/db/schema/deliverable";
+import { extraRoundOffer } from "@roundcut/db/schema/extra-round-offer";
 import { project } from "@roundcut/db/schema/project";
 import { reviewer } from "@roundcut/db/schema/reviewer";
 import { round } from "@roundcut/db/schema/round";
@@ -497,6 +498,14 @@ export const reviewRouter = {
         .where(eq(project.id, projectId));
       const current = await findVersionRound(context.db, target.id);
       const positions = await projectRoundPositions(context.db, projectId);
+      // The agreement that granted the round, whose receipt the client can
+      // download once the offer itself is settled (EXTRA-07).
+      const [agreed] = current
+        ? await context.db
+            .select({ offerId: extraRoundOffer.id })
+            .from(extraRoundOffer)
+            .where(eq(extraRoundOffer.roundId, current.id))
+        : [];
       return {
         approval: await versionApproval(context.db, target.id),
         includedRounds: terms?.termsSnapshot.includedRounds ?? 0,
@@ -504,6 +513,7 @@ export const reviewRouter = {
         round: current
           ? {
               ...current,
+              agreementOfferId: agreed?.offerId ?? null,
               batchCount: await batchSize(context.db, current.id),
               position: positions.get(current.id) ?? current.number,
             }

@@ -4,7 +4,7 @@ import {
   extraRoundForwardEmail,
   sendEmail,
 } from "@roundcut/auth/email";
-import { type Locale, resolveLocale } from "@roundcut/auth/locale";
+import { LOCALES, type Locale, resolveLocale } from "@roundcut/auth/locale";
 import type { Database } from "@roundcut/db";
 import {
   EXTRA_ROUND_CONTACT_MAX_LENGTH,
@@ -38,6 +38,7 @@ import {
   fetchPaymentsActive,
   type StripeClient,
 } from "../payments";
+import { emailReceipt, findReceipt, receiptFile } from "../receipt";
 import { reviewTokenSchema } from "../review-link";
 import { isDeciderEmail } from "../reviewer";
 import { consumeReviewerCode, reviewerCodeSchema } from "../reviewer-code";
@@ -545,6 +546,14 @@ export const extraRoundRouter = {
       if (!offer.requirePayment) {
         await openAgreedRound(context.db, offer.id);
       }
+      if (consent) {
+        await emailReceipt(
+          context.db,
+          context.notifications,
+          consent.id,
+          "agreed"
+        );
+      }
       return {
         ...offer,
         acceptedAt: now,
@@ -831,5 +840,28 @@ export const extraRoundRouter = {
             canAccept: isDeciderEmail(context.reviewerClient, viewer.email),
           }
         : null;
+    }),
+
+  // The agreement receipt of an accepted offer as a PDF (EXTRA-07), for any
+  // identified reviewer of the project, in the page's language.
+  receipt: publicProcedure
+    .input(
+      z.object({
+        locale: z.enum(LOCALES),
+        offerId: z.string().min(1),
+        token: reviewTokenSchema,
+      })
+    )
+    .use(requireReviewLink)
+    .handler(async ({ context, input }) => {
+      requireReviewer(context.reviewer);
+      const receipt = await findReceipt(
+        context.db,
+        and(
+          eq(consentRecord.offerId, input.offerId),
+          eq(consentRecord.projectId, context.reviewLink.projectId)
+        )
+      );
+      return receiptFile(receipt, input.locale);
     }),
 };

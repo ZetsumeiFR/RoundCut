@@ -33,12 +33,13 @@ import {
   SendIcon,
   TriangleAlertIcon,
 } from "lucide-react";
-import { useCallback, useState } from "react";
+import { type ReactNode, useCallback, useState } from "react";
 import { toast } from "sonner";
 
 import { formatMessage, type Messages } from "@/i18n/messages";
 import { client as api, orpc } from "@/utils/orpc";
 import { ExtraRoundOffer } from "./extra-round-offer";
+import { ReceiptDownloadButton } from "./receipt-download-button";
 
 type SubmitMessages = Messages["review"]["submit"];
 
@@ -167,6 +168,7 @@ function RoundBanner({
   includedRounds,
   locale,
   messages,
+  receipt,
   round,
   workspaceName,
 }: {
@@ -174,6 +176,8 @@ function RoundBanner({
   includedRounds: number;
   locale: Locale;
   messages: SubmitMessages;
+  // The agreement receipt of an extra round the client agreed to (EXTRA-07).
+  receipt: ReactNode;
   round: BannerRound | null;
   workspaceName: string;
 }) {
@@ -218,6 +222,7 @@ function RoundBanner({
               {line}
             </p>
           ))}
+          {receipt ? <div className="pt-1">{receipt}</div> : null}
         </AlertDescription>
       ) : null}
     </Alert>
@@ -348,6 +353,16 @@ export function SubmitBatch({
   const refetchRound = current.refetch;
   const handleRetry = useCallback(() => refetchRound(), [refetchRound]);
   const openConfirm = useCallback(() => setConfirming(true), []);
+  const agreementOfferId = current.data?.round?.agreementOfferId ?? null;
+  const fetchReceipt = useCallback(
+    () =>
+      api.extraRound.receipt({
+        locale,
+        offerId: agreementOfferId ?? "",
+        token,
+      }),
+    [agreementOfferId, locale, token]
+  );
 
   const handleConfirm = useCallback(async () => {
     setBusy(true);
@@ -405,6 +420,14 @@ export function SubmitBatch({
       includedRounds={includedRounds}
       locale={locale}
       messages={messages}
+      receipt={
+        round?.kind === "extra" && agreementOfferId ? (
+          <ReceiptDownloadButton
+            fetchReceipt={fetchReceipt}
+            messages={offerMessages.answer.record}
+          />
+        ) : null
+      }
       round={round}
       workspaceName={workspaceName}
     />

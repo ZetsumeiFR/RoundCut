@@ -1,6 +1,7 @@
 import type { Database } from "@roundcut/db";
 import { offerAmounts } from "@roundcut/db/extra-round";
 import { canGiftRound } from "@roundcut/db/round";
+import { consentRecord } from "@roundcut/db/schema/consent-record";
 import { deliverable } from "@roundcut/db/schema/deliverable";
 import { extraRoundOffer } from "@roundcut/db/schema/extra-round-offer";
 import { project } from "@roundcut/db/schema/project";
@@ -8,6 +9,9 @@ import { round } from "@roundcut/db/schema/round";
 import { workspace } from "@roundcut/db/schema/workspace";
 import { and, eq, isNotNull, isNull, or } from "drizzle-orm";
 import type Stripe from "stripe";
+
+import type { Notifications } from "./context";
+import { emailReceipt } from "./receipt";
 
 import { projectRoundPositions } from "./routers/round";
 
@@ -114,6 +118,7 @@ export async function grantAgreedOfferOnNewRound(
 // that editor's account and charged the offer's total in its currency.
 async function fulfillCheckoutSession(
   db: Database,
+  notifications: Notifications,
   session: Stripe.Checkout.Session,
   accountId: string
 ) {
@@ -149,26 +154,45 @@ async function fulfillCheckoutSession(
     });
     return;
   }
-  await db
+  const [paid] = await db
     .update(extraRoundOffer)
     .set({ paidAt: new Date(), stripeCheckoutSessionId: session.id })
-    .where(
-      and(eq(extraRoundOffer.id, offerId), isNull(extraRoundOffer.paidAt))
-    );
+    .where(and(eq(extraRoundOffer.id, offerId), isNull(extraRoundOffer.paidAt)))
+    .returning({ id: extraRoundOffer.id });
   // Also run on redeliveries, so a round left closed by a failure between
   // the two steps still opens.
   await openAgreedRound(db, offerId);
+  // The receipt goes out again marked paid (EXTRA-07), once: redeliveries
+  // find the offer already paid.
+  if (paid) {
+    const [consent] = await db
+      .select({ id: consentRecord.id })
+      .from(consentRecord)
+      .where(eq(consentRecord.offerId, paid.id));
+    if (consent) {
+      await emailReceipt(db, notifications, consent.id, "paid");
+    }
+  }
 }
 
 // Events of /api/webhooks/stripe, already verified against the signing
 // secret. Payments are confirmed on the connected account's events only;
 // delayed payment methods complete unpaid and succeed later.
-export async function handleStripeEvent(db: Database, event: Stripe.Event) {
+export async function handleStripeEvent(
+  db: Database,
+  notifications: Notifications,
+  event: Stripe.Event
+) {
   switch (event.type) {
     case "checkout.session.completed":
     case "checkout.session.async_payment_succeeded":
       if (event.account) {
-        await fulfillCheckoutSession(db, event.data.object, event.account);
+        await fulfillCheckoutSession(
+          db,
+          notifications,
+          event.data.object,
+          event.account
+        );
       }
       return;
     default:

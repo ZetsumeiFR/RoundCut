@@ -1102,6 +1102,28 @@ const en = {
       noVersion: "No version yet",
       openCommentsLabel: "Open feedback: {count}",
       openVersion: "Play V{number} of {title}",
+      receipts: {
+        description:
+          "Every extra round the client agreed to, with the receipt sent to you both.",
+        download: "PDF",
+        downloadError: "Couldn't download the receipt. Try again.",
+        downloading: "Preparing…",
+        downloadLabel:
+          "Download the receipt of extra round {round} for {deliverable}",
+        emptyDescription:
+          "When the client accepts an extra round, its agreement receipt shows up here.",
+        emptyTitle: "No agreement yet",
+        item: "Extra round {round} · {deliverable}",
+        loadError: "Couldn't load the receipts.",
+        loading: "Loading receipts…",
+        signed: "Accepted by {name} ({email}) on {date} · Version {version}",
+        statuses: {
+          awaiting_payment: "Payment pending",
+          paid: "Paid",
+          to_invoice: "To invoice",
+        },
+        title: "Agreement receipts",
+      },
       round: "Round {current}/{included}",
       roundLabel: "Round {current} of {included} included",
       roundSubmitted: "Round {current} submitted",
@@ -1323,6 +1345,9 @@ const en = {
         offerClosed: "This offer is no longer waiting for an answer.",
         onlyDecider: "Only {decider} can accept this round.",
         record: {
+          download: "Download the receipt (PDF)",
+          downloadError: "Couldn't download the receipt. Try again.",
+          downloading: "Preparing the receipt…",
           email: "Email",
           fingerprint: "SHA-256 fingerprint",
           sealed:
@@ -2581,6 +2606,28 @@ const fr: Messages = {
       noVersion: "Aucune version",
       openCommentsLabel: "Retours ouverts : {count}",
       openVersion: "Lire la V{number} de {title}",
+      receipts: {
+        description:
+          "Chaque tour supplémentaire accepté par le client, avec le reçu envoyé à vous deux.",
+        download: "PDF",
+        downloadError: "Impossible de télécharger le reçu. Réessayez.",
+        downloading: "Préparation…",
+        downloadLabel:
+          "Télécharger le reçu du tour supplémentaire {round} de {deliverable}",
+        emptyDescription:
+          "Quand le client accepte un tour supplémentaire, son reçu d'accord apparaît ici.",
+        emptyTitle: "Aucun accord pour l'instant",
+        item: "Tour supplémentaire {round} · {deliverable}",
+        loadError: "Impossible de charger les reçus.",
+        loading: "Chargement des reçus…",
+        signed: "Accepté par {name} ({email}) le {date} · Version {version}",
+        statuses: {
+          awaiting_payment: "Paiement en attente",
+          paid: "Payé",
+          to_invoice: "À facturer",
+        },
+        title: "Reçus d'accord",
+      },
       round: "Tour {current}/{included}",
       roundLabel: "Tour {current} sur {included} inclus",
       roundSubmitted: "Tour {current} soumis",
@@ -2803,6 +2850,9 @@ const fr: Messages = {
         offerClosed: "Cette proposition n'attend plus de réponse.",
         onlyDecider: "Seul {decider} peut accepter ce tour.",
         record: {
+          download: "Télécharger le reçu (PDF)",
+          downloadError: "Impossible de télécharger le reçu. Réessayez.",
+          downloading: "Préparation du reçu…",
           email: "E-mail",
           fingerprint: "Empreinte SHA-256",
           sealed:
