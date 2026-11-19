@@ -216,7 +216,14 @@ export function ExtraRoundAgreement({
           token,
           versionId,
         });
-        await refreshOffer();
+        // Without payment asked, the agreement opens the round at once
+        // (EXTRA-05): the banner and submit button follow it.
+        await Promise.all([
+          refreshOffer(),
+          queryClient.invalidateQueries({
+            queryKey: orpc.review.round.key(),
+          }),
+        ]);
       } catch (failure) {
         setError(errorMessage(failure, messages, locale));
         setCode("");
@@ -233,6 +240,7 @@ export function ExtraRoundAgreement({
       locale,
       messages,
       offer.id,
+      queryClient,
       refreshOffer,
       shownLines,
       token,

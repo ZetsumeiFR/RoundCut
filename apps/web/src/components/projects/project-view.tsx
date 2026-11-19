@@ -475,12 +475,14 @@ function DeliverablesTab({
 function RoundItem({
   dateFormat,
   includedRounds,
+  locale,
   messages,
   projectId,
   round,
 }: {
   dateFormat: Intl.DateTimeFormat;
   includedRounds: number;
+  locale: Locale;
   messages: ViewMessages;
   projectId: string;
   round: ProjectRound;
@@ -598,6 +600,17 @@ function RoundItem({
           {formatMessage(rounds.closedNote, { note: round.closedNote })}
         </p>
       ) : null}
+      {round.billing ? (
+        <p className="text-muted-foreground text-xs tabular-nums">
+          {formatMessage(rounds.billing, {
+            amount: new Intl.NumberFormat(locale, {
+              currency: round.billing.currency,
+              style: "currency",
+            }).format(round.billing.unitPriceCents / CENTS_PER_UNIT),
+            status: rounds.billingStatuses[round.billing.status],
+          })}
+        </p>
+      ) : null}
     </li>
   );
 }
@@ -710,6 +723,7 @@ function RoundsTab({
               dateFormat={dateFormat}
               includedRounds={includedRounds}
               key={item.id}
+              locale={locale}
               messages={messages.view}
               projectId={projectId}
               round={item}

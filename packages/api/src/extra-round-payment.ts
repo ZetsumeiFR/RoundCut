@@ -6,18 +6,25 @@ import { extraRoundOffer } from "@roundcut/db/schema/extra-round-offer";
 import { project } from "@roundcut/db/schema/project";
 import { round } from "@roundcut/db/schema/round";
 import { workspace } from "@roundcut/db/schema/workspace";
-import { and, eq, isNotNull, isNull } from "drizzle-orm";
+import { and, eq, isNotNull, isNull, or } from "drizzle-orm";
 import type Stripe from "stripe";
 
 import { projectRoundPositions } from "./routers/round";
 
 type Transaction = Parameters<Parameters<Database["transaction"]>[0]>[0];
 
-// A paid offer grants the round open on its deliverable when that round is
-// the one waiting for the agreement (beyond the included ones, neither
+// An accepted offer is settled once paid (EXTRA-04), or right away when it
+// doesn't ask for payment (EXTRA-05): it then grants its round.
+const settled = or(
+  isNotNull(extraRoundOffer.paidAt),
+  eq(extraRoundOffer.requirePayment, false)
+);
+
+// A settled offer grants the round open on its deliverable when that round
+// is the one waiting for the agreement (beyond the included ones, neither
 // gifted nor granted yet): it becomes an extra round and its batch can be
 // submitted. Otherwise the offer waits for the next version's round.
-async function openPaidRound(db: Database, offerId: string) {
+export async function openAgreedRound(db: Database, offerId: string) {
   const [paid] = await db
     .select({
       deliverableId: extraRoundOffer.deliverableId,
@@ -30,7 +37,8 @@ async function openPaidRound(db: Database, offerId: string) {
     .where(
       and(
         eq(extraRoundOffer.id, offerId),
-        isNotNull(extraRoundOffer.paidAt),
+        eq(extraRoundOffer.status, "accepted"),
+        settled,
         isNull(extraRoundOffer.roundId)
       )
     );
@@ -78,8 +86,9 @@ async function grantExtraRound(tx: Transaction, roundId: string) {
 }
 
 // When a version opens a new round (VER-04), an offer the client already
-// paid while no round was open for it is granted on that round.
-export async function grantPaidOfferOnNewRound(
+// paid, or agreed to without payment, while no round was open for it is
+// granted on that round.
+export async function grantAgreedOfferOnNewRound(
   tx: Transaction,
   opened: { deliverableId: string; roundId: string }
 ) {
@@ -90,7 +99,7 @@ export async function grantPaidOfferOnNewRound(
       and(
         eq(extraRoundOffer.deliverableId, opened.deliverableId),
         eq(extraRoundOffer.status, "accepted"),
-        isNotNull(extraRoundOffer.paidAt),
+        settled,
         isNull(extraRoundOffer.roundId)
       )
     )
@@ -148,7 +157,7 @@ async function fulfillCheckoutSession(
     );
   // Also run on redeliveries, so a round left closed by a failure between
   // the two steps still opens.
-  await openPaidRound(db, offerId);
+  await openAgreedRound(db, offerId);
 }
 
 // Events of /api/webhooks/stripe, already verified against the signing

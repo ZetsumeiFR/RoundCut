@@ -1,12 +1,13 @@
 import { ORPCError } from "@orpc/server";
 import { extraRoundForwardEmail, sendEmail } from "@roundcut/auth/email";
-import { resolveLocale } from "@roundcut/auth/locale";
+import { type Locale, resolveLocale } from "@roundcut/auth/locale";
 import type { Database } from "@roundcut/db";
 import {
   EXTRA_ROUND_OFFER_VALIDITY_DAYS,
   needsExtraRound,
   offerAmounts,
 } from "@roundcut/db/extra-round";
+import { billableLine } from "@roundcut/db/schema/billable-line";
 import { client } from "@roundcut/db/schema/client";
 import { consentRecord } from "@roundcut/db/schema/consent-record";
 import { deliverable } from "@roundcut/db/schema/deliverable";
@@ -24,6 +25,7 @@ import {
   snapshotHash,
 } from "../consent";
 import type { Notifications, RequestOrigin } from "../context";
+import { openAgreedRound } from "../extra-round-payment";
 import { publicProcedure, requireReviewLink } from "../index";
 import {
   canTakeRoundPayments,
@@ -328,18 +330,16 @@ async function agreementSnapshot(
   };
 }
 
-// The editor's connected account an offer is paid on, checked with Stripe
-// right before taking the payment (EXTRA-04), and the line's label in the
-// workspace language.
-async function paymentAccount(
-  context: { db: Database; stripe: StripeClient | null },
-  offer: Offer
-) {
-  const [row] = await context.db
+// The project and workspace an offer's deliverable belongs to, for its
+// payment (EXTRA-04) or its billable line (EXTRA-05).
+async function offerOwner(db: Database, deliverableId: string) {
+  const [row] = await db
     .select({
+      clientId: project.clientId,
       deliverableTitle: deliverable.title,
       locale: workspace.locale,
       plan: workspace.plan,
+      projectId: project.id,
       projectName: project.name,
       stripeAccountId: workspace.stripeAccountId,
       stripePaymentsActive: workspace.stripePaymentsActive,
@@ -348,7 +348,32 @@ async function paymentAccount(
     .from(deliverable)
     .innerJoin(project, eq(deliverable.projectId, project.id))
     .innerJoin(workspace, eq(project.workspaceId, workspace.id))
-    .where(eq(deliverable.id, offer.deliverableId));
+    .where(eq(deliverable.id, deliverableId));
+  return row;
+}
+
+// The extra round's label on the Stripe payment and the billable line, in
+// the workspace language.
+function extraRoundLabel(
+  locale: Locale,
+  offer: Offer,
+  owner: { deliverableTitle: string; projectName: string }
+) {
+  const round =
+    locale === "fr"
+      ? `Tour supplémentaire ${offer.round}`
+      : `Extra round ${offer.round}`;
+  return `${round} · ${owner.projectName} · ${owner.deliverableTitle}`;
+}
+
+// The editor's connected account an offer is paid on, checked with Stripe
+// right before taking the payment (EXTRA-04), and the line's label in the
+// workspace language.
+async function paymentAccount(
+  context: { db: Database; stripe: StripeClient | null },
+  offer: Offer
+) {
+  const row = await offerOwner(context.db, offer.deliverableId);
   const { stripe } = context;
   const active =
     stripe !== null &&
@@ -368,14 +393,10 @@ async function paymentAccount(
     });
   }
   const locale = resolveLocale(row.locale);
-  const round =
-    locale === "fr"
-      ? `Tour supplémentaire ${offer.round}`
-      : `Extra round ${offer.round}`;
   return {
     account: {
       id: row.stripeAccountId,
-      label: `${round} · ${row.projectName} · ${row.deliverableTitle}`,
+      label: extraRoundLabel(locale, offer, row),
       locale,
     },
     stripe,
@@ -387,6 +408,8 @@ export const extraRoundRouter = {
   // agreement and type the code emailed by review.requestOtp. The answer is
   // recorded once, and proves the decider's email. The agreement record
   // (EXTRA-03) is written in the same transaction, with the text shown.
+  // Without payment asked, the agreement also creates the billable line the
+  // editor invoices, and grants the round at once (EXTRA-05).
   accept: publicProcedure
     .input(
       offerInput.extend({
@@ -415,6 +438,10 @@ export const extraRoundRouter = {
         signer: decider,
         versionId: input.versionId,
       });
+      const owner = await offerOwner(context.db, offer.deliverableId);
+      if (!owner) {
+        throw new ORPCError("NOT_FOUND", { message: "Deliverable not found" });
+      }
       const consent = await context.db.transaction(async (tx) => {
         const [accepted] = await tx
           .update(extraRoundOffer)
@@ -454,15 +481,33 @@ export const extraRoundRouter = {
           .returning({
             createdAt: consentRecord.createdAt,
             email: consentRecord.email,
+            id: consentRecord.id,
             name: consentRecord.name,
             snapshotHash: consentRecord.snapshotHash,
           });
+        if (record && !offer.requirePayment) {
+          await tx.insert(billableLine).values({
+            clientId: owner.clientId,
+            consentRecordId: record.id,
+            createdAt: now,
+            currency: offer.currency,
+            label: extraRoundLabel(resolveLocale(owner.locale), offer, owner),
+            projectId: owner.projectId,
+            source: "extra_round",
+            unitPriceCents: offer.netCents,
+            vatRateBps: offer.vatRateBps,
+            workspaceId: owner.workspaceId,
+          });
+        }
         await tx
           .update(reviewer)
           .set({ verifiedAt: now })
           .where(eq(reviewer.id, decider.id));
         return record ?? null;
       });
+      if (!offer.requirePayment) {
+        await openAgreedRound(context.db, offer.id);
+      }
       return {
         ...offer,
         acceptedAt: now,
