@@ -1106,6 +1106,12 @@ const en = {
       roundLabel: "Round {current} of {included} included",
       roundSubmitted: "Round {current} submitted",
       rounds: {
+        billing: "Billable line: {status} · {amount} excl. VAT",
+        billingStatuses: {
+          exported: "exported",
+          paid: "paid",
+          to_invoice: "to invoice",
+        },
         close: {
           action: "Close round",
           cancel: "Cancel",
@@ -1258,6 +1264,8 @@ const en = {
     expiresAt: "Link valid until {date}",
     extraRound: {
       acceptedBadge: "Accepted",
+      agreedNextVersion:
+        "Round {round} opens when {workspace} publishes the next version. {workspace} invoices it to you.",
       agreement:
         "By accepting, you order extra round {round} for {net} excl. VAT ({gross} incl. VAT). {workspace} delivers the next version within {delay} of receiving your feedback.",
       answer: {
@@ -2542,6 +2550,12 @@ const fr: Messages = {
       roundLabel: "Tour {current} sur {included} inclus",
       roundSubmitted: "Tour {current} soumis",
       rounds: {
+        billing: "Ligne facturable : {status} · {amount} HT",
+        billingStatuses: {
+          exported: "exportée",
+          paid: "payée",
+          to_invoice: "à facturer",
+        },
         close: {
           action: "Clore le tour",
           cancel: "Annuler",
@@ -2695,6 +2709,8 @@ const fr: Messages = {
     expiresAt: "Lien valable jusqu'au {date}",
     extraRound: {
       acceptedBadge: "Accepté",
+      agreedNextVersion:
+        "Le tour {round} s'ouvre dès que {workspace} publie la prochaine version. {workspace} vous le facturera.",
       agreement:
         "En acceptant, vous commandez le tour supplémentaire {round} pour {net} HT ({gross} TTC). {workspace} livre la version suivante sous {delay} après réception de vos retours.",
       answer: {

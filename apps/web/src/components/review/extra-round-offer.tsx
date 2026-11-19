@@ -14,7 +14,7 @@ import {
 import { Skeleton } from "@roundcut/ui/components/skeleton";
 import { cn } from "@roundcut/ui/lib/utils";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { TriangleAlertIcon } from "lucide-react";
+import { InfoIcon, TriangleAlertIcon } from "lucide-react";
 import { useSearchParams } from "next/navigation";
 import { useCallback, useEffect } from "react";
 
@@ -217,6 +217,17 @@ export function ExtraRoundOffer({
             token={token}
             versionId={versionId}
           />
+          {current.status === "accepted" && !current.requirePayment ? (
+            <Alert variant="info">
+              <InfoIcon aria-hidden="true" />
+              <AlertDescription>
+                {formatMessage(messages.agreedNextVersion, {
+                  round: current.round,
+                  workspace: workspaceName,
+                })}
+              </AlertDescription>
+            </Alert>
+          ) : null}
           {current.status === "accepted" ? (
             <ExtraRoundPayment
               gross={gross}

@@ -1,4 +1,5 @@
 export * from "./auth";
+export * from "./billable-line";
 export * from "./client";
 export * from "./comment";
 export * from "./consent-record";

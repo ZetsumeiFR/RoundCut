@@ -9,7 +9,10 @@ import {
   type RoundEvent,
   roundPositions,
 } from "@roundcut/db/round";
+import { billableLine } from "@roundcut/db/schema/billable-line";
+import { consentRecord } from "@roundcut/db/schema/consent-record";
 import { deliverable } from "@roundcut/db/schema/deliverable";
+import { extraRoundOffer } from "@roundcut/db/schema/extra-round-offer";
 import { project } from "@roundcut/db/schema/project";
 import { round } from "@roundcut/db/schema/round";
 import { version } from "@roundcut/db/schema/version";
@@ -200,6 +203,9 @@ export const roundRouter = {
       );
       const rounds = await context.db
         .select({
+          billingCurrency: billableLine.currency,
+          billingStatus: billableLine.status,
+          billingUnitPriceCents: billableLine.unitPriceCents,
           closedAt: round.closedAt,
           closedNote: round.closedNote,
           closedReason: round.closedReason,
@@ -219,12 +225,35 @@ export const roundRouter = {
         .from(round)
         .innerJoin(deliverable, eq(round.deliverableId, deliverable.id))
         .innerJoin(version, eq(round.versionId, version.id))
+        // The billable line of the agreement that granted an extra round
+        // (EXTRA-05); none when the client paid it online or it was gifted.
+        .leftJoin(extraRoundOffer, eq(extraRoundOffer.roundId, round.id))
+        .leftJoin(consentRecord, eq(consentRecord.offerId, extraRoundOffer.id))
+        .leftJoin(
+          billableLine,
+          eq(billableLine.consentRecordId, consentRecord.id)
+        )
         .where(eq(deliverable.projectId, owned.id))
         .orderBy(asc(deliverable.position), desc(round.number));
       const positions = await projectRoundPositions(context.db, owned.id);
-      return rounds.map((item) => ({
-        ...item,
-        position: positions.get(item.id) ?? item.number,
-      }));
+      return rounds.map(
+        ({
+          billingCurrency,
+          billingStatus,
+          billingUnitPriceCents,
+          ...item
+        }) => ({
+          ...item,
+          billing:
+            billingStatus && billingCurrency && billingUnitPriceCents !== null
+              ? {
+                  currency: billingCurrency,
+                  status: billingStatus,
+                  unitPriceCents: billingUnitPriceCents,
+                }
+              : null,
+          position: positions.get(item.id) ?? item.number,
+        })
+      );
     }),
 };
