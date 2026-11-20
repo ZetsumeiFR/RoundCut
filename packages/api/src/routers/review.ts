@@ -15,7 +15,6 @@ import {
   REVIEWER_CODE_VALIDITY_MINUTES,
 } from "@roundcut/db/reviewer-code";
 import { canGiftRound } from "@roundcut/db/round";
-import { user } from "@roundcut/db/schema/auth";
 import { client } from "@roundcut/db/schema/client";
 import { comment } from "@roundcut/db/schema/comment";
 import { consentRecord } from "@roundcut/db/schema/consent-record";
@@ -47,6 +46,7 @@ import {
   requireReviewLink,
   reviewerProcedure,
 } from "../index";
+import { notifyEditor, versionEditor } from "../notifications";
 import { reviewTokenSchema } from "../review-link";
 import {
   isAllowedReviewer,
@@ -152,26 +152,6 @@ export async function pendingSize(db: Database, versionId: string) {
   return row?.total ?? 0;
 }
 
-// The editor to tell about a client's move on a version: the workspace owner,
-// written to in the workspace language.
-async function versionEditor(db: Database, versionId: string) {
-  const [row] = await db
-    .select({
-      deliverableTitle: deliverable.title,
-      editorEmail: user.email,
-      locale: workspace.locale,
-      projectName: project.name,
-      versionNumber: version.number,
-    })
-    .from(version)
-    .innerJoin(deliverable, eq(version.deliverableId, deliverable.id))
-    .innerJoin(project, eq(deliverable.projectId, project.id))
-    .innerJoin(workspace, eq(project.workspaceId, workspace.id))
-    .innerJoin(user, eq(workspace.ownerUserId, user.id))
-    .where(eq(version.id, versionId));
-  return row ?? null;
-}
-
 // Emails the editor that a client submitted a batch. The submission is
 // already saved: a mail failure is logged rather than reported to the client,
 // who could not submit again.
@@ -190,6 +170,9 @@ async function notifyBatchSubmitted(
   if (!row) {
     return;
   }
+  await notifyEditor(db, row, "batch_submitted", [
+    { actorName: batch.reviewerName, roundNumber: batch.roundNumber },
+  ]);
   try {
     await sendEmail(
       notifications.email,
@@ -224,6 +207,9 @@ async function notifyVersionApproved(
   if (!row) {
     return;
   }
+  await notifyEditor(db, row, "version_approved", [
+    { actorName: approval.approverName },
+  ]);
   try {
     await sendEmail(
       notifications.email,

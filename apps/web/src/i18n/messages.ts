@@ -1069,6 +1069,15 @@ const en = {
       createdAt: "Created on {date}",
       description:
         "Your client opens this private link to watch the latest versions, without an account.",
+      email: {
+        error: "Couldn't email the review link. Try again.",
+        failed:
+          "Not delivered to: {emails}. Copy the link and send it yourself.",
+        resend: "Send again by email",
+        send: "Send to the client by email",
+        sending: "Sending…",
+        sent: "Link emailed to {emails}",
+      },
       emptyDescription:
         "Generate a private link to share this project with your client.",
       emptyTitle: "No review link yet",
@@ -2739,6 +2748,15 @@ const fr: Messages = {
       createdAt: "Créé le {date}",
       description:
         "Votre client ouvre ce lien privé pour regarder les dernières versions, sans créer de compte.",
+      email: {
+        error: "Impossible d'envoyer le lien de revue par email. Réessayez.",
+        failed:
+          "Non remis à : {emails}. Copiez le lien et envoyez-le vous-même.",
+        resend: "Renvoyer par email",
+        send: "Envoyer au client par email",
+        sending: "Envoi…",
+        sent: "Lien envoyé par email à {emails}",
+      },
       emptyDescription:
         "Générez un lien privé pour partager ce projet avec votre client.",
       emptyTitle: "Aucun lien de revue",

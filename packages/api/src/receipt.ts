@@ -61,7 +61,7 @@ export const agreementSnapshotSchema = z.object({
   project: z.object({
     deliverable: z.object({ title: z.string() }),
     name: z.string(),
-    version: z.object({ number: z.number() }),
+    version: z.object({ id: z.string(), number: z.number() }),
     workspace: z.string(),
   }),
   request: z.object({ ip: z.string().nullable() }),

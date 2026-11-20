@@ -34,10 +34,13 @@ import { isAllowedReviewer } from "./reviewer";
 import { DECIDER_REMINDER_MAX_SENDS } from "./workspace";
 
 // The client has nothing left to send on these projects.
-const FINISHED_PROJECT_STATUSES: ProjectStatus[] = ["approved", "archived"];
+export const FINISHED_PROJECT_STATUSES: ProjectStatus[] = [
+  "approved",
+  "archived",
+];
 
 // The project still has a review link the client can open.
-const activeReviewLink = (db: Database) =>
+export const activeReviewLink = (db: Database) =>
   exists(
     db
       .select({ id: reviewLink.id })

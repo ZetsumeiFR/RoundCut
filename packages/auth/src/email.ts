@@ -432,6 +432,175 @@ export function agreementReceiptEmail(
   return { attachments: [pdf], to, ...agreementReceiptEmails[locale](details) };
 }
 
+export interface ReviewLinkDetails {
+  // Already formatted in the recipient's language; null when it never expires.
+  expiresOn: string | null;
+  projectName: string;
+  studioName: string;
+  url: string;
+}
+
+const reviewLinkEmails = {
+  en: (details: ReviewLinkDetails) => ({
+    subject: `${details.studioName} shared ${details.projectName} for your review`,
+    text: `Hello,\n\n${details.studioName} invites you to review ${details.projectName} on RoundCut: watch the latest versions and leave timestamped comments, without creating an account.\n\nOpen the private review link${details.expiresOn ? ` (valid until ${details.expiresOn})` : ""}:\n${details.url}\n\nKeep this email: the link is personal to your team and isn't shown elsewhere.`,
+  }),
+  fr: (details: ReviewLinkDetails) => ({
+    subject: `${details.studioName} partage ${details.projectName} pour votre revue`,
+    text: `Bonjour,\n\n${details.studioName} vous invite à revoir ${details.projectName} sur RoundCut : regardez les dernières versions et laissez des commentaires horodatés, sans créer de compte.\n\nOuvrez le lien de revue privé${details.expiresOn ? ` (valable jusqu'au ${details.expiresOn})` : ""} :\n${details.url}\n\nConservez cet email : le lien est réservé à votre équipe et n'est affiché nulle part ailleurs.`,
+  }),
+} satisfies Record<
+  Locale,
+  (details: ReviewLinkDetails) => Omit<EmailMessage, "to">
+>;
+
+// The project's review link (REV-01), sent by the editor to the client's
+// decider and reviewers right after generating it (NOTIF-01).
+export function reviewLinkEmail(
+  locale: Locale,
+  to: string,
+  details: ReviewLinkDetails
+): EmailMessage {
+  return { to, ...reviewLinkEmails[locale](details) };
+}
+
+export interface ExtraRoundProposedDetails {
+  deliverableTitle: string;
+  // Excluding VAT, already formatted in the recipient's language.
+  price: string;
+  projectName: string;
+  reviewerName: string;
+  roundNumber: number;
+  url: string;
+}
+
+const extraRoundProposedEmails = {
+  en: (details: ExtraRoundProposedDetails) => ({
+    subject: `${details.projectName}: extra round ${details.roundNumber} offered to your client`,
+    text: `${details.reviewerName} started a new batch of feedback on ${details.deliverableTitle} (${details.projectName}) after the included rounds. RoundCut offered them extra round ${details.roundNumber} at ${details.price} excl. VAT: the feedback is kept until the decider accepts it.\n\nProject:\n${details.url}`,
+  }),
+  fr: (details: ExtraRoundProposedDetails) => ({
+    subject: `${details.projectName} : tour supplémentaire ${details.roundNumber} proposé à votre client`,
+    text: `${details.reviewerName} a commencé un nouveau lot de retours sur ${details.deliverableTitle} (${details.projectName}) après les tours inclus. RoundCut lui a proposé le tour supplémentaire ${details.roundNumber} à ${details.price} HT : les retours sont conservés jusqu'à l'accord du décideur.\n\nProjet :\n${details.url}`,
+  }),
+} satisfies Record<
+  Locale,
+  (details: ExtraRoundProposedDetails) => Omit<EmailMessage, "to">
+>;
+
+// Tells the editor an extra round was offered to the client (EXTRA-01,
+// NOTIF-01).
+export function extraRoundProposedEmail(
+  locale: Locale,
+  to: string,
+  details: ExtraRoundProposedDetails
+): EmailMessage {
+  return { to, ...extraRoundProposedEmails[locale](details) };
+}
+
+export interface DigestComment {
+  // Who wrote it, or for a status change the comment's author.
+  authorName: string;
+  body: string;
+  // What the editor did, for the reviewers' digest; "comment" for new
+  // feedback, "reply" for an answer in a thread.
+  kind: "comment" | "done" | "open" | "rejected" | "reply";
+  // The refusal reason of a "rejected" comment.
+  reason?: string | null;
+  // "Teaser V2 · 00:41", already formatted.
+  where: string;
+}
+
+const digestLabels = {
+  en: {
+    comment: "new comment",
+    done: "marked done",
+    open: "reopened",
+    reason: "reason: ",
+    rejected: "declined",
+    reply: "reply",
+  },
+  fr: {
+    comment: "nouveau commentaire",
+    done: "marqué traité",
+    open: "rouvert",
+    reason: "motif : ",
+    rejected: "refusé",
+    reply: "réponse",
+  },
+} satisfies Record<Locale, Record<string, string>>;
+
+const digestLines = (locale: Locale, items: DigestComment[]) =>
+  items
+    .map((item) => {
+      const labels = digestLabels[locale];
+      const reason = item.reason ? ` (${labels.reason}${item.reason})` : "";
+      return `- ${item.where} · ${labels[item.kind]} · ${item.authorName}${reason}\n  ${item.body}`;
+    })
+    .join("\n");
+
+export interface EditorDigestDetails {
+  items: DigestComment[];
+  projectName: string;
+  url: string;
+}
+
+const editorDigestEmails = {
+  en: (details: EditorDigestDetails) => ({
+    subject: `${details.projectName}: ${details.items.length === 1 ? "1 new comment" : `${details.items.length} new comments`}`,
+    text: `Your client wrote on ${details.projectName} in the last few minutes:\n\n${digestLines("en", details.items)}\n\nComments written during an open round reach you as drafts: the client submits them as a batch.\n\nOpen the project:\n${details.url}`,
+  }),
+  fr: (details: EditorDigestDetails) => ({
+    subject: `${details.projectName} : ${details.items.length === 1 ? "1 nouveau commentaire" : `${details.items.length} nouveaux commentaires`}`,
+    text: `Votre client a écrit sur ${details.projectName} ces dernières minutes :\n\n${digestLines("fr", details.items)}\n\nLes commentaires d'un tour ouvert vous parviennent en brouillon : le client les soumet par lot.\n\nOuvrir le projet :\n${details.url}`,
+  }),
+} satisfies Record<
+  Locale,
+  (details: EditorDigestDetails) => Omit<EmailMessage, "to">
+>;
+
+// The editor's grouped email of the client's new comments and replies,
+// sent at most every 15 minutes per project (NOTIF-01).
+export function editorDigestEmail(
+  locale: Locale,
+  to: string,
+  details: EditorDigestDetails
+): EmailMessage {
+  return { to, ...editorDigestEmails[locale](details) };
+}
+
+export interface ReviewerDigestDetails {
+  items: DigestComment[];
+  projectName: string;
+  reviewerName: string;
+  studioName: string;
+}
+
+const reviewerDigestEmails = {
+  en: (details: ReviewerDigestDetails) => ({
+    subject: `${details.projectName}: ${details.studioName} answered your feedback`,
+    text: `Hello ${details.reviewerName},\n\n${details.studioName} answered on ${details.projectName}:\n\n${digestLines("en", details.items)}\n\nOpen the review link ${details.studioName} shared with you to read the threads and reply.`,
+  }),
+  fr: (details: ReviewerDigestDetails) => ({
+    subject: `${details.projectName} : ${details.studioName} a répondu à vos retours`,
+    text: `Bonjour ${details.reviewerName},\n\n${details.studioName} a répondu sur ${details.projectName} :\n\n${digestLines("fr", details.items)}\n\nOuvrez le lien de revue partagé par ${details.studioName} pour lire les fils et répondre.`,
+  }),
+} satisfies Record<
+  Locale,
+  (details: ReviewerDigestDetails) => Omit<EmailMessage, "to">
+>;
+
+// A reviewer's grouped email of the editor's replies and status changes,
+// sent at most every 15 minutes per project (NOTIF-01). Without the review
+// link: only its hash is stored.
+export function reviewerDigestEmail(
+  locale: Locale,
+  to: string,
+  details: ReviewerDigestDetails
+): EmailMessage {
+  return { to, ...reviewerDigestEmails[locale](details) };
+}
+
 export function resetPasswordEmail(
   locale: Locale,
   to: string,

@@ -6,7 +6,7 @@ import { deliverable } from "@roundcut/db/schema/deliverable";
 import { reviewer } from "@roundcut/db/schema/reviewer";
 import { round } from "@roundcut/db/schema/round";
 import { version } from "@roundcut/db/schema/version";
-import { and, asc, eq, isNull, ne } from "drizzle-orm";
+import { and, asc, eq, isNull, ne, sql } from "drizzle-orm";
 import z from "zod";
 
 import {
@@ -25,6 +25,7 @@ import {
   publicProcedure,
   requireReviewLink,
 } from "../index";
+import { notifyVersionEditor } from "../notifications";
 import { reviewTokenSchema } from "../review-link";
 import { isDeciderEmail } from "../reviewer";
 import type { Storage } from "../storage";
@@ -324,6 +325,13 @@ export const commentRouter = {
       if (!saved) {
         throw new ORPCError("INTERNAL_SERVER_ERROR");
       }
+      await notifyVersionEditor(context.db, target.id, "comment", [
+        {
+          actorName: author.name,
+          body: saved.body,
+          timecodeMs: saved.timecodeMs,
+        },
+      ]);
       return await toComment(context.storage, {
         ...saved,
         editorName: null,
@@ -364,7 +372,13 @@ export const commentRouter = {
             versionId: target.id,
           }))
         )
-        .returning({ id: comment.id });
+        .returning({ body: comment.body, timecodeMs: comment.timecodeMs });
+      await notifyVersionEditor(
+        context.db,
+        target.id,
+        "comment",
+        saved.map((item) => ({ actorName: author.name, ...item }))
+      );
       return { count: saved.length };
     }),
 
@@ -442,6 +456,14 @@ export const commentRouter = {
         { authorType: "reviewer", reviewerId: author.id },
         input.body
       );
+      await notifyVersionEditor(context.db, saved.versionId, "comment", [
+        {
+          actorName: author.name,
+          body: saved.body,
+          reply: true,
+          timecodeMs: saved.timecodeMs,
+        },
+      ]);
       return await toComment(context.storage, {
         ...saved,
         editorName: null,
@@ -483,7 +505,11 @@ export const commentRouter = {
         input.status === "rejected" ? input.rejectReason : null;
       const [saved] = await context.db
         .update(comment)
-        .set({ rejectReason, status: input.status })
+        .set({
+          rejectReason,
+          status: input.status,
+          statusChangedAt: sql`now()`,
+        })
         .where(and(eq(comment.id, input.id), isNull(comment.parentId)))
         .returning({
           id: comment.id,

@@ -2,6 +2,7 @@ import { ORPCError } from "@orpc/server";
 import {
   extraRoundContactEmail,
   extraRoundForwardEmail,
+  extraRoundProposedEmail,
   sendEmail,
 } from "@roundcut/auth/email";
 import { LOCALES, resolveLocale } from "@roundcut/auth/locale";
@@ -35,6 +36,11 @@ import type { Notifications, RequestOrigin } from "../context";
 import { openAgreedRound } from "../extra-round-payment";
 import { publicProcedure, requireReviewLink } from "../index";
 import {
+  notifyEditor,
+  notifyVersionEditor,
+  versionEditor,
+} from "../notifications";
+import {
   canTakeRoundPayments,
   fetchPaymentsActive,
   type StripeClient,
@@ -51,6 +57,8 @@ import { projectRoundPositions } from "./round";
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 const FORWARD_INTERVAL_MS = 60 * 60 * 1000;
+
+const CENTS_PER_UNIT = 100;
 
 const offerInput = z.object({
   offerId: z.string().min(1),
@@ -74,7 +82,8 @@ interface OfferTerms {
 async function proposeOffer(
   db: Database,
   deliverableId: string,
-  terms: OfferTerms
+  terms: OfferTerms,
+  onProposed: (offer: typeof extraRoundOffer.$inferSelect) => Promise<void>
 ) {
   const now = new Date();
   const proposed = and(
@@ -85,7 +94,7 @@ async function proposeOffer(
     .update(extraRoundOffer)
     .set({ status: "expired" })
     .where(and(proposed, lte(extraRoundOffer.expiresAt, now)));
-  await db
+  const [created] = await db
     .insert(extraRoundOffer)
     .values({
       ...terms,
@@ -94,7 +103,11 @@ async function proposeOffer(
         now.getTime() + EXTRA_ROUND_OFFER_VALIDITY_DAYS * DAY_MS
       ),
     })
-    .onConflictDoNothing();
+    .onConflictDoNothing()
+    .returning();
+  if (created) {
+    await onProposed(created);
+  }
   const [offer] = await db.select().from(extraRoundOffer).where(proposed);
   return offer ?? null;
 }
@@ -160,6 +173,28 @@ async function offerConsent(db: Database, offerId: string) {
   return record ?? null;
 }
 
+// The reviewer whose request may propose the offer, and how to announce it.
+interface Proposer {
+  isDecider: boolean;
+  notifications: Notifications;
+  reviewerName: string;
+  token: string;
+}
+
+const proposerOf = (
+  context: {
+    notifications: Notifications;
+    reviewerClient: { deciderEmail: string };
+  },
+  viewer: { email: string; name: string },
+  token: string
+): Proposer => ({
+  isDecider: isDeciderEmail(context.reviewerClient, viewer.email),
+  notifications: context.notifications,
+  reviewerName: viewer.name,
+  token,
+});
+
 // The extra round offered on a version (EXTRA-01): null until the included
 // rounds are used up and the client has started a new batch, then the offer
 // with its amounts, delay, payment rule and the decider's answer.
@@ -167,7 +202,8 @@ async function currentOffer(
   db: Database,
   stripe: StripeClient | null,
   projectId: string,
-  versionId: string
+  versionId: string,
+  proposer: Proposer
 ) {
   const target = await findReviewVersion(db, projectId, versionId);
   const current = await findVersionRound(db, target.id);
@@ -208,17 +244,27 @@ async function currentOffer(
   const offer =
     (await acceptedOffer(db, target.deliverableId)) ??
     (await declinedOffer(db, current.id)) ??
-    (await proposeOffer(db, target.deliverableId, {
-      currency: owner.currency,
-      delayDays: terms.extraRoundDelayDays,
-      lightPriceCents: lightExtraRoundPrice(terms),
-      priceCents: terms.extraRoundPriceCents,
-      // Online payment needs the editor's connected Stripe account
-      // (EXTRA-04); without it the editor invoices the round.
-      requirePayment:
-        terms.requirePayment && canTakeRoundPayments(stripe, owner),
-      vatRateBps: owner.vatRateBps,
-    }));
+    (await proposeOffer(
+      db,
+      target.deliverableId,
+      {
+        currency: owner.currency,
+        delayDays: terms.extraRoundDelayDays,
+        lightPriceCents: lightExtraRoundPrice(terms),
+        priceCents: terms.extraRoundPriceCents,
+        // Online payment needs the editor's connected Stripe account
+        // (EXTRA-04); without it the editor invoices the round.
+        requirePayment:
+          terms.requirePayment && canTakeRoundPayments(stripe, owner),
+        vatRateBps: owner.vatRateBps,
+      },
+      (created) =>
+        announceOffer(db, proposer, {
+          offer: created,
+          round: opensBatch ? position : position + 1,
+          versionId: target.id,
+        })
+    ));
   if (!offer) {
     return null;
   }
@@ -262,13 +308,15 @@ type Offer = NonNullable<Awaited<ReturnType<typeof currentOffer>>>;
 async function openOffer(
   context: { db: Database; stripe: StripeClient | null },
   projectId: string,
-  input: { offerId: string; versionId: string }
+  input: { offerId: string; versionId: string },
+  proposer: Proposer
 ) {
   const offer = await currentOffer(
     context.db,
     context.stripe,
     projectId,
-    input.versionId
+    input.versionId,
+    proposer
   );
   if (offer?.id !== input.offerId || offer.status !== "proposed") {
     throw new ORPCError("CONFLICT", {
@@ -283,7 +331,7 @@ async function openOffer(
 async function emailDecider(
   db: Database,
   notifications: Notifications,
-  offer: Offer,
+  offer: Pick<Offer, "deliverableId" | "round">,
   forward: { reviewerName: string; token: string }
 ) {
   const [row] = await db
@@ -315,6 +363,65 @@ async function emailDecider(
       url: `${notifications.appUrl}/r/${forward.token}`,
     })
   );
+}
+
+// A new offer (EXTRA-01) is emailed to the client's decider with the review
+// link, unless they proposed it themselves, and to the editor (NOTIF-01). The
+// offer stands either way: a failed email is only logged.
+async function announceOffer(
+  db: Database,
+  proposer: Proposer,
+  proposal: {
+    offer: typeof extraRoundOffer.$inferSelect;
+    round: number;
+    versionId: string;
+  }
+) {
+  const { notifications } = proposer;
+  if (!proposer.isDecider) {
+    try {
+      await emailDecider(
+        db,
+        notifications,
+        { deliverableId: proposal.offer.deliverableId, round: proposal.round },
+        proposer
+      );
+      // Counts as forwarded: the reviewer's "forward" won't send it again
+      // within the hour.
+      await db
+        .update(extraRoundOffer)
+        .set({ forwardedAt: new Date() })
+        .where(eq(extraRoundOffer.id, proposal.offer.id));
+    } catch (error) {
+      console.error("Extra round offer email to the decider failed", error);
+    }
+  }
+  const editor = await versionEditor(db, proposal.versionId);
+  if (!editor) {
+    return;
+  }
+  await notifyEditor(db, editor, "extra_round_proposed", [
+    { actorName: proposer.reviewerName, roundNumber: proposal.round },
+  ]);
+  const locale = resolveLocale(editor.locale);
+  try {
+    await sendEmail(
+      notifications.email,
+      extraRoundProposedEmail(locale, editor.editorEmail, {
+        deliverableTitle: editor.deliverableTitle,
+        price: new Intl.NumberFormat(locale, {
+          currency: proposal.offer.currency,
+          style: "currency",
+        }).format(proposal.offer.priceCents / CENTS_PER_UNIT),
+        projectName: editor.projectName,
+        reviewerName: proposer.reviewerName,
+        roundNumber: proposal.round,
+        url: `${notifications.appUrl}/projects/${editor.projectId}`,
+      })
+    );
+  } catch (error) {
+    console.error("Extra round offer email to the editor failed", error);
+  }
 }
 
 // Everything the decider agreed to (EXTRA-03): who, when (UTC), from where,
@@ -459,7 +566,12 @@ export const extraRoundRouter = {
     .handler(async ({ context, input }) => {
       const decider = requireDecider(context.reviewer, context.reviewerClient);
       const { projectId } = context.reviewLink;
-      const proposed = await openOffer(context, projectId, input);
+      const proposed = await openOffer(
+        context,
+        projectId,
+        input,
+        proposerOf(context, decider, input.token)
+      );
       const chosen = input.size === "light" ? proposed.light : proposed;
       if (!chosen) {
         throw new ORPCError("BAD_REQUEST", {
@@ -558,6 +670,12 @@ export const extraRoundRouter = {
           consent.id,
           "agreed"
         );
+        await notifyVersionEditor(
+          context.db,
+          input.versionId,
+          "extra_round_accepted",
+          [{ actorName: decider.name, roundNumber: proposed.round }]
+        );
       }
       return {
         ...offer,
@@ -582,7 +700,8 @@ export const extraRoundRouter = {
         context.db,
         context.stripe,
         projectId,
-        input.versionId
+        input.versionId,
+        proposerOf(context, decider, input.token)
       );
       if (
         offer?.id !== input.offerId ||
@@ -664,7 +783,8 @@ export const extraRoundRouter = {
         context.db,
         context.stripe,
         projectId,
-        input.versionId
+        input.versionId,
+        proposerOf(context, decider, input.token)
       );
       const conflict = new ORPCError("CONFLICT", {
         message: "The editor was already contacted about this offer",
@@ -742,7 +862,12 @@ export const extraRoundRouter = {
     .handler(async ({ context, input }) => {
       const decider = requireDecider(context.reviewer, context.reviewerClient);
       const { projectId } = context.reviewLink;
-      const offer = await openOffer(context, projectId, input);
+      const offer = await openOffer(
+        context,
+        projectId,
+        input,
+        proposerOf(context, decider, input.token)
+      );
       const now = new Date();
       const [declined] = await context.db
         .update(extraRoundOffer)
@@ -786,7 +911,12 @@ export const extraRoundRouter = {
         });
       }
       const { projectId } = context.reviewLink;
-      const offer = await openOffer(context, projectId, input);
+      const offer = await openOffer(
+        context,
+        projectId,
+        input,
+        proposerOf(context, sender, input.token)
+      );
       const now = new Date();
       const [claimed] = await context.db
         .update(extraRoundOffer)
@@ -831,13 +961,14 @@ export const extraRoundRouter = {
   getOffer: publicProcedure
     .input(z.object({ token: reviewTokenSchema, versionId: z.string().min(1) }))
     .use(requireReviewLink)
-    .handler(async ({ context, input: { versionId } }) => {
+    .handler(async ({ context, input: { token, versionId } }) => {
       const viewer = requireReviewer(context.reviewer);
       const offer = await currentOffer(
         context.db,
         context.stripe,
         context.reviewLink.projectId,
-        versionId
+        versionId,
+        proposerOf(context, viewer, token)
       );
       return offer
         ? {
