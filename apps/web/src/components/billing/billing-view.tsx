@@ -75,6 +75,7 @@ import { toast } from "sonner";
 
 import { ClientsSkeleton, gridI18n } from "@/components/clients/clients-view";
 import { FilterSelect } from "@/components/dashboard/projects-dashboard";
+import { ReceiptDownloadButton } from "@/components/review/receipt-download-button";
 import { formatMessage, type Messages } from "@/i18n/messages";
 import { client as api, orpc } from "@/utils/orpc";
 import { AddFeeDialog } from "./add-fee-dialog";
@@ -810,6 +811,22 @@ export function BillingView({
     [refetch, refetchWorkspace]
   );
   const currency = workspace.data?.currency;
+  const exportShown = useCallback(
+    () =>
+      api.billing.lines.exportCsv({
+        ids: shown.map((line) => line.id),
+        locale,
+      }),
+    [locale, shown]
+  );
+  const exportMessages = useMemo(
+    () => ({
+      download: messages.export.action,
+      downloadError: messages.export.error,
+      downloading: messages.export.exporting,
+    }),
+    [messages.export]
+  );
 
   let summary = messages.description;
   if (data) {
@@ -854,15 +871,19 @@ export function BillingView({
               {summary}
             </FrameDescription>
           </div>
-          <Button
-            className="shrink-0"
-            disabled={!currency}
-            onClick={openFee}
-            type="button"
-          >
-            <PlusIcon aria-hidden="true" data-icon="inline-start" />
-            {messages.add}
-          </Button>
+          <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
+            {currency && shown.length > 0 ? (
+              <ReceiptDownloadButton
+                fetchReceipt={exportShown}
+                label={messages.export.label}
+                messages={exportMessages}
+              />
+            ) : null}
+            <Button disabled={!currency} onClick={openFee} type="button">
+              <PlusIcon aria-hidden="true" data-icon="inline-start" />
+              {messages.add}
+            </Button>
+          </div>
         </FrameHeader>
         {data?.length && currency ? (
           <FramePanel className="flex flex-col gap-4">

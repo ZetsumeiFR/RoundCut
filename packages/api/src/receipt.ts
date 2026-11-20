@@ -45,7 +45,7 @@ export type ReceiptPaymentStatus = (typeof RECEIPT_PAYMENT_STATUSES)[number];
 // The parts of an extra round agreement record (EXTRA-03) a receipt shows.
 // The record is sealed: the receipt reads it, never the live project, so a
 // renamed project or a changed price doesn't rewrite what was agreed.
-const agreementSnapshotSchema = z.object({
+export const agreementSnapshotSchema = z.object({
   agreedAt: z.string(),
   offer: z.object({
     currency: z.string(),
