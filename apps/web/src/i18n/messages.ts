@@ -1448,6 +1448,10 @@ const en = {
     loading: "Loading the review…",
     noVersion: "No version yet",
     play: "Watch {title}",
+    projectApproved: {
+      description: "Every video of this project is approved.",
+      title: "Project approved",
+    },
     retry: "Try again",
     sharedBy: "Shared by {workspace} · {client}",
     submit: {
@@ -2980,6 +2984,10 @@ const fr: Messages = {
     loading: "Chargement de la revue…",
     noVersion: "Pas encore de version",
     play: "Regarder {title}",
+    projectApproved: {
+      description: "Toutes les vidéos de ce projet sont validées.",
+      title: "Projet validé",
+    },
     retry: "Réessayer",
     sharedBy: "Partagé par {workspace} · {client}",
     submit: {

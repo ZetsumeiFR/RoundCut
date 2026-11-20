@@ -20,10 +20,11 @@ type LinkedProject = Awaited<
 >;
 
 // Marks the version approved in the cached review link, which freezes its
-// thread (APPR-02) without refetching: that would re-sign the playback URL
-// and restart the video.
+// thread (APPR-02), and the project when that was its last deliverable
+// (APPR-03), without refetching: that would re-sign the playback URL and
+// restart the video.
 const markApproved =
-  (versionId: string) =>
+  (versionId: string, projectApproved: boolean) =>
   (data: LinkedProject | undefined): LinkedProject | undefined => {
     if (!data?.reviewer) {
       return data;
@@ -38,6 +39,7 @@ const markApproved =
             }
           : item
       ),
+      status: projectApproved ? "approved" : data.status,
     };
   };
 
@@ -107,7 +109,7 @@ export function ApproveVersion({
       setBusy(true);
       setError(null);
       try {
-        await api.review.approveVersion({
+        const { projectApproved } = await api.review.approveVersion({
           agreed: true,
           code,
           shown: { lines: [description, decline.approveConsent], locale },
@@ -123,7 +125,7 @@ export function ApproveVersion({
         ]);
         queryClient.setQueriesData<LinkedProject>(
           { queryKey: orpc.review.resolveLink.key() },
-          markApproved(versionId)
+          markApproved(versionId, projectApproved)
         );
       } catch (failure) {
         setError(errorMessage(failure, messages, locale));

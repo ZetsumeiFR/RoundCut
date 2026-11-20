@@ -23,6 +23,14 @@ export const PROJECT_STATUS_TRANSITIONS: Record<
   in_progress: ["awaiting_client", "archived"],
 };
 
+// A live project turns approved on its own once the client has approved
+// every deliverable (APPR-03); an archived project stays archived.
+export const PROJECT_AUTO_APPROVAL_SOURCES = [
+  "draft",
+  "in_progress",
+  "awaiting_client",
+] as const satisfies readonly ProjectStatus[];
+
 // Statuses from which a project may move to `status`.
 export const projectStatusSources = (status: ProjectStatus) =>
   PROJECT_STATUSES.filter((from) =>
