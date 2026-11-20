@@ -8,12 +8,19 @@ import {
 import type { ExtraRoundSize } from "@roundcut/db/extra-round";
 import { billableLine } from "@roundcut/db/schema/billable-line";
 import { client } from "@roundcut/db/schema/client";
+import { consentRecord } from "@roundcut/db/schema/consent-record";
 import { project } from "@roundcut/db/schema/project";
 import { workspace } from "@roundcut/db/schema/workspace";
-import { and, desc, eq, inArray } from "drizzle-orm";
+import { and, asc, desc, eq, inArray } from "drizzle-orm";
 
-import { lineStatusSchema, manualLineSchema } from "../billing";
+import {
+  exportLinesSchema,
+  lineStatusSchema,
+  manualLineSchema,
+} from "../billing";
+import { billableLinesCsv } from "../billing-csv";
 import { protectedProcedure } from "../index";
+import { agreementSnapshotSchema } from "../receipt";
 import { getOrCreateWorkspace } from "./workspace";
 
 export type Transaction = Parameters<Parameters<Database["transaction"]>[0]>[0];
@@ -165,6 +172,59 @@ export const billingRouter = {
           throw new Error("Billable line insert returned no row");
         }
         return line;
+      }),
+    // The lines shown on /billing (BILL-04), filtered there, as a CSV file in
+    // the page's language; ids of other workspaces' lines match nothing.
+    // Exporting doesn't mark them exported: the editor does once imported.
+    exportCsv: protectedProcedure
+      .input(exportLinesSchema)
+      .handler(async ({ context, input: { ids, locale } }) => {
+        const owner = await getOrCreateWorkspace(
+          context.db,
+          context.session.user
+        );
+        const rows = await context.db
+          .select({
+            agreementId: consentRecord.id,
+            agreementSnapshot: consentRecord.snapshot,
+            clientName: client.name,
+            createdAt: billableLine.createdAt,
+            label: billableLine.label,
+            projectName: project.name,
+            quantity: billableLine.quantity,
+            siren: client.siren,
+            status: billableLine.status,
+            unitPriceCents: billableLine.unitPriceCents,
+            vatRateBps: billableLine.vatRateBps,
+          })
+          .from(billableLine)
+          .innerJoin(client, eq(billableLine.clientId, client.id))
+          .innerJoin(project, eq(billableLine.projectId, project.id))
+          .leftJoin(
+            consentRecord,
+            eq(billableLine.consentRecordId, consentRecord.id)
+          )
+          .where(
+            and(
+              eq(billableLine.workspaceId, owner.id),
+              inArray(billableLine.id, ids)
+            )
+          )
+          .orderBy(asc(billableLine.createdAt), asc(billableLine.id));
+        // An extra round's deliverable is the one agreed to, read from its
+        // sealed agreement like its receipt.
+        const lines = rows.map(({ agreementSnapshot, ...row }) => ({
+          ...row,
+          deliverableTitle: agreementSnapshot
+            ? agreementSnapshotSchema.parse(agreementSnapshot).project
+                .deliverable.title
+            : null,
+        }));
+        return billableLinesCsv(lines, {
+          locale,
+          now: new Date(),
+          timeZone: owner.timezone,
+        });
       }),
     list: protectedProcedure.handler(async ({ context }) => {
       const owner = await getOrCreateWorkspace(

@@ -429,6 +429,12 @@ const en = {
         "Lines show up when a project has a flat fee or a client agrees to an extra round. You can also add a fee by hand.",
       title: "No billable lines yet",
     },
+    export: {
+      action: "Export CSV",
+      error: "Couldn't export the lines. Try again.",
+      exporting: "Exporting…",
+      label: "Export the filtered lines as CSV",
+    },
     fee: {
       cancel: "Cancel",
       description:
@@ -2066,6 +2072,12 @@ const fr: Messages = {
       description:
         "Les lignes apparaissent quand un projet a un forfait ou qu'un client accepte un tour supplémentaire. Vous pouvez aussi ajouter des frais à la main.",
       title: "Aucune ligne facturable pour l'instant",
+    },
+    export: {
+      action: "Exporter CSV",
+      error: "Impossible d'exporter les lignes. Réessayez.",
+      exporting: "Export…",
+      label: "Exporter les lignes filtrées en CSV",
     },
     fee: {
       cancel: "Annuler",
