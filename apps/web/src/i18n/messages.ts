@@ -4,6 +4,7 @@ const en = {
   account: {
     menu: {
       label: "My account",
+      notifications: "Notifications",
       security: "Security",
       sessions: "Active sessions",
       signIn: "Sign in",
@@ -14,9 +15,57 @@ const en = {
     },
     nav: {
       description:
-        "Manage your workspace, plan terms, team, security and signed-in devices.",
+        "Manage your workspace, plan terms, team, notifications, security and signed-in devices.",
       label: "Settings sections",
       title: "Settings",
+    },
+    notifications: {
+      alwaysSent:
+        "Security emails, sign-in codes and the messages your clients write to you are always sent.",
+      channels: {
+        email: {
+          description:
+            "Sent to your account address. New comments are grouped in one email every 15 minutes.",
+          title: "Email",
+        },
+        in_app: {
+          description: "The bell at the top of the app and its unread count.",
+          title: "In the app",
+        },
+      },
+      loadErrorDescription: "Check your connection and try again.",
+      loadErrorTitle: "Couldn't load your notification settings",
+      retry: "Retry",
+      saveError: "Couldn't save this setting. Try again.",
+      types: {
+        batch_submitted: {
+          description: "A reviewer submits their batch of feedback.",
+          title: "Submitted feedback",
+        },
+        comment: {
+          description: "Comments and replies from your clients.",
+          title: "New comments",
+        },
+        extra_round_accepted: {
+          description:
+            "The decider agrees to an extra round. The email carries the receipt.",
+          title: "Extra round accepted",
+        },
+        extra_round_proposed: {
+          description:
+            "Your client's feedback goes beyond the included rounds.",
+          title: "Extra round proposed",
+        },
+        payment_received: {
+          description:
+            "The decider pays an extra round online. The email carries the paid receipt.",
+          title: "Payment received",
+        },
+        version_approved: {
+          description: "The decider approves a version.",
+          title: "Version approved",
+        },
+      },
     },
     security: {
       backupCodesDescription:
@@ -1685,6 +1734,7 @@ const fr: Messages = {
   account: {
     menu: {
       label: "Mon compte",
+      notifications: "Notifications",
       security: "Sécurité",
       sessions: "Sessions actives",
       signIn: "Se connecter",
@@ -1695,9 +1745,58 @@ const fr: Messages = {
     },
     nav: {
       description:
-        "Gérez votre espace de travail, vos conditions de forfait, votre équipe, votre sécurité et vos appareils connectés.",
+        "Gérez votre espace de travail, vos conditions de forfait, votre équipe, vos notifications, votre sécurité et vos appareils connectés.",
       label: "Sections des réglages",
       title: "Réglages",
+    },
+    notifications: {
+      alwaysSent:
+        "Les emails de sécurité, les codes de connexion et les messages que vos clients vous écrivent sont toujours envoyés.",
+      channels: {
+        email: {
+          description:
+            "Envoyés à l'adresse de votre compte. Les nouveaux commentaires sont regroupés dans un email toutes les 15 minutes.",
+          title: "Email",
+        },
+        in_app: {
+          description:
+            "La cloche en haut de l'application et son compteur de non lues.",
+          title: "Dans l'application",
+        },
+      },
+      loadErrorDescription: "Vérifiez votre connexion et réessayez.",
+      loadErrorTitle: "Impossible de charger vos réglages de notification",
+      retry: "Réessayer",
+      saveError: "Impossible d'enregistrer ce réglage. Réessayez.",
+      types: {
+        batch_submitted: {
+          description: "Un relecteur soumet son lot de retours.",
+          title: "Retours soumis",
+        },
+        comment: {
+          description: "Les commentaires et réponses de vos clients.",
+          title: "Nouveaux commentaires",
+        },
+        extra_round_accepted: {
+          description:
+            "Le décideur accepte un tour supplémentaire. L'email contient le reçu.",
+          title: "Tour supplémentaire accepté",
+        },
+        extra_round_proposed: {
+          description:
+            "Les retours de votre client dépassent les tours inclus.",
+          title: "Tour supplémentaire proposé",
+        },
+        payment_received: {
+          description:
+            "Le décideur paie un tour supplémentaire en ligne. L'email contient le reçu payé.",
+          title: "Paiement reçu",
+        },
+        version_approved: {
+          description: "Le décideur valide une version.",
+          title: "Version validée",
+        },
+      },
     },
     security: {
       backupCodesDescription:

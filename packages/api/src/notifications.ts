@@ -8,7 +8,9 @@ import {
 import { resolveLocale } from "@roundcut/auth/locale";
 import type { Database } from "@roundcut/db";
 import {
+  defaultNotificationPreferences,
   type NotificationPayload,
+  type NotificationPreferences,
   type NotificationType,
   notificationExcerpt,
 } from "@roundcut/db/notification";
@@ -17,6 +19,7 @@ import { client } from "@roundcut/db/schema/client";
 import { comment } from "@roundcut/db/schema/comment";
 import { deliverable } from "@roundcut/db/schema/deliverable";
 import { notification } from "@roundcut/db/schema/notification";
+import { notificationPreference } from "@roundcut/db/schema/notification-preference";
 import { project } from "@roundcut/db/schema/project";
 import { reviewer } from "@roundcut/db/schema/reviewer";
 import { version } from "@roundcut/db/schema/version";
@@ -38,8 +41,35 @@ import type { Notifications } from "./context";
 import { activeReviewLink, FINISHED_PROJECT_STATUSES } from "./reminders";
 import { isAllowedReviewer } from "./reviewer";
 
+// A user's notification choices (NOTIF-03): the defaults overlaid with what
+// they turned off or back on.
+export async function notificationPreferences(
+  db: Database,
+  userId: string
+): Promise<NotificationPreferences> {
+  const rows = await db
+    .select({
+      channel: notificationPreference.channel,
+      enabled: notificationPreference.enabled,
+      type: notificationPreference.type,
+    })
+    .from(notificationPreference)
+    .where(eq(notificationPreference.userId, userId));
+  const preferences = defaultNotificationPreferences();
+  for (const row of rows) {
+    // Rows of a type no longer offered are ignored.
+    const type = preferences[row.type] as
+      | NotificationPreferences[NotificationType]
+      | undefined;
+    if (type) {
+      type[row.channel] = row.enabled;
+    }
+  }
+  return preferences;
+}
+
 // The editor to tell about a client's move on a version: the workspace owner,
-// written to in the workspace language.
+// written to in the workspace language, with their notification choices.
 export async function versionEditor(db: Database, versionId: string) {
   const [row] = await db
     .select({
@@ -58,7 +88,13 @@ export async function versionEditor(db: Database, versionId: string) {
     .innerJoin(workspace, eq(project.workspaceId, workspace.id))
     .innerJoin(user, eq(workspace.ownerUserId, user.id))
     .where(eq(version.id, versionId));
-  return row ?? null;
+  if (!row) {
+    return null;
+  }
+  return {
+    ...row,
+    preferences: await notificationPreferences(db, row.editorId),
+  };
 }
 
 export type VersionEditor = NonNullable<
@@ -72,6 +108,9 @@ type EventDetails = Pick<
 
 // Records events of a version for its editor (NOTIF-01). The client's move
 // is already saved: a failure is logged, never reported to the client.
+// Turned off in the app (NOTIF-03), a row is kept but born read, so it
+// never counts as unread; comments the editor doesn't want by email are born
+// emailed, so no grouped email picks them up.
 export async function notifyEditor(
   db: Database,
   editor: VersionEditor,
@@ -81,9 +120,12 @@ export async function notifyEditor(
   if (events.length === 0) {
     return;
   }
+  const wanted = editor.preferences[type];
+  const now = new Date();
   try {
     await db.insert(notification).values(
       events.map((event) => ({
+        emailedAt: type === "comment" && !wanted.email ? now : null,
         payload: {
           ...event,
           body:
@@ -96,6 +138,7 @@ export async function notifyEditor(
           versionId: editor.versionId,
           versionNumber: editor.versionNumber,
         },
+        readAt: wanted.in_app ? null : now,
         type,
         userId: editor.editorId,
       }))

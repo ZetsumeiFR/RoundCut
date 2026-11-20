@@ -6,6 +6,7 @@ export * from "./consent-record";
 export * from "./deliverable";
 export * from "./extra-round-offer";
 export * from "./notification";
+export * from "./notification-preference";
 export * from "./project";
 export * from "./review-link";
 export * from "./reviewer";
