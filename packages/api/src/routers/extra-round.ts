@@ -4,19 +4,17 @@ import {
   extraRoundForwardEmail,
   sendEmail,
 } from "@roundcut/auth/email";
-import { LOCALES, type Locale, resolveLocale } from "@roundcut/auth/locale";
+import { LOCALES, resolveLocale } from "@roundcut/auth/locale";
 import type { Database } from "@roundcut/db";
 import {
   EXTRA_ROUND_CONTACT_MAX_LENGTH,
   EXTRA_ROUND_OFFER_VALIDITY_DAYS,
   EXTRA_ROUND_SIZES,
-  type ExtraRoundSize,
   needsExtraRound,
   offerAmounts,
 } from "@roundcut/db/extra-round";
 import { lightExtraRoundPrice } from "@roundcut/db/revision-terms";
 import { user } from "@roundcut/db/schema/auth";
-import { billableLine } from "@roundcut/db/schema/billable-line";
 import { client } from "@roundcut/db/schema/client";
 import { consentRecord } from "@roundcut/db/schema/consent-record";
 import { deliverable } from "@roundcut/db/schema/deliverable";
@@ -45,6 +43,7 @@ import { emailReceipt, findReceipt, receiptFile } from "../receipt";
 import { reviewTokenSchema } from "../review-link";
 import { isDeciderEmail } from "../reviewer";
 import { consumeReviewerCode, reviewerCodeSchema } from "../reviewer-code";
+import { extraRoundLabel, insertExtraRoundLine } from "./billing";
 import { findReviewVersion, requireDecider, requireReviewer } from "./comment";
 import { batchSize, findVersionRound, pendingSize } from "./review";
 import { projectRoundPositions } from "./round";
@@ -382,15 +381,13 @@ async function agreementSnapshot(
 }
 
 // The project and workspace an offer's deliverable belongs to, for its
-// payment (EXTRA-04) or its billable line (EXTRA-05).
+// payment (EXTRA-04).
 async function offerOwner(db: Database, deliverableId: string) {
   const [row] = await db
     .select({
-      clientId: project.clientId,
       deliverableTitle: deliverable.title,
       locale: workspace.locale,
       plan: workspace.plan,
-      projectId: project.id,
       projectName: project.name,
       stripeAccountId: workspace.stripeAccountId,
       stripePaymentsActive: workspace.stripePaymentsActive,
@@ -401,22 +398,6 @@ async function offerOwner(db: Database, deliverableId: string) {
     .innerJoin(workspace, eq(project.workspaceId, workspace.id))
     .where(eq(deliverable.id, deliverableId));
   return row;
-}
-
-const ROUND_LABELS = {
-  en: { full: "Extra round", light: "Light extra round" },
-  fr: { full: "Tour supplémentaire", light: "Tour supplémentaire léger" },
-} as const satisfies Record<Locale, Record<ExtraRoundSize, string>>;
-
-// The extra round's label on the Stripe payment and the billable line, in
-// the workspace language, naming the light round the decider chose.
-function extraRoundLabel(
-  locale: Locale,
-  offer: Offer,
-  owner: { deliverableTitle: string; projectName: string }
-) {
-  const round = `${ROUND_LABELS[locale][offer.size ?? "full"]} ${offer.round}`;
-  return `${round} · ${owner.projectName} · ${owner.deliverableTitle}`;
 }
 
 // The editor's connected account an offer is paid on, checked with Stripe
@@ -507,10 +488,6 @@ export const extraRoundRouter = {
         signer: decider,
         versionId: input.versionId,
       });
-      const owner = await offerOwner(context.db, offer.deliverableId);
-      if (!owner) {
-        throw new ORPCError("NOT_FOUND", { message: "Deliverable not found" });
-      }
       const consent = await context.db.transaction(async (tx) => {
         const [accepted] = await tx
           .update(extraRoundOffer)
@@ -557,17 +534,12 @@ export const extraRoundRouter = {
             snapshotHash: consentRecord.snapshotHash,
           });
         if (record && !offer.requirePayment) {
-          await tx.insert(billableLine).values({
-            clientId: owner.clientId,
+          await insertExtraRoundLine(tx, {
+            agreement: snapshot,
             consentRecordId: record.id,
             createdAt: now,
-            currency: offer.currency,
-            label: extraRoundLabel(resolveLocale(owner.locale), offer, owner),
-            projectId: owner.projectId,
-            source: "extra_round",
-            unitPriceCents: offer.netCents,
-            vatRateBps: offer.vatRateBps,
-            workspaceId: owner.workspaceId,
+            paidAt: null,
+            projectId,
           });
         }
         await tx

@@ -23,12 +23,13 @@ export default function Header({
     { label: "Dashboard", to: "/dashboard" },
     { label: "Clients", to: "/clients" },
     { label: "Projects", to: "/projects" },
+    { label: "Billing", to: "/billing" },
   ] as const;
 
   return (
     <div>
       <div className="flex flex-row items-center justify-between px-2 py-1">
-        <nav className="flex min-w-0 gap-3 text-base sm:gap-4 sm:text-lg">
+        <nav className="flex min-w-0 gap-2 text-sm sm:gap-4 sm:text-lg">
           {links.map(({ to, label }) => (
             <Link href={to} key={to}>
               {label}

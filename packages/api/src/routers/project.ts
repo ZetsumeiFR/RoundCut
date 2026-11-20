@@ -1,6 +1,7 @@
 import { ORPCError } from "@orpc/server";
 import { projectStatusSources } from "@roundcut/db/project-status";
 import type { RoundStatus } from "@roundcut/db/round";
+import { billableLine } from "@roundcut/db/schema/billable-line";
 import { client } from "@roundcut/db/schema/client";
 import { comment } from "@roundcut/db/schema/comment";
 import { deliverable } from "@roundcut/db/schema/deliverable";
@@ -8,7 +9,17 @@ import { project } from "@roundcut/db/schema/project";
 import { round } from "@roundcut/db/schema/round";
 import { version } from "@roundcut/db/schema/version";
 import type { VersionStatus } from "@roundcut/db/version";
-import { and, asc, count, desc, eq, inArray, isNull, ne } from "drizzle-orm";
+import {
+  and,
+  asc,
+  count,
+  desc,
+  eq,
+  inArray,
+  isNull,
+  ne,
+  sql,
+} from "drizzle-orm";
 import z from "zod";
 
 import { protectedProcedure } from "../index";
@@ -17,6 +28,7 @@ import {
   projectSchema,
   projectStatusSchema,
 } from "../project";
+import { insertFlatFeeLine } from "./billing";
 import { toDeliverable } from "./deliverable";
 import { projectRoundPositions } from "./round";
 import { thumbnailUrl } from "./version";
@@ -44,18 +56,17 @@ export interface ReviewActivity {
 }
 
 export interface DashboardIndicators {
-  // Amount still to bill: flat fees and accepted extra rounds (BILL-01).
+  // Amount still to invoice, excluding VAT: flat fees, extra rounds and
+  // manual fees not exported yet (BILL-01).
   billableCents: number;
   extraRoundsThisMonth: number;
   openRounds: number;
   submittedBatches: number;
 }
 
-// Rounds, comment batches, extra rounds and billable lines don't exist yet
-// (ROUND-01, REV-03, EXTRA-05, BILL-01): until they ship, the dashboard
-// reads as having nothing to process.
-const NO_DASHBOARD_ACTIVITY: DashboardIndicators = {
-  billableCents: 0,
+// Rounds, comment batches and extra rounds aren't counted yet (#118): until
+// then, the dashboard reads as having nothing to process.
+const NO_DASHBOARD_ACTIVITY: Omit<DashboardIndicators, "billableCents"> = {
   extraRoundsThisMonth: 0,
   openRounds: 0,
   submittedBatches: 0,
@@ -121,6 +132,7 @@ export const projectRouter = {
           if (!row) {
             throw new Error("Project insert returned no row");
           }
+          await insertFlatFeeLine(tx, row, workspace);
           const created =
             deliverables.length > 0
               ? await tx
@@ -186,6 +198,7 @@ export const projectRouter = {
         if (!row) {
           throw new Error("Project insert returned no row");
         }
+        await insertFlatFeeLine(tx, row, workspace);
         const items = copyDeliverables
           ? await tx
               .select({
@@ -326,7 +339,27 @@ export const projectRouter = {
       );
     }),
   indicators: protectedProcedure.handler(
-    (): DashboardIndicators => NO_DASHBOARD_ACTIVITY
+    async ({ context }): Promise<DashboardIndicators> => {
+      const workspace = await getOrCreateWorkspace(
+        context.db,
+        context.session.user
+      );
+      const [billable] = await context.db
+        .select({
+          cents: sql<string>`coalesce(sum(${billableLine.quantity} * ${billableLine.unitPriceCents}), 0)`,
+        })
+        .from(billableLine)
+        .where(
+          and(
+            eq(billableLine.workspaceId, workspace.id),
+            eq(billableLine.status, "to_invoice")
+          )
+        );
+      return {
+        ...NO_DASHBOARD_ACTIVITY,
+        billableCents: Number(billable?.cents ?? 0),
+      };
+    }
   ),
   list: protectedProcedure.handler(async ({ context }) => {
     const workspace = await getOrCreateWorkspace(

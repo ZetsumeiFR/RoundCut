@@ -227,7 +227,8 @@ export const roundRouter = {
         .innerJoin(deliverable, eq(round.deliverableId, deliverable.id))
         .innerJoin(version, eq(round.versionId, version.id))
         // The billable line of the agreement that granted an extra round
-        // (EXTRA-05); none when the client paid it online or it was gifted.
+        // (EXTRA-05), paid once the client paid it online (BILL-01); none
+        // when it was gifted.
         .leftJoin(extraRoundOffer, eq(extraRoundOffer.roundId, round.id))
         .leftJoin(consentRecord, eq(consentRecord.offerId, extraRoundOffer.id))
         .leftJoin(
