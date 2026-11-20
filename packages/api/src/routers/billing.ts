@@ -18,7 +18,8 @@ import {
   lineStatusSchema,
   manualLineSchema,
 } from "../billing";
-import { billableLinesCsv } from "../billing-csv";
+import { billableLinesCsv, invoiceSummaryCsv } from "../billing-csv";
+import { pennylaneDraftsXlsx } from "../billing-pennylane";
 import { protectedProcedure } from "../index";
 import { agreementSnapshotSchema } from "../receipt";
 import { getOrCreateWorkspace } from "./workspace";
@@ -173,12 +174,13 @@ export const billingRouter = {
         }
         return line;
       }),
-    // The lines shown on /billing (BILL-04), filtered there, as a CSV file in
-    // the page's language; ids of other workspaces' lines match nothing.
-    // Exporting doesn't mark them exported: the editor does once imported.
+    // The lines shown on /billing (BILL-04), filtered there, as a file in the
+    // page's language and the chosen tool's format (BILL-05); ids of other
+    // workspaces' lines match nothing. Exporting doesn't mark them exported:
+    // the editor does once imported.
     exportCsv: protectedProcedure
       .input(exportLinesSchema)
-      .handler(async ({ context, input: { ids, locale } }) => {
+      .handler(async ({ context, input: { ids, locale, preset } }) => {
         const owner = await getOrCreateWorkspace(
           context.db,
           context.session.user
@@ -220,11 +222,14 @@ export const billingRouter = {
                 .deliverable.title
             : null,
         }));
-        return billableLinesCsv(lines, {
-          locale,
-          now: new Date(),
-          timeZone: owner.timezone,
-        });
+        const options = { locale, now: new Date(), timeZone: owner.timezone };
+        if (preset === "pennylane") {
+          return pennylaneDraftsXlsx(lines, options);
+        }
+        if (preset === "recap") {
+          return invoiceSummaryCsv(lines, options);
+        }
+        return billableLinesCsv(lines, options);
       }),
     list: protectedProcedure.handler(async ({ context }) => {
       const owner = await getOrCreateWorkspace(

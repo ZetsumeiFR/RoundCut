@@ -26,8 +26,15 @@ export const lineStatusSchema = z.object({
   status: z.enum(BILLABLE_LINE_STATUSES),
 });
 
-// The lines the editor exports as CSV (BILL-04), in the page's language.
+// Export formats (BILL-05): the full CSV for any spreadsheet (BILL-04),
+// Pennylane's invoice drafts import (.xlsx), and a per-client recap for
+// Indy, Tiime and Freebe, which only take invoices entered one by one.
+export const EXPORT_PRESETS = ["standard", "pennylane", "recap"] as const;
+export type ExportPreset = (typeof EXPORT_PRESETS)[number];
+
+// The lines the editor exports (BILL-04), in the page's language.
 export const exportLinesSchema = z.object({
   ids: z.array(z.string().min(1)).min(1).max(BILLABLE_LINE_EXPORT_MAX),
   locale: z.enum(LOCALES),
+  preset: z.enum(EXPORT_PRESETS).default("standard"),
 });

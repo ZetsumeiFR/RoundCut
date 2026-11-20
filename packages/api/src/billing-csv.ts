@@ -16,6 +16,12 @@ export interface CsvLine {
   vatRateBps: number;
 }
 
+export interface ExportOptions {
+  locale: Locale;
+  now: Date;
+  timeZone: string;
+}
+
 const COLUMNS = [
   "date",
   "client",
@@ -34,6 +40,21 @@ const COLUMNS = [
 ] as const;
 
 type Column = (typeof COLUMNS)[number];
+
+const RECAP_COLUMNS = [
+  "client",
+  "siren",
+  "label",
+  "description",
+  "quantity",
+  "unitPrice",
+  "vatRate",
+  "net",
+  "vat",
+  "gross",
+] as const;
+
+type RecapColumn = (typeof RECAP_COLUMNS)[number];
 
 const TEXT = {
   en: {
@@ -54,6 +75,22 @@ const TEXT = {
       vatRate: "VAT rate (%)",
     },
     fileName: "billable-lines",
+    recap: {
+      columns: {
+        client: "Client",
+        description: "Description",
+        gross: "Total incl. VAT",
+        label: "Item",
+        net: "Total excl. VAT",
+        quantity: "Quantity",
+        siren: "SIREN",
+        unitPrice: "Unit price excl. VAT",
+        vat: "VAT",
+        vatRate: "VAT rate (%)",
+      },
+      fileName: "invoice-summary-by-client",
+      total: "Invoice total",
+    },
     statuses: { exported: "Exported", paid: "Paid", to_invoice: "To invoice" },
   },
   fr: {
@@ -74,6 +111,22 @@ const TEXT = {
       vatRate: "Taux de TVA (%)",
     },
     fileName: "lignes-facturables",
+    recap: {
+      columns: {
+        client: "Client",
+        description: "Description",
+        gross: "Total TTC",
+        label: "Désignation",
+        net: "Total HT",
+        quantity: "Quantité",
+        siren: "SIREN",
+        unitPrice: "Prix unitaire HT",
+        vat: "TVA",
+        vatRate: "Taux de TVA (%)",
+      },
+      fileName: "recapitulatif-factures-par-client",
+      total: "Total de la facture",
+    },
     statuses: { exported: "Exportée", paid: "Payée", to_invoice: "À facturer" },
   },
 } as const satisfies Record<
@@ -81,6 +134,11 @@ const TEXT = {
   {
     columns: Record<Column, string>;
     fileName: string;
+    recap: {
+      columns: Record<RecapColumn, string>;
+      fileName: string;
+      total: string;
+    };
     statuses: Record<BillableLineStatus, string>;
   }
 >;
@@ -93,7 +151,7 @@ const SEPARATORS = { en: ",", fr: ";" } as const satisfies Record<
 >;
 // Excel reads a CSV as UTF-8 only when it starts with a byte order mark.
 const BYTE_ORDER_MARK = "\uFEFF";
-const CENTS_PER_UNIT = 100;
+export const CENTS_PER_UNIT = 100;
 const BASIS_POINTS_PER_PERCENT = 100;
 const NEEDS_QUOTES = {
   en: /[",\r\n]/,
@@ -113,8 +171,8 @@ const numberFormat = (locale: Locale, minimumFractionDigits: number) =>
     useGrouping: false,
   });
 
-// In the workspace's time zone: 20/11/2026 in French, 2026-11-20 in English.
-const dateFormat = (locale: Locale, timeZone: string) => {
+// A day's calendar parts in the workspace's time zone.
+export const calendarDay = (timeZone: string) => {
   const parts = new Intl.DateTimeFormat("en-US", {
     day: "2-digit",
     month: "2-digit",
@@ -123,33 +181,64 @@ const dateFormat = (locale: Locale, timeZone: string) => {
   });
   return (date: Date) => {
     const part = (type: Intl.DateTimeFormatPartTypes) =>
-      parts.formatToParts(date).find((item) => item.type === type)?.value;
-    const [day, month, year] = [part("day"), part("month"), part("year")];
+      parts.formatToParts(date).find((item) => item.type === type)?.value ?? "";
+    return { day: part("day"), month: part("month"), year: part("year") };
+  };
+};
+
+// In the workspace's time zone: 20/11/2026 in French, 2026-11-20 in English.
+const dateFormat = (locale: Locale, timeZone: string) => {
+  const dayOf = calendarDay(timeZone);
+  return (date: Date) => {
+    const { day, month, year } = dayOf(date);
     return locale === "fr"
       ? `${day}/${month}/${year}`
       : `${year}-${month}-${day}`;
   };
 };
 
-// The billable lines as a CSV file (BILL-04, §6.10) for the editor's
-// invoicing tool, in the language of the page that exports them. VAT is
-// rounded per line, like the totals on /billing.
-export function billableLinesCsv(
-  lines: CsvLine[],
-  options: { locale: Locale; now: Date; timeZone: string }
-) {
-  const { locale, timeZone } = options;
-  const text = TEXT[locale];
-  const separator = SEPARATORS[locale];
-  const date = dateFormat(locale, timeZone);
+// The export day in a file name, e.g. billable-lines-2026-11-20.csv.
+export const fileDay = (options: ExportOptions) =>
+  dateFormat("en", options.timeZone)(options.now);
+
+// VAT is rounded per line, like the totals on /billing.
+export const lineAmounts = (line: CsvLine) =>
+  offerAmounts(line.quantity * line.unitPriceCents, line.vatRateBps);
+
+// A line's description: its project, and the deliverable of an extra round.
+export const lineDescription = (line: CsvLine) =>
+  [line.projectName, line.deliverableTitle].filter(Boolean).join(" · ");
+
+const csvFile = (rows: string[][], locale: Locale, fileName: string) => {
+  const csv = rows
+    .map((row) =>
+      row.map((value) => quoted(value, locale)).join(SEPARATORS[locale])
+    )
+    .join("\r\n");
+  return new File([`${BYTE_ORDER_MARK}${csv}\r\n`], fileName, {
+    type: "text/csv;charset=utf-8",
+  });
+};
+
+const csvFormats = (locale: Locale) => {
   const amount = numberFormat(locale, 2);
   const rate = numberFormat(locale, 0);
-  const money = (cents: number) => amount.format(cents / CENTS_PER_UNIT);
+  return {
+    money: (cents: number) => amount.format(cents / CENTS_PER_UNIT),
+    rate: (vatRateBps: number) =>
+      rate.format(vatRateBps / BASIS_POINTS_PER_PERCENT),
+  };
+};
+
+// The billable lines as a CSV file (BILL-04, §6.10) for the editor's
+// invoicing tool, in the language of the page that exports them.
+export function billableLinesCsv(lines: CsvLine[], options: ExportOptions) {
+  const { locale } = options;
+  const text = TEXT[locale];
+  const date = dateFormat(locale, options.timeZone);
+  const { money, rate } = csvFormats(locale);
   const rows = lines.map((line) => {
-    const totals = offerAmounts(
-      line.quantity * line.unitPriceCents,
-      line.vatRateBps
-    );
+    const totals = lineAmounts(line);
     return [
       date(line.createdAt),
       line.clientName,
@@ -159,7 +248,7 @@ export function billableLinesCsv(
       line.label,
       String(line.quantity),
       money(line.unitPriceCents),
-      rate.format(line.vatRateBps / BASIS_POINTS_PER_PERCENT),
+      rate(line.vatRateBps),
       money(totals.netCents),
       money(totals.vatCents),
       money(totals.grossCents),
@@ -167,13 +256,61 @@ export function billableLinesCsv(
       text.statuses[line.status],
     ];
   });
-  const csv = [COLUMNS.map((column) => text.columns[column]), ...rows]
-    .map((row) => row.map((value) => quoted(value, locale)).join(separator))
-    .join("\r\n");
-  const day = dateFormat("en", timeZone)(options.now);
-  return new File(
-    [`${BYTE_ORDER_MARK}${csv}\r\n`],
-    `${text.fileName}-${day}.csv`,
-    { type: "text/csv;charset=utf-8" }
+  return csvFile(
+    [COLUMNS.map((column) => text.columns[column]), ...rows],
+    locale,
+    `${text.fileName}-${fileDay(options)}.csv`
+  );
+}
+
+// The lines grouped into one invoice per client, each followed by its
+// totals (BILL-05): Indy, Tiime and Freebe import no invoice lines, so the
+// editor copies each group into a new invoice, item by item, and checks
+// the totals match.
+export function invoiceSummaryCsv(lines: CsvLine[], options: ExportOptions) {
+  const { locale } = options;
+  const text = TEXT[locale].recap;
+  const { money, rate } = csvFormats(locale);
+  const clients = Map.groupBy(
+    lines.toSorted((a, b) => a.clientName.localeCompare(b.clientName, locale)),
+    (line) => `${line.clientName}\n${line.siren ?? ""}`
+  );
+  const rows = [...clients.values()].flatMap((group) => {
+    const items = group.map((line) => {
+      const totals = lineAmounts(line);
+      return [
+        line.clientName,
+        line.siren ?? "",
+        line.label,
+        lineDescription(line),
+        String(line.quantity),
+        money(line.unitPriceCents),
+        rate(line.vatRateBps),
+        money(totals.netCents),
+        money(totals.vatCents),
+        money(totals.grossCents),
+      ];
+    });
+    const sum = (key: "grossCents" | "netCents" | "vatCents") =>
+      money(group.reduce((cents, line) => cents + lineAmounts(line)[key], 0));
+    const [first] = group;
+    const totalRow = [
+      first?.clientName ?? "",
+      first?.siren ?? "",
+      text.total,
+      "",
+      "",
+      "",
+      "",
+      sum("netCents"),
+      sum("vatCents"),
+      sum("grossCents"),
+    ];
+    return [...items, totalRow];
+  });
+  return csvFile(
+    [RECAP_COLUMNS.map((column) => text.columns[column]), ...rows],
+    locale,
+    `${text.fileName}-${fileDay(options)}.csv`
   );
 }

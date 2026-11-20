@@ -1,5 +1,6 @@
 "use client";
 
+import { EXPORT_PRESETS, type ExportPreset } from "@roundcut/api/billing";
 import type { AppRouterClient } from "@roundcut/api/routers/index";
 import type { Locale } from "@roundcut/auth/locale";
 import {
@@ -65,6 +66,7 @@ import {
 import {
   ChevronDownIcon,
   CircleAlertIcon,
+  DownloadIcon,
   PlusIcon,
   ReceiptTextIcon,
   SearchXIcon,
@@ -75,7 +77,7 @@ import { toast } from "sonner";
 
 import { ClientsSkeleton, gridI18n } from "@/components/clients/clients-view";
 import { FilterSelect } from "@/components/dashboard/projects-dashboard";
-import { ReceiptDownloadButton } from "@/components/review/receipt-download-button";
+import { saveFile } from "@/components/review/receipt-download-button";
 import { formatMessage, type Messages } from "@/i18n/messages";
 import { client as api, orpc } from "@/utils/orpc";
 import { AddFeeDialog } from "./add-fee-dialog";
@@ -244,6 +246,82 @@ function StatusMenuItem({
     [line, onChange, status]
   );
   return <DropdownMenuItem onClick={handleClick}>{label}</DropdownMenuItem>;
+}
+
+function ExportMenuItem({
+  messages,
+  onExport,
+  preset,
+}: {
+  messages: BillingMessages["export"]["presets"][ExportPreset];
+  onExport: (preset: ExportPreset) => void;
+  preset: ExportPreset;
+}) {
+  const handleClick = useCallback(() => onExport(preset), [onExport, preset]);
+  return (
+    <DropdownMenuItem
+      className="flex-col items-start gap-0.5"
+      onClick={handleClick}
+    >
+      <span>{messages.title}</span>
+      <span className="text-muted-foreground text-xs">
+        {messages.description}
+      </span>
+    </DropdownMenuItem>
+  );
+}
+
+// Exports the filtered lines (BILL-04) for the editor's invoicing tool
+// (BILL-05): any spreadsheet, Pennylane's import, or a per-client recap for
+// Indy, Tiime and Freebe.
+function ExportMenu({
+  ids,
+  locale,
+  messages,
+}: {
+  ids: string[];
+  locale: Locale;
+  messages: BillingMessages["export"];
+}) {
+  const [busy, setBusy] = useState(false);
+  const handleExport = useCallback(
+    async (preset: ExportPreset) => {
+      setBusy(true);
+      try {
+        saveFile(await api.billing.lines.exportCsv({ ids, locale, preset }));
+      } catch {
+        toast.error(messages.error);
+      } finally {
+        setBusy(false);
+      }
+    },
+    [ids, locale, messages.error]
+  );
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger
+        aria-label={messages.label}
+        disabled={busy}
+        render={<Button size="sm" type="button" variant="outline" />}
+      >
+        <DownloadIcon aria-hidden="true" />
+        {busy ? messages.exporting : messages.action}
+        <ChevronDownIcon aria-hidden="true" />
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-72">
+        <DropdownMenuGroup>
+          {EXPORT_PRESETS.map((preset) => (
+            <ExportMenuItem
+              key={preset}
+              messages={messages.presets[preset]}
+              onExport={handleExport}
+              preset={preset}
+            />
+          ))}
+        </DropdownMenuGroup>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
 }
 
 // The status badge opens the statuses the line can be marked with (BILL-02);
@@ -811,22 +889,7 @@ export function BillingView({
     [refetch, refetchWorkspace]
   );
   const currency = workspace.data?.currency;
-  const exportShown = useCallback(
-    () =>
-      api.billing.lines.exportCsv({
-        ids: shown.map((line) => line.id),
-        locale,
-      }),
-    [locale, shown]
-  );
-  const exportMessages = useMemo(
-    () => ({
-      download: messages.export.action,
-      downloadError: messages.export.error,
-      downloading: messages.export.exporting,
-    }),
-    [messages.export]
-  );
+  const shownIds = useMemo(() => shown.map((line) => line.id), [shown]);
 
   let summary = messages.description;
   if (data) {
@@ -873,10 +936,10 @@ export function BillingView({
           </div>
           <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
             {currency && shown.length > 0 ? (
-              <ReceiptDownloadButton
-                fetchReceipt={exportShown}
-                label={messages.export.label}
-                messages={exportMessages}
+              <ExportMenu
+                ids={shownIds}
+                locale={locale}
+                messages={messages.export}
               />
             ) : null}
             <Button disabled={!currency} onClick={openFee} type="button">

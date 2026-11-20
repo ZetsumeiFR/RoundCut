@@ -430,10 +430,26 @@ const en = {
       title: "No billable lines yet",
     },
     export: {
-      action: "Export CSV",
+      action: "Export",
       error: "Couldn't export the lines. Try again.",
       exporting: "Exporting…",
-      label: "Export the filtered lines as CSV",
+      label: "Export the filtered lines",
+      presets: {
+        pennylane: {
+          description:
+            "Invoice drafts to import, one per client, matched by SIREN.",
+          title: "Pennylane (.xlsx)",
+        },
+        recap: {
+          description:
+            "One invoice per client with its totals, to copy into a new invoice.",
+          title: "Indy, Tiime, Freebe",
+        },
+        standard: {
+          description: "Every column, for Excel or any spreadsheet.",
+          title: "CSV spreadsheet",
+        },
+      },
     },
     fee: {
       cancel: "Cancel",
@@ -2074,10 +2090,26 @@ const fr: Messages = {
       title: "Aucune ligne facturable pour l'instant",
     },
     export: {
-      action: "Exporter CSV",
+      action: "Exporter",
       error: "Impossible d'exporter les lignes. Réessayez.",
       exporting: "Export…",
-      label: "Exporter les lignes filtrées en CSV",
+      label: "Exporter les lignes filtrées",
+      presets: {
+        pennylane: {
+          description:
+            "Brouillons de facture à importer, un par client, retrouvé par son SIREN.",
+          title: "Pennylane (.xlsx)",
+        },
+        recap: {
+          description:
+            "Une facture par client avec ses totaux, à reporter dans une nouvelle facture.",
+          title: "Indy, Tiime, Freebe",
+        },
+        standard: {
+          description: "Toutes les colonnes, pour Excel ou un tableur.",
+          title: "CSV tableur",
+        },
+      },
     },
     fee: {
       cancel: "Annuler",
