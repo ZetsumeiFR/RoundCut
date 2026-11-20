@@ -166,6 +166,7 @@ function bannerLines(
 // state, or the decider's final approval once the version is approved.
 function RoundBanner({
   approval,
+  certificate,
   includedRounds,
   locale,
   messages,
@@ -174,6 +175,8 @@ function RoundBanner({
   workspaceName,
 }: {
   approval: { approvedAt: Date; approverName: string } | null;
+  // The validation certificate of the approved version (APPR-04).
+  certificate: ReactNode;
   includedRounds: number;
   locale: Locale;
   messages: SubmitMessages;
@@ -195,6 +198,9 @@ function RoundBanner({
             name: approval.approverName,
           })}
         </AlertTitle>
+        <AlertDescription>
+          <div className="pt-1">{certificate}</div>
+        </AlertDescription>
       </Alert>
     );
   }
@@ -368,6 +374,10 @@ export function SubmitBatch({
       }),
     [agreementOfferId, locale, token]
   );
+  const fetchCertificate = useCallback(
+    () => api.review.approvalCertificate({ locale, token, versionId }),
+    [locale, token, versionId]
+  );
 
   const handleConfirm = useCallback(async () => {
     setBusy(true);
@@ -422,6 +432,12 @@ export function SubmitBatch({
   const banner = (
     <RoundBanner
       approval={approval}
+      certificate={
+        <ReceiptDownloadButton
+          fetchReceipt={fetchCertificate}
+          messages={messages.certificate}
+        />
+      }
       includedRounds={includedRounds}
       locale={locale}
       messages={messages}

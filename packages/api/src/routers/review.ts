@@ -6,7 +6,7 @@ import {
   sendEmail,
   versionApprovedEmail,
 } from "@roundcut/auth/email";
-import { resolveLocale } from "@roundcut/auth/locale";
+import { LOCALES, resolveLocale } from "@roundcut/auth/locale";
 import type { Database } from "@roundcut/db";
 import { PROJECT_AUTO_APPROVAL_SOURCES } from "@roundcut/db/project-status";
 import {
@@ -39,6 +39,7 @@ import {
 } from "drizzle-orm";
 import z from "zod";
 
+import { certificateFile, findCertificate } from "../certificate";
 import { consentShownSchema, snapshotHash } from "../consent";
 import type { Notifications } from "../context";
 import {
@@ -241,6 +242,22 @@ async function notifyVersionApproved(
 }
 
 export const reviewRouter = {
+  // The validation certificate (APPR-04) of an approved version, for any
+  // identified reviewer of the link.
+  approvalCertificate: publicProcedure
+    .input(versionInput.extend({ locale: z.enum(LOCALES) }))
+    .use(requireReviewLink)
+    .handler(async ({ context, input }) => {
+      requireReviewer(context.reviewer);
+      const certificate = await findCertificate(
+        context.db,
+        and(
+          eq(consentRecord.versionId, input.versionId),
+          eq(consentRecord.projectId, context.reviewLink.projectId)
+        )
+      );
+      return certificateFile(certificate, input.locale);
+    }),
   // The decider approves the version they review with an email code
   // (APPR-01, also offered after declining an extra round in EXTRA-06): the
   // version and its deliverable turn approved, the version's round closes
@@ -289,6 +306,9 @@ export const reviewRouter = {
       if (!row) {
         throw new ORPCError("NOT_FOUND", { message: "Version not found" });
       }
+      // Versions published before APPR-04 are fingerprinted when approved.
+      const sha256 =
+        target.sha256 ?? (await context.storage.sha256(target.r2Key));
       const now = new Date();
       const snapshot = {
         approvedAt: now.toISOString(),
@@ -304,6 +324,7 @@ export const reviewRouter = {
             fileName: target.fileName,
             id: target.id,
             number: target.number,
+            sha256,
             sizeBytes: target.sizeBytes,
           },
           workspace: row.workspaceName,
@@ -331,7 +352,7 @@ export const reviewRouter = {
           .for("update");
         const [approved] = await tx
           .update(version)
-          .set({ status: "approved" })
+          .set({ sha256, status: "approved" })
           .where(and(eq(version.id, target.id), eq(version.status, "ready")))
           .returning({ id: version.id });
         if (!approved) {

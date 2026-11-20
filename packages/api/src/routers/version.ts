@@ -1,5 +1,7 @@
 import { ORPCError } from "@orpc/server";
+import { LOCALES } from "@roundcut/auth/locale";
 import type { Database } from "@roundcut/db";
+import { consentRecord } from "@roundcut/db/schema/consent-record";
 import { deliverable } from "@roundcut/db/schema/deliverable";
 import { project } from "@roundcut/db/schema/project";
 import { version } from "@roundcut/db/schema/version";
@@ -10,6 +12,7 @@ import {
 import { and, desc, eq } from "drizzle-orm";
 import z from "zod";
 
+import { certificateFile, findCertificate } from "../certificate";
 import { protectedProcedure } from "../index";
 import type { Storage } from "../storage";
 import type { FrameRate } from "../timecode";
@@ -95,6 +98,21 @@ const assertPublished = (row: VersionRow) => {
 };
 
 export const versionRouter = {
+  // The validation certificate (APPR-04) once the client approved the version.
+  approvalCertificate: protectedProcedure
+    .input(z.object({ id: z.string().min(1), locale: z.enum(LOCALES) }))
+    .handler(async ({ context, input }) => {
+      const workspace = await getOrCreateWorkspace(
+        context.db,
+        context.session.user
+      );
+      const row = await findOwnedVersion(context.db, workspace.id, input.id);
+      const certificate = await findCertificate(
+        context.db,
+        eq(consentRecord.versionId, row.id)
+      );
+      return certificateFile(certificate, input.locale);
+    }),
   // The editor can always download the original file; the client's access
   // follows clientDownload (VER-07) once the review link exists (REV-01).
   downloadUrl: protectedProcedure

@@ -38,6 +38,9 @@ export const version = pgTable(
       .$defaultFn(() => crypto.randomUUID()),
     number: integer("number").notNull(),
     r2Key: text("r2_key").notNull(),
+    // Hex SHA-256 of the stored file, computed by the server when the version
+    // is published (APPR-04); null for versions published before.
+    sha256: text("sha256"),
     sizeBytes: bigint("size_bytes", { mode: "number" }).notNull(),
     status: text("status")
       .$type<VersionStatus>()

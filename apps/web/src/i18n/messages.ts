@@ -791,6 +791,11 @@ const en = {
     player: {
       approved: "Approved",
       back: "Back to {project}",
+      certificate: {
+        download: "Validation certificate (PDF)",
+        downloadError: "Couldn't download the certificate. Try again.",
+        downloading: "Preparing…",
+      },
       compare: {
         action: "Compare",
         audio: {
@@ -1460,6 +1465,11 @@ const en = {
         "This round's feedback was already submitted. New comments will join the next round.",
       approved: "Version approved on {date} by {name}",
       cancel: "Cancel",
+      certificate: {
+        download: "Download the validation certificate (PDF)",
+        downloadError: "Couldn't download the certificate. Try again.",
+        downloading: "Preparing…",
+      },
       closedManually: "Round {round} closed by {workspace} on {date}",
       closedNote: "Note from {workspace}: {note}",
       confirm: "Submit",
@@ -2319,6 +2329,11 @@ const fr: Messages = {
     player: {
       approved: "Validée",
       back: "Retour à {project}",
+      certificate: {
+        download: "Certificat de validation (PDF)",
+        downloadError: "Impossible de télécharger le certificat. Réessayez.",
+        downloading: "Préparation…",
+      },
       compare: {
         action: "Comparer",
         audio: {
@@ -2996,6 +3011,11 @@ const fr: Messages = {
         "Les retours de ce tour ont déjà été soumis. Les nouveaux retours rejoindront le tour suivant.",
       approved: "Version validée le {date} par {name}",
       cancel: "Annuler",
+      certificate: {
+        download: "Télécharger le certificat de validation (PDF)",
+        downloadError: "Impossible de télécharger le certificat. Réessayez.",
+        downloading: "Préparation…",
+      },
       closedManually: "Tour {round} clos par {workspace} le {date}",
       closedNote: "Note de {workspace} : {note}",
       confirm: "Soumettre",
