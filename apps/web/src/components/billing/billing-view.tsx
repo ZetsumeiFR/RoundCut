@@ -4,9 +4,11 @@ import type { AppRouterClient } from "@roundcut/api/routers/index";
 import type { Locale } from "@roundcut/auth/locale";
 import {
   BILLABLE_LINE_STATUS_TRANSITIONS,
+  BILLABLE_LINE_STATUSES,
   type BillableLineSource,
   type BillableLineStatus,
 } from "@roundcut/db/billing";
+import { offerAmounts } from "@roundcut/db/extra-round";
 import {
   AlertDialog,
   AlertDialogCancel,
@@ -65,12 +67,14 @@ import {
   CircleAlertIcon,
   PlusIcon,
   ReceiptTextIcon,
+  SearchXIcon,
 } from "lucide-react";
 import Link from "next/link";
 import { useCallback, useMemo, useState } from "react";
 import { toast } from "sonner";
 
 import { ClientsSkeleton, gridI18n } from "@/components/clients/clients-view";
+import { FilterSelect } from "@/components/dashboard/projects-dashboard";
 import { formatMessage, type Messages } from "@/i18n/messages";
 import { client as api, orpc } from "@/utils/orpc";
 import { AddFeeDialog } from "./add-fee-dialog";
@@ -101,6 +105,99 @@ const SOURCE_BADGES = {
 
 const lineTotalCents = (line: BillableLine) =>
   line.quantity * line.unitPriceCents;
+
+const ALL = "all";
+const PERIODS = [
+  "all",
+  "thisMonth",
+  "lastMonth",
+  "thisQuarter",
+  "lastQuarter",
+  "thisYear",
+  "lastYear",
+] as const;
+const MONTHS_PER_QUARTER = 3;
+const MONTHS_PER_YEAR = 12;
+
+type Period = (typeof PERIODS)[number];
+interface LineFilters {
+  clientId: string;
+  period: Period;
+  status: BillableLineStatus | typeof ALL;
+}
+
+const NO_FILTERS: LineFilters = { clientId: ALL, period: "all", status: ALL };
+
+const isPeriod = (value: string): value is Period =>
+  (PERIODS as readonly string[]).includes(value);
+const isStatusFilter = (value: string): value is LineFilters["status"] =>
+  value === ALL ||
+  (BILLABLE_LINE_STATUSES as readonly string[]).includes(value);
+
+// The calendar period [start, end) in local time, counted from `now`'s month;
+// null for all time.
+function periodRange(period: Period, now: Date): [Date, Date] | null {
+  const year = now.getFullYear();
+  const month = now.getMonth();
+  const quarter = month - (month % MONTHS_PER_QUARTER);
+  const months = (from: number, count: number): [Date, Date] => [
+    new Date(year, from, 1),
+    new Date(year, from + count, 1),
+  ];
+  switch (period) {
+    case "thisMonth":
+      return months(month, 1);
+    case "lastMonth":
+      return months(month - 1, 1);
+    case "thisQuarter":
+      return months(quarter, MONTHS_PER_QUARTER);
+    case "lastQuarter":
+      return months(quarter - MONTHS_PER_QUARTER, MONTHS_PER_QUARTER);
+    case "thisYear":
+      return months(0, MONTHS_PER_YEAR);
+    case "lastYear":
+      return months(-MONTHS_PER_YEAR, MONTHS_PER_YEAR);
+    default:
+      return null;
+  }
+}
+
+function filterLines(lines: BillableLine[], filters: LineFilters, now: Date) {
+  const range = periodRange(filters.period, now);
+  return lines.filter((line) => {
+    const createdAt = new Date(line.createdAt);
+    return (
+      (filters.clientId === ALL || line.client.id === filters.clientId) &&
+      (filters.status === ALL || line.status === filters.status) &&
+      (range === null || (createdAt >= range[0] && createdAt < range[1]))
+    );
+  });
+}
+
+interface Totals {
+  grossCents: number;
+  netCents: number;
+  vatCents: number;
+}
+
+// Totals excl. VAT, VAT and incl. VAT per currency, VAT rounded per line
+// like on an invoice; zero in the workspace currency when nothing matches.
+function totalsByCurrency(lines: BillableLine[], currency: string) {
+  const totals = new Map<string, Totals>();
+  for (const line of lines) {
+    const amounts = offerAmounts(lineTotalCents(line), line.vatRateBps);
+    const sum = totals.get(line.currency);
+    totals.set(line.currency, {
+      grossCents: (sum?.grossCents ?? 0) + amounts.grossCents,
+      netCents: (sum?.netCents ?? 0) + amounts.netCents,
+      vatCents: (sum?.vatCents ?? 0) + amounts.vatCents,
+    });
+  }
+  if (totals.size === 0) {
+    totals.set(currency, { grossCents: 0, netCents: 0, vatCents: 0 });
+  }
+  return [...totals];
+}
 
 function SortableHeader({ column }: { column: LineColumn }) {
   return <DataGridColumnHeader column={column} />;
@@ -346,6 +443,174 @@ function buildColumns(
   ];
 }
 
+function TotalItem({
+  emphasis = false,
+  label,
+  value,
+}: {
+  emphasis?: boolean;
+  label: string;
+  value: string;
+}) {
+  return (
+    <div className="flex min-w-0 flex-col gap-0.5">
+      <dt className="text-muted-foreground text-xs">{label}</dt>
+      <dd
+        className={`whitespace-nowrap text-sm tabular-nums ${emphasis ? "font-semibold" : "font-medium"}`}
+      >
+        {value}
+      </dd>
+    </div>
+  );
+}
+
+function LineTotals({
+  currency,
+  lines,
+  locale,
+  messages,
+}: {
+  currency: string;
+  lines: BillableLine[];
+  locale: Locale;
+  messages: BillingMessages["totals"];
+}) {
+  return (
+    <section aria-label={messages.label} className="flex flex-col gap-3">
+      {totalsByCurrency(lines, currency).map(([code, totals]) => {
+        const format = (cents: number) =>
+          new Intl.NumberFormat(locale, {
+            currency: code,
+            style: "currency",
+          }).format(cents / CENTS_PER_UNIT);
+        return (
+          <dl className="grid grid-cols-3 gap-3" key={code}>
+            <TotalItem label={messages.net} value={format(totals.netCents)} />
+            <TotalItem label={messages.vat} value={format(totals.vatCents)} />
+            <TotalItem
+              emphasis
+              label={messages.gross}
+              value={format(totals.grossCents)}
+            />
+          </dl>
+        );
+      })}
+    </section>
+  );
+}
+
+// Period, client and status filters over the loaded lines (BILL-03); the
+// client choices are the clients the lines belong to.
+function LineFilterBar({
+  filters,
+  lines,
+  locale,
+  messages,
+  onChange,
+}: {
+  filters: LineFilters;
+  lines: BillableLine[];
+  locale: Locale;
+  messages: BillingMessages;
+  onChange: (update: (filters: LineFilters) => LineFilters) => void;
+}) {
+  const { filters: labels } = messages;
+  const periodOptions = useMemo(
+    () =>
+      PERIODS.map((period) => ({
+        label: labels.periods[period],
+        value: period,
+      })),
+    [labels.periods]
+  );
+  const clientOptions = useMemo(() => {
+    const byId = new Map(lines.map((line) => [line.client.id, line.client]));
+    return [
+      { label: labels.allClients, value: ALL },
+      ...[...byId.values()]
+        .map((client) => ({ label: client.name, value: client.id }))
+        .sort((a, b) => a.label.localeCompare(b.label, locale)),
+    ];
+  }, [labels.allClients, lines, locale]);
+  const statusOptions = useMemo(
+    () => [
+      { label: labels.allStatuses, value: ALL },
+      ...BILLABLE_LINE_STATUSES.map((status) => ({
+        label: messages.statuses[status],
+        value: status,
+      })),
+    ],
+    [labels.allStatuses, messages.statuses]
+  );
+  const handlePeriodChange = useCallback(
+    (period: string) => {
+      if (isPeriod(period)) {
+        onChange((current) => ({ ...current, period }));
+      }
+    },
+    [onChange]
+  );
+  const handleClientChange = useCallback(
+    (clientId: string) => onChange((current) => ({ ...current, clientId })),
+    [onChange]
+  );
+  const handleStatusChange = useCallback(
+    (status: string) => {
+      if (isStatusFilter(status)) {
+        onChange((current) => ({ ...current, status }));
+      }
+    },
+    [onChange]
+  );
+  return (
+    <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+      <FilterSelect
+        label={labels.period}
+        onChange={handlePeriodChange}
+        options={periodOptions}
+        value={filters.period}
+      />
+      <FilterSelect
+        label={labels.client}
+        onChange={handleClientChange}
+        options={clientOptions}
+        value={filters.clientId}
+      />
+      <FilterSelect
+        label={labels.status}
+        onChange={handleStatusChange}
+        options={statusOptions}
+        value={filters.status}
+      />
+    </div>
+  );
+}
+
+function FilteredEmpty({
+  messages,
+  onClear,
+}: {
+  messages: BillingMessages["filteredEmpty"];
+  onClear: () => void;
+}) {
+  return (
+    <Empty className="py-16">
+      <EmptyHeader>
+        <EmptyMedia variant="icon">
+          <SearchXIcon aria-hidden="true" />
+        </EmptyMedia>
+        <EmptyTitle>{messages.title}</EmptyTitle>
+        <EmptyDescription>{messages.description}</EmptyDescription>
+      </EmptyHeader>
+      <EmptyContent>
+        <Button onClick={onClear} type="button" variant="outline">
+          {messages.action}
+        </Button>
+      </EmptyContent>
+    </Empty>
+  );
+}
+
 function EmptyLines({
   messages,
   onAdd,
@@ -398,11 +663,13 @@ function LinesLoadError({
 }
 
 function LinesGrid({
+  filters,
   lines,
   locale,
   messages,
   onChange,
 }: {
+  filters: LineFilters;
   lines: BillableLine[];
   locale: Locale;
   messages: BillingMessages;
@@ -413,6 +680,12 @@ function LinesGrid({
     pageIndex: 0,
     pageSize: DEFAULT_PAGE_SIZE,
   });
+  // New filters start back on the first page; a status change keeps it.
+  const [pagedFilters, setPagedFilters] = useState(filters);
+  if (pagedFilters !== filters) {
+    setPagedFilters(filters);
+    setPagination((current) => ({ ...current, pageIndex: 0 }));
+  }
   const columns = useMemo(
     () => buildColumns(messages, locale, onChange),
     [locale, messages, onChange]
@@ -467,6 +740,12 @@ export function BillingView({
   const workspace = useQuery(orpc.workspace.get.queryOptions());
   const [feeOpen, setFeeOpen] = useState(false);
   const openFee = useCallback(() => setFeeOpen(true), []);
+  const [filters, setFilters] = useState<LineFilters>(NO_FILTERS);
+  const clearFilters = useCallback(() => setFilters(NO_FILTERS), []);
+  const shown = useMemo(
+    () => filterLines(data ?? [], filters, new Date()),
+    [data, filters]
+  );
 
   const queryClient = useQueryClient();
   const [paying, setPaying] = useState<BillableLine | null>(null);
@@ -535,20 +814,25 @@ export function BillingView({
   let summary = messages.description;
   if (data) {
     summary = formatMessage(
-      new Intl.PluralRules(locale).select(data.length) === "one"
+      new Intl.PluralRules(locale).select(shown.length) === "one"
         ? messages.countOne
         : messages.countOther,
-      { count: data.length }
+      { count: shown.length }
     );
   }
 
   let body = <ClientsSkeleton label={messages.grid.loading} />;
   if (data && currency && data.length === 0) {
     body = <EmptyLines messages={messages} onAdd={openFee} />;
+  } else if (data && currency && shown.length === 0) {
+    body = (
+      <FilteredEmpty messages={messages.filteredEmpty} onClear={clearFilters} />
+    );
   } else if (data && currency) {
     body = (
       <LinesGrid
-        lines={data}
+        filters={filters}
+        lines={shown}
         locale={locale}
         messages={messages}
         onChange={handleChangeStatus}
@@ -580,6 +864,23 @@ export function BillingView({
             {messages.add}
           </Button>
         </FrameHeader>
+        {data?.length && currency ? (
+          <FramePanel className="flex flex-col gap-4">
+            <LineFilterBar
+              filters={filters}
+              lines={data}
+              locale={locale}
+              messages={messages}
+              onChange={setFilters}
+            />
+            <LineTotals
+              currency={currency}
+              lines={shown}
+              locale={locale}
+              messages={messages.totals}
+            />
+          </FramePanel>
+        ) : null}
         <FramePanel className="p-0">{body}</FramePanel>
       </Frame>
       {currency ? (
