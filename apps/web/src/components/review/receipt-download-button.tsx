@@ -11,6 +11,19 @@ export interface ReceiptDownloadMessages {
   downloading: string;
 }
 
+// Saves a file the API returned through the browser's download.
+export function saveFile(file: unknown) {
+  if (!(file instanceof File)) {
+    throw new Error("The API response isn't a file");
+  }
+  const url = URL.createObjectURL(file);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = file.name;
+  link.click();
+  URL.revokeObjectURL(url);
+}
+
 // Saves an agreement receipt PDF (EXTRA-07) fetched through the API: the
 // reviewer's identity cookie only reaches /api/rpc, so the file comes back
 // from the procedure rather than from a plain link.
@@ -28,16 +41,7 @@ export function ReceiptDownloadButton({
   const handleClick = useCallback(async () => {
     setBusy(true);
     try {
-      const file = await fetchReceipt();
-      if (!(file instanceof File)) {
-        throw new Error("The receipt response isn't a file");
-      }
-      const url = URL.createObjectURL(file);
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = file.name;
-      link.click();
-      URL.revokeObjectURL(url);
+      saveFile(await fetchReceipt());
     } catch {
       toast.error(messages.downloadError);
     } finally {
