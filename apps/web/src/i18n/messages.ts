@@ -450,6 +450,27 @@ const en = {
       tooLong: "Use at most {max} characters.",
       unitPrice: "Unit price excl. VAT",
     },
+    filteredEmpty: {
+      action: "Clear filters",
+      description: "No billable line matches these filters.",
+      title: "No matching lines",
+    },
+    filters: {
+      allClients: "All clients",
+      allStatuses: "All statuses",
+      client: "Filter by client",
+      period: "Filter by period",
+      periods: {
+        all: "All time",
+        lastMonth: "Last month",
+        lastQuarter: "Last quarter",
+        lastYear: "Last year",
+        thisMonth: "This month",
+        thisQuarter: "This quarter",
+        thisYear: "This year",
+      },
+      status: "Filter by status",
+    },
     grid: {
       empty: "No billable lines",
       goToPage: "Go to page {page}",
@@ -487,6 +508,12 @@ const en = {
       to_invoice: "To invoice",
     },
     title: "Billable lines",
+    totals: {
+      gross: "Total incl. VAT",
+      label: "Totals of the filtered lines",
+      net: "Total excl. VAT",
+      vat: "VAT",
+    },
   },
   clients: {
     actionError: "Couldn't update this client. Try again.",
@@ -2062,6 +2089,27 @@ const fr: Messages = {
       tooLong: "{max} caractères au plus.",
       unitPrice: "Prix unitaire HT",
     },
+    filteredEmpty: {
+      action: "Effacer les filtres",
+      description: "Aucune ligne facturable ne correspond à ces filtres.",
+      title: "Aucune ligne correspondante",
+    },
+    filters: {
+      allClients: "Tous les clients",
+      allStatuses: "Tous les statuts",
+      client: "Filtrer par client",
+      period: "Filtrer par période",
+      periods: {
+        all: "Toutes les périodes",
+        lastMonth: "Mois dernier",
+        lastQuarter: "Trimestre dernier",
+        lastYear: "Année dernière",
+        thisMonth: "Ce mois-ci",
+        thisQuarter: "Ce trimestre",
+        thisYear: "Cette année",
+      },
+      status: "Filtrer par statut",
+    },
     grid: {
       empty: "Aucune ligne facturable",
       goToPage: "Aller à la page {page}",
@@ -2099,6 +2147,12 @@ const fr: Messages = {
       to_invoice: "À facturer",
     },
     title: "Lignes facturables",
+    totals: {
+      gross: "Total TTC",
+      label: "Totaux des lignes filtrées",
+      net: "Total HT",
+      vat: "TVA",
+    },
   },
   clients: {
     actionError: "Impossible de modifier ce client. Réessayez.",

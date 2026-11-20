@@ -302,7 +302,7 @@ function Indicators({
   );
 }
 
-function FilterSelect({
+export function FilterSelect({
   label,
   onChange,
   options,
