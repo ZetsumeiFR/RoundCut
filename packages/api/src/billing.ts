@@ -1,3 +1,4 @@
+import { BILLABLE_LINE_STATUSES } from "@roundcut/db/billing";
 import z from "zod";
 
 import { PROJECT_FLAT_FEE_MAX_CENTS } from "./project";
@@ -16,3 +17,9 @@ export const manualLineSchema = z.object({
 });
 
 export type ManualLineInput = z.input<typeof manualLineSchema>;
+
+// The editor marks a line exported or paid by hand (BILL-02).
+export const lineStatusSchema = z.object({
+  id: z.string().min(1),
+  status: z.enum(BILLABLE_LINE_STATUSES),
+});

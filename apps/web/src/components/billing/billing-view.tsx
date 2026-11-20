@@ -2,11 +2,29 @@
 
 import type { AppRouterClient } from "@roundcut/api/routers/index";
 import type { Locale } from "@roundcut/auth/locale";
-import type {
-  BillableLineSource,
-  BillableLineStatus,
+import {
+  BILLABLE_LINE_STATUS_TRANSITIONS,
+  type BillableLineSource,
+  type BillableLineStatus,
 } from "@roundcut/db/billing";
+import {
+  AlertDialog,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@roundcut/ui/components/alert-dialog";
 import { Button } from "@roundcut/ui/components/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuGroup,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@roundcut/ui/components/dropdown-menu";
 import {
   Empty,
   EmptyContent,
@@ -34,7 +52,7 @@ import {
   FrameTitle,
 } from "@roundcut/ui/components/reui/frame";
 import { Separator } from "@roundcut/ui/components/separator";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   type Column,
   type ColumnDef,
@@ -42,13 +60,19 @@ import {
   type SortingState,
   useTable,
 } from "@tanstack/react-table";
-import { CircleAlertIcon, PlusIcon, ReceiptTextIcon } from "lucide-react";
+import {
+  ChevronDownIcon,
+  CircleAlertIcon,
+  PlusIcon,
+  ReceiptTextIcon,
+} from "lucide-react";
 import Link from "next/link";
 import { useCallback, useMemo, useState } from "react";
+import { toast } from "sonner";
 
 import { ClientsSkeleton, gridI18n } from "@/components/clients/clients-view";
 import { formatMessage, type Messages } from "@/i18n/messages";
-import { orpc } from "@/utils/orpc";
+import { client as api, orpc } from "@/utils/orpc";
 import { AddFeeDialog } from "./add-fee-dialog";
 
 type BillingMessages = Messages["billing"];
@@ -56,6 +80,7 @@ type BillableLine = Awaited<
   ReturnType<AppRouterClient["billing"]["lines"]["list"]>
 >[number];
 type LineColumn = Column<DataGridFeatures, BillableLine, unknown>;
+type ChangeStatus = (line: BillableLine, status: BillableLineStatus) => void;
 
 const DEFAULT_PAGE_SIZE = 25;
 const PAGE_SIZES = [10, DEFAULT_PAGE_SIZE, 50];
@@ -105,6 +130,122 @@ function AmountCell({ value }: { value: string }) {
   return <span className="text-sm tabular-nums">{value}</span>;
 }
 
+function StatusMenuItem({
+  label,
+  line,
+  onChange,
+  status,
+}: {
+  label: string;
+  line: BillableLine;
+  onChange: ChangeStatus;
+  status: BillableLineStatus;
+}) {
+  const handleClick = useCallback(
+    () => onChange(line, status),
+    [line, onChange, status]
+  );
+  return <DropdownMenuItem onClick={handleClick}>{label}</DropdownMenuItem>;
+}
+
+// The status badge opens the statuses the line can be marked with (BILL-02);
+// "paid" comes last and asks for confirmation since it is final.
+function StatusCell({
+  line,
+  messages,
+  onChange,
+}: {
+  line: BillableLine;
+  messages: BillingMessages;
+  onChange: ChangeStatus;
+}) {
+  const badge = (
+    <Badge variant={STATUS_BADGES[line.status]}>
+      {messages.statuses[line.status]}
+    </Badge>
+  );
+  const targets = BILLABLE_LINE_STATUS_TRANSITIONS[line.status];
+  if (targets.length === 0) {
+    return badge;
+  }
+  const moves = targets.filter((status) => status !== "paid");
+  const { statusChange } = messages;
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger
+        aria-label={formatMessage(statusChange.actions, {
+          label: line.label,
+          status: messages.statuses[line.status],
+        })}
+        render={
+          <Button className="-ms-2 gap-1 px-2" size="sm" variant="ghost" />
+        }
+      >
+        {badge}
+        <ChevronDownIcon aria-hidden="true" className="text-muted-foreground" />
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="start" className="w-56">
+        <DropdownMenuGroup>
+          {moves.map((status) => (
+            <StatusMenuItem
+              key={status}
+              label={formatMessage(statusChange.moveTo, {
+                status: messages.statuses[status],
+              })}
+              line={line}
+              onChange={onChange}
+              status={status}
+            />
+          ))}
+        </DropdownMenuGroup>
+        <DropdownMenuSeparator />
+        <StatusMenuItem
+          label={statusChange.pay}
+          line={line}
+          onChange={onChange}
+          status="paid"
+        />
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
+function PayDialog({
+  busy,
+  line,
+  messages,
+  onConfirm,
+  onOpenChange,
+}: {
+  busy: boolean;
+  line: BillableLine | null;
+  messages: BillingMessages;
+  onConfirm: () => void;
+  onOpenChange: (open: boolean) => void;
+}) {
+  const { statusChange } = messages;
+  return (
+    <AlertDialog onOpenChange={onOpenChange} open={line !== null}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>{statusChange.payTitle}</AlertDialogTitle>
+          <AlertDialogDescription>
+            {formatMessage(statusChange.payDescription, {
+              label: line?.label ?? "",
+            })}
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>{statusChange.cancel}</AlertDialogCancel>
+          <Button disabled={busy} onClick={onConfirm}>
+            {busy ? statusChange.paying : statusChange.pay}
+          </Button>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+  );
+}
+
 const numericMeta = (headerTitle: string) => ({
   cellClassName: "text-end",
   headerClassName: "text-end [&>div]:w-full [&>div]:justify-end",
@@ -113,7 +254,8 @@ const numericMeta = (headerTitle: string) => ({
 
 function buildColumns(
   messages: BillingMessages,
-  locale: Locale
+  locale: Locale,
+  onChange: ChangeStatus
 ): ColumnDef<DataGridFeatures, BillableLine>[] {
   const { columns } = messages;
   const date = new Intl.DateTimeFormat(locale, { dateStyle: "medium" });
@@ -190,14 +332,16 @@ function buildColumns(
     {
       accessorFn: (line) => line.status,
       cell: ({ row }) => (
-        <Badge variant={STATUS_BADGES[row.original.status]}>
-          {messages.statuses[row.original.status]}
-        </Badge>
+        <StatusCell
+          line={row.original}
+          messages={messages}
+          onChange={onChange}
+        />
       ),
       header: ({ column }) => <SortableHeader column={column} />,
       id: "status",
       meta: { headerTitle: columns.status },
-      size: 120,
+      size: 150,
     },
   ];
 }
@@ -257,10 +401,12 @@ function LinesGrid({
   lines,
   locale,
   messages,
+  onChange,
 }: {
   lines: BillableLine[];
   locale: Locale;
   messages: BillingMessages;
+  onChange: ChangeStatus;
 }) {
   const [sorting, setSorting] = useState<SortingState>(DEFAULT_SORTING);
   const [pagination, setPagination] = useState<PaginationState>({
@@ -268,8 +414,8 @@ function LinesGrid({
     pageSize: DEFAULT_PAGE_SIZE,
   });
   const columns = useMemo(
-    () => buildColumns(messages, locale),
-    [locale, messages]
+    () => buildColumns(messages, locale, onChange),
+    [locale, messages, onChange]
   );
   const i18n = useMemo(
     () => gridI18n(messages.grid, messages.grid.empty),
@@ -306,7 +452,8 @@ function LinesGrid({
 }
 
 // The editor's billable lines (BILL-01, E14): flat fees, agreed extra
-// rounds and manual fees, which they invoice from their own tool.
+// rounds and manual fees, which they invoice from their own tool and mark
+// exported, then paid (BILL-02).
 export function BillingView({
   locale,
   messages,
@@ -320,6 +467,63 @@ export function BillingView({
   const workspace = useQuery(orpc.workspace.get.queryOptions());
   const [feeOpen, setFeeOpen] = useState(false);
   const openFee = useCallback(() => setFeeOpen(true), []);
+
+  const queryClient = useQueryClient();
+  const [paying, setPaying] = useState<BillableLine | null>(null);
+  const [payBusy, setPayBusy] = useState(false);
+  const { statusChange } = messages;
+  const changeStatus = useCallback(
+    async (line: BillableLine, status: BillableLineStatus) => {
+      try {
+        await api.billing.lines.updateStatus({ id: line.id, status });
+        toast.success(
+          formatMessage(statusChange.changed, {
+            label: line.label,
+            status: messages.statuses[status],
+          })
+        );
+        return true;
+      } catch {
+        toast.error(statusChange.error);
+        return false;
+      } finally {
+        // Also refreshes a line another tab marked meanwhile (409), and the
+        // dashboard's billable amount.
+        await queryClient.invalidateQueries({
+          queryKey: orpc.billing.lines.list.queryKey(),
+        });
+        await queryClient.invalidateQueries({
+          queryKey: orpc.project.indicators.queryKey(),
+        });
+      }
+    },
+    [messages.statuses, queryClient, statusChange]
+  );
+  const handleChangeStatus = useCallback(
+    (line: BillableLine, status: BillableLineStatus) => {
+      if (status === "paid") {
+        setPaying(line);
+        return;
+      }
+      changeStatus(line, status);
+    },
+    [changeStatus]
+  );
+  const handlePayOpenChange = useCallback((open: boolean) => {
+    if (!open) {
+      setPaying(null);
+    }
+  }, []);
+  const confirmPay = useCallback(async () => {
+    if (!paying) {
+      return;
+    }
+    setPayBusy(true);
+    if (await changeStatus(paying, "paid")) {
+      setPaying(null);
+    }
+    setPayBusy(false);
+  }, [changeStatus, paying]);
 
   const refetchWorkspace = workspace.refetch;
   const handleRetry = useCallback(
@@ -342,7 +546,14 @@ export function BillingView({
   if (data && currency && data.length === 0) {
     body = <EmptyLines messages={messages} onAdd={openFee} />;
   } else if (data && currency) {
-    body = <LinesGrid lines={data} locale={locale} messages={messages} />;
+    body = (
+      <LinesGrid
+        lines={data}
+        locale={locale}
+        messages={messages}
+        onChange={handleChangeStatus}
+      />
+    );
   } else if (isError || workspace.isError) {
     body = <LinesLoadError messages={messages} onRetry={handleRetry} />;
   }
@@ -380,6 +591,13 @@ export function BillingView({
           open={feeOpen}
         />
       ) : null}
+      <PayDialog
+        busy={payBusy}
+        line={paying}
+        messages={messages}
+        onConfirm={confirmPay}
+        onOpenChange={handlePayOpenChange}
+      />
     </>
   );
 }
