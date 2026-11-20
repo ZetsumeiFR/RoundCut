@@ -739,6 +739,33 @@ const en = {
     title: "Join {studio}",
     toDashboard: "Go to dashboard",
   },
+  notifications: {
+    empty: {
+      description:
+        "Comments, submitted feedback, agreements and approvals from your clients show up here.",
+      title: "No notifications yet",
+    },
+    error: "Couldn't load your notifications.",
+    markAllRead: "Mark all as read",
+    markError: "Couldn't mark the notifications as read.",
+    open: "Notifications",
+    openUnread: "Notifications, {count} unread",
+    retry: "Retry",
+    title: "Notifications",
+    types: {
+      batch_submitted:
+        "{actor} submitted feedback on {deliverable} · V{version}",
+      comment: "{actor} commented on {deliverable} · V{version}",
+      extra_round_accepted:
+        "{actor} accepted extra round {round} on {deliverable}",
+      extra_round_proposed:
+        "Extra round {round} proposed after {actor}'s feedback on {deliverable}",
+      payment_received: "{actor} paid extra round {round} on {deliverable}",
+      reply: "{actor} replied on {deliverable} · V{version}",
+      version_approved: "{actor} approved {deliverable} · V{version}",
+    },
+    unread: "Unread",
+  },
   onboarding: {
     back: "Back",
     continue: "Continue",
@@ -2413,6 +2440,34 @@ const fr: Messages = {
     signUp: "Créer un compte",
     title: "Rejoindre {studio}",
     toDashboard: "Aller au tableau de bord",
+  },
+  notifications: {
+    empty: {
+      description:
+        "Les commentaires, lots soumis, accords et validations de vos clients s'afficheront ici.",
+      title: "Aucune notification",
+    },
+    error: "Impossible de charger vos notifications.",
+    markAllRead: "Tout marquer comme lu",
+    markError: "Impossible de marquer les notifications comme lues.",
+    open: "Notifications",
+    openUnread: "Notifications, {count} non lues",
+    retry: "Réessayer",
+    title: "Notifications",
+    types: {
+      batch_submitted:
+        "{actor} a soumis ses retours sur {deliverable} · V{version}",
+      comment: "{actor} a commenté {deliverable} · V{version}",
+      extra_round_accepted:
+        "{actor} a accepté le tour supplémentaire {round} sur {deliverable}",
+      extra_round_proposed:
+        "Tour supplémentaire {round} proposé après les retours de {actor} sur {deliverable}",
+      payment_received:
+        "{actor} a payé le tour supplémentaire {round} sur {deliverable}",
+      reply: "{actor} a répondu sur {deliverable} · V{version}",
+      version_approved: "{actor} a validé {deliverable} · V{version}",
+    },
+    unread: "Non lue",
   },
   onboarding: {
     back: "Retour",

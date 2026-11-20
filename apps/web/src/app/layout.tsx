@@ -37,7 +37,11 @@ export default async function RootLayout({
       >
         <Providers>
           <div className="grid h-svh grid-rows-[auto_1fr]">
-            <Header menuMessages={messages.account.menu} />
+            <Header
+              locale={locale}
+              menuMessages={messages.account.menu}
+              notificationMessages={messages.notifications}
+            />
             {children}
           </div>
         </Providers>
