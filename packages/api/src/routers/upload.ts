@@ -148,6 +148,8 @@ export const uploadRouter = {
       }
       const { video } = media;
       const thumbnailKey = await storedThumbnail(context.storage, row.r2Key);
+      // The file's fingerprint, sealed into its approval certificate (APPR-04).
+      const sha256 = await context.storage.sha256(row.r2Key);
       // Publishing the version opens the next round and closes the running
       // one (§7.2): all or nothing, so a version never lacks its round.
       const published = await context.db.transaction(async (tx) => {
@@ -158,6 +160,7 @@ export const uploadRouter = {
           .set({
             durationMs: video.durationMs,
             height: video.height,
+            sha256,
             status: "ready",
             thumbnailKey,
             uploadId: null,

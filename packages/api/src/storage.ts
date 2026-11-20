@@ -1,3 +1,5 @@
+import { createHash } from "node:crypto";
+import { Readable } from "node:stream";
 import {
   AbortMultipartUploadCommand,
   CompleteMultipartUploadCommand,
@@ -154,6 +156,23 @@ export function createStorage(config: StorageConfig) {
         throw new Error(`Storage returned no body for ${key}`);
       }
       return await object.Body.transformToByteArray();
+    },
+
+    // Hex SHA-256 of the stored object, streamed rather than held in memory.
+    async sha256(key: string) {
+      const object = await s3.send(
+        new GetObjectCommand({ Bucket: bucket, Key: key })
+      );
+      if (!object.Body) {
+        throw new Error(`Storage returned no body for ${key}`);
+      }
+      const hash = createHash("sha256");
+      for await (const chunk of Readable.fromWeb(
+        object.Body.transformToWebStream()
+      )) {
+        hash.update(chunk);
+      }
+      return hash.digest("hex");
     },
 
     // With a file name, the URL downloads the object under that name instead

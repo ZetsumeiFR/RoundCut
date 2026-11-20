@@ -9,17 +9,28 @@ import { extraRoundOffer } from "@roundcut/db/schema/extra-round-offer";
 import { project } from "@roundcut/db/schema/project";
 import { workspace } from "@roundcut/db/schema/workspace";
 import { and, desc, eq, type SQL } from "drizzle-orm";
-import {
-  type Color,
-  PDFDocument,
-  type PDFFont,
-  type PDFPage,
-  rgb,
-  StandardFonts,
-} from "pdf-lib";
+import { PDFDocument, rgb } from "pdf-lib";
 import z from "zod";
 
 import type { Notifications } from "./context";
+import {
+  type BadgeColors,
+  Column,
+  drawBadge,
+  drawFooter,
+  drawSidebarRule,
+  embedFonts,
+  encodable,
+  fill,
+  INK,
+  MAIN_WIDTH,
+  MAIN_X,
+  MARGIN,
+  MUTED,
+  PAGE_HEIGHT,
+  PAGE_WIDTH,
+  SIDEBAR_WIDTH,
+} from "./pdf-layout";
 
 // Where an agreed extra round stands with its payment (EXTRA-04/05): paid
 // online, waiting for the online payment, or invoiced by the editor.
@@ -184,31 +195,10 @@ const labels = {
   },
 } satisfies Record<Locale, Record<string, string>>;
 
-const fill = (template: string, values: Record<string, string | number>) =>
-  template.replace(/\{(\w+)\}/g, (match, key: string) =>
-    key in values ? String(values[key]) : match
-  );
-
 const CENTS_PER_UNIT = 100;
 const BASIS_POINTS = 10_000;
 
-const PAGE_WIDTH = 595.28;
-const PAGE_HEIGHT = 841.89;
-const MARGIN = 48;
-const SIDEBAR_WIDTH = 168;
-const GUTTER = 32;
-const MAIN_X = MARGIN + SIDEBAR_WIDTH + GUTTER;
-const MAIN_WIDTH = PAGE_WIDTH - MAIN_X - MARGIN;
-const FOOTER_SPACE = 64;
-
-const INK = rgb(0.09, 0.09, 0.11);
-const MUTED = rgb(0.42, 0.43, 0.47);
-const RULE = rgb(0.88, 0.88, 0.9);
-
-const statusColors: Record<
-  ReceiptPaymentStatus,
-  { background: Color; text: Color }
-> = {
+const statusColors: Record<ReceiptPaymentStatus, BadgeColors> = {
   awaiting_payment: {
     background: rgb(1, 0.95, 0.85),
     text: rgb(0.6, 0.35, 0),
@@ -216,189 +206,6 @@ const statusColors: Record<
   paid: { background: rgb(0.88, 0.97, 0.9), text: rgb(0.06, 0.45, 0.2) },
   to_invoice: { background: rgb(0.93, 0.93, 0.95), text: INK },
 };
-
-const WHITESPACE = /\s+/;
-
-interface Fonts {
-  bold: PDFFont;
-  mono: PDFFont;
-  regular: PDFFont;
-}
-
-// The standard PDF fonts only encode WinAnsi: other characters (the narrow
-// spaces Intl puts in French amounts, emoji in a name) become a space or "?".
-function encodable(font: PDFFont) {
-  const supported = new Set(font.getCharacterSet());
-  return (text: string) =>
-    Array.from(text, (char) => {
-      const code = char.codePointAt(0) ?? 0;
-      if (supported.has(code)) {
-        return char;
-      }
-      return WHITESPACE.test(char) ? " " : "?";
-    }).join("");
-}
-
-// Splits text into lines that fit `width`, breaking long words (a hash, an
-// email) where they overflow.
-function wrap(text: string, font: PDFFont, size: number, width: number) {
-  const lines: string[] = [];
-  for (const paragraph of text.split("\n")) {
-    let line = "";
-    for (const word of paragraph.split(" ")) {
-      const candidate = line ? `${line} ${word}` : word;
-      if (font.widthOfTextAtSize(candidate, size) <= width) {
-        line = candidate;
-        continue;
-      }
-      if (line) {
-        lines.push(line);
-      }
-      line = "";
-      for (const char of word) {
-        if (font.widthOfTextAtSize(line + char, size) > width && line) {
-          lines.push(line);
-          line = "";
-        }
-        line += char;
-      }
-    }
-    lines.push(line);
-  }
-  return lines;
-}
-
-// Writes top to bottom in one column, adding a page when it runs out.
-class Column {
-  readonly #document: PDFDocument;
-  readonly #sanitize: (text: string) => string;
-  readonly #width: number;
-  readonly #x: number;
-  page: PDFPage;
-  y: number;
-
-  constructor(
-    document: PDFDocument,
-    page: PDFPage,
-    area: { width: number; x: number; y: number },
-    sanitize: (text: string) => string
-  ) {
-    this.#document = document;
-    this.page = page;
-    this.#width = area.width;
-    this.#x = area.x;
-    this.y = area.y;
-    this.#sanitize = sanitize;
-  }
-
-  ensure(height: number) {
-    if (this.y - height >= MARGIN + FOOTER_SPACE) {
-      return;
-    }
-    this.page = this.#document.addPage([PAGE_WIDTH, PAGE_HEIGHT]);
-    this.y = PAGE_HEIGHT - MARGIN;
-  }
-
-  text(
-    value: string,
-    style: { color?: Color; font: PDFFont; gap?: number; size: number }
-  ) {
-    const lineHeight = style.size * 1.35;
-    for (const line of wrap(
-      this.#sanitize(value),
-      style.font,
-      style.size,
-      this.#width
-    )) {
-      this.ensure(lineHeight);
-      this.y -= style.size;
-      this.page.drawText(line, {
-        color: style.color ?? INK,
-        font: style.font,
-        size: style.size,
-        x: this.#x,
-        y: this.y,
-      });
-      this.y -= lineHeight - style.size;
-    }
-    this.y -= style.gap ?? 0;
-  }
-
-  row(
-    label: string,
-    value: string,
-    style: { font: PDFFont; size: number; strong?: boolean }
-  ) {
-    this.ensure(style.size * 1.6);
-    this.y -= style.size;
-    this.page.drawText(this.#sanitize(label), {
-      color: style.strong ? INK : MUTED,
-      font: style.font,
-      size: style.size,
-      x: this.#x,
-      y: this.y,
-    });
-    const amount = this.#sanitize(value);
-    this.page.drawText(amount, {
-      color: INK,
-      font: style.font,
-      size: style.size,
-      x:
-        this.#x +
-        this.#width -
-        style.font.widthOfTextAtSize(amount, style.size),
-      y: this.y,
-    });
-    this.y -= style.size * 0.6;
-  }
-
-  rule(gap = 10) {
-    this.ensure(gap * 2);
-    this.y -= gap;
-    this.page.drawLine({
-      color: RULE,
-      end: { x: this.#x + this.#width, y: this.y },
-      start: { x: this.#x, y: this.y },
-      thickness: 0.75,
-    });
-    this.y -= gap;
-  }
-
-  label(value: string, fonts: Fonts) {
-    this.text(value.toLocaleUpperCase(), {
-      color: MUTED,
-      font: fonts.bold,
-      gap: 3,
-      size: 7,
-    });
-  }
-}
-
-function drawBadge(
-  page: PDFPage,
-  text: string,
-  status: ReceiptPaymentStatus,
-  at: { font: PDFFont; x: number; y: number }
-) {
-  const size = 8;
-  const padding = 6;
-  const width = at.font.widthOfTextAtSize(text, size) + padding * 2;
-  const colors = statusColors[status];
-  page.drawRectangle({
-    color: colors.background,
-    height: size + padding,
-    width,
-    x: at.x - width,
-    y: at.y - size - padding / 2,
-  });
-  page.drawText(text, {
-    color: colors.text,
-    font: at.font,
-    size,
-    x: at.x - width + padding,
-    y: at.y - size,
-  });
-}
 
 // The agreement receipt (EXTRA-07) as a one-to-two page A4 PDF, laid out as
 // a statement: the total, payment status and who/when/where on the left,
@@ -413,11 +220,7 @@ export async function renderReceiptPdf(receipt: Receipt, locale: Locale) {
   document.setCreator("RoundCut");
   document.setProducer("RoundCut");
   document.setCreationDate(receipt.createdAt);
-  const fonts: Fonts = {
-    bold: await document.embedFont(StandardFonts.HelveticaBold),
-    mono: await document.embedFont(StandardFonts.Courier),
-    regular: await document.embedFont(StandardFonts.Helvetica),
-  };
+  const fonts = await embedFonts(document);
   const sanitize = encodable(fonts.regular);
   const money = new Intl.NumberFormat(locale, {
     currency: offer.currency,
@@ -452,11 +255,16 @@ export async function renderReceiptPdf(receipt: Receipt, locale: Locale) {
     gap: 14,
     size: 11,
   });
-  drawBadge(first, sanitize(text[receipt.status]), receipt.status, {
-    font: fonts.bold,
-    x: MARGIN + SIDEBAR_WIDTH,
-    y: top,
-  });
+  drawBadge(
+    first,
+    sanitize(text[receipt.status]),
+    statusColors[receipt.status],
+    {
+      font: fonts.bold,
+      x: MARGIN + SIDEBAR_WIDTH,
+      y: top,
+    }
+  );
   side.label(text.totalLabel, fonts);
   side.text(amount(offer.grossCents), { font: fonts.bold, gap: 4, size: 22 });
   side.text(fill(text.agreedOn, { date: day.format(receipt.createdAt) }), {
@@ -473,24 +281,9 @@ export async function renderReceiptPdf(receipt: Receipt, locale: Locale) {
     [text.project, agreement.project.name, agreement.project.deliverable.title],
   ];
   for (const [label, value, detail] of meta) {
-    side.label(label, fonts);
-    side.text(value, { font: fonts.regular, gap: detail ? 1 : 10, size: 9.5 });
-    if (detail) {
-      side.text(detail, {
-        color: MUTED,
-        font: fonts.regular,
-        gap: 10,
-        size: 8,
-      });
-    }
+    side.field(label, value, detail, fonts);
   }
-
-  first.drawLine({
-    color: RULE,
-    end: { x: MAIN_X - GUTTER / 2, y: MARGIN + FOOTER_SPACE },
-    start: { x: MAIN_X - GUTTER / 2, y: top },
-    thickness: 0.75,
-  });
+  drawSidebarRule(first);
 
   // Main pane: what was agreed, its amounts, the text shown and the seal.
   const main = new Column(
@@ -573,18 +366,11 @@ export async function renderReceiptPdf(receipt: Receipt, locale: Locale) {
     size: 7.5,
   });
 
-  const generated = sanitize(
-    fill(text.generated, { date: utc.format(new Date()) })
+  drawFooter(
+    document,
+    sanitize(fill(text.generated, { date: utc.format(new Date()) })),
+    fonts.regular
   );
-  for (const page of document.getPages()) {
-    page.drawText(generated, {
-      color: MUTED,
-      font: fonts.regular,
-      size: 7,
-      x: MARGIN,
-      y: MARGIN,
-    });
-  }
   return document.save();
 }
 

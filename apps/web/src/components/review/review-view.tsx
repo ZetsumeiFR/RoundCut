@@ -61,6 +61,7 @@ import {
   type StatusHandler,
   toMarkers,
 } from "./comment-thread";
+import { ReceiptDownloadButton } from "./receipt-download-button";
 import { type PlayerHandle, VideoPlayer } from "./video-player";
 
 type ProjectsMessages = Messages["projects"];
@@ -310,6 +311,28 @@ function DownloadControls({
   );
 }
 
+// The validation certificate (APPR-04) of a version the client approved.
+function CertificateDownload({
+  locale,
+  messages,
+  versionId,
+}: {
+  locale: Locale;
+  messages: ProjectsMessages["player"]["certificate"];
+  versionId: string;
+}) {
+  const fetchCertificate = useCallback(
+    () => client.version.approvalCertificate({ id: versionId, locale }),
+    [locale, versionId]
+  );
+  return (
+    <ReceiptDownloadButton
+      fetchReceipt={fetchCertificate}
+      messages={messages}
+    />
+  );
+}
+
 export function ReviewView({
   locale,
   messages,
@@ -515,6 +538,13 @@ export function ReviewView({
             includedRounds={includedRounds}
             messages={player}
           />
+          {approved ? (
+            <CertificateDownload
+              locale={locale}
+              messages={player.certificate}
+              versionId={versionId}
+            />
+          ) : null}
           <Select onValueChange={handleVersionChange} value={versionId}>
             <SelectTrigger
               aria-label={player.versionLabel}
