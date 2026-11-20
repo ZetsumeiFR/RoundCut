@@ -8,6 +8,7 @@ import {
 } from "@roundcut/auth/email";
 import { resolveLocale } from "@roundcut/auth/locale";
 import type { Database } from "@roundcut/db";
+import { PROJECT_AUTO_APPROVAL_SOURCES } from "@roundcut/db/project-status";
 import {
   REVIEWER_CODE_PURPOSES,
   REVIEWER_CODE_RESEND_SECONDS,
@@ -25,7 +26,17 @@ import { reviewer } from "@roundcut/db/schema/reviewer";
 import { round } from "@roundcut/db/schema/round";
 import { version } from "@roundcut/db/schema/version";
 import { workspace } from "@roundcut/db/schema/workspace";
-import { and, asc, count, desc, eq, isNull, ne } from "drizzle-orm";
+import {
+  and,
+  asc,
+  count,
+  desc,
+  eq,
+  inArray,
+  isNull,
+  ne,
+  notExists,
+} from "drizzle-orm";
 import z from "zod";
 
 import { consentShownSchema, snapshotHash } from "../consent";
@@ -235,7 +246,8 @@ export const reviewRouter = {
   // version and its deliverable turn approved, the version's round closes
   // as approved, the agreement record (kind "approval", one per version)
   // seals who approved what, when and from where, with the text shown, and
-  // the editor is emailed.
+  // the editor is emailed. Approving the last deliverable approves the
+  // project (APPR-03).
   approveVersion: publicProcedure
     .input(
       versionInput.extend({
@@ -310,6 +322,13 @@ export const reviewRouter = {
       };
       const approving = roundTransition("approve", now);
       const record = await context.db.transaction(async (tx) => {
+        // Approvals of one project run one at a time, so the approval of its
+        // last deliverables always sees the others and approves the project.
+        await tx
+          .select({ id: project.id })
+          .from(project)
+          .where(eq(project.id, projectId))
+          .for("update");
         const [approved] = await tx
           .update(version)
           .set({ status: "approved" })
@@ -350,7 +369,28 @@ export const reviewRouter = {
           .update(reviewer)
           .set({ verifiedAt: now })
           .where(eq(reviewer.id, decider.id));
-        return saved;
+        const [completed] = await tx
+          .update(project)
+          .set({ status: "approved" })
+          .where(
+            and(
+              eq(project.id, projectId),
+              inArray(project.status, PROJECT_AUTO_APPROVAL_SOURCES),
+              notExists(
+                tx
+                  .select({ id: deliverable.id })
+                  .from(deliverable)
+                  .where(
+                    and(
+                      eq(deliverable.projectId, projectId),
+                      ne(deliverable.status, "approved")
+                    )
+                  )
+              )
+            )
+          )
+          .returning({ id: project.id });
+        return saved && { ...saved, projectApproved: Boolean(completed) };
       });
       if (!record) {
         throw conflict;
@@ -459,6 +499,7 @@ export const reviewRouter = {
         clientName: client.name,
         name: project.name,
         plan: workspace.plan,
+        status: project.status,
         workspaceName: workspace.name,
       })
       .from(project)
@@ -473,6 +514,7 @@ export const reviewRouter = {
       clientName: row.clientName,
       expiresAt,
       name: row.name,
+      status: row.status,
       workspaceName: row.workspaceName,
     };
     if (!context.reviewer) {

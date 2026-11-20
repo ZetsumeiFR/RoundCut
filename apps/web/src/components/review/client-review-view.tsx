@@ -9,6 +9,7 @@ import { Skeleton } from "@roundcut/ui/components/skeleton";
 import { cn } from "@roundcut/ui/lib/utils";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
+  BadgeCheckIcon,
   CircleAlertIcon,
   ClapperboardIcon,
   ClockAlertIcon,
@@ -150,6 +151,17 @@ function ReviewHeader({
         })}
       </p>
       <h1 className="break-words font-semibold text-lg">{project.name}</h1>
+      {project.status === "approved" ? (
+        <div className="flex flex-wrap items-center gap-2 text-muted-foreground text-xs">
+          <Badge variant="success-light">
+            <BadgeCheckIcon aria-hidden="true" />
+            {messages.projectApproved.title}
+          </Badge>
+          <span className="min-w-0">
+            {messages.projectApproved.description}
+          </span>
+        </div>
+      ) : null}
       {project.expiresAt ? (
         <p className="text-muted-foreground text-xs">
           {formatMessage(messages.expiresAt, {
