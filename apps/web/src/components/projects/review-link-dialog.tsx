@@ -34,6 +34,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   CopyIcon,
   LinkIcon,
+  MailIcon,
   RefreshCwIcon,
   TriangleAlertIcon,
 } from "lucide-react";
@@ -145,24 +146,94 @@ function IssuedUrl({ messages, url }: { messages: LinkMessages; url: string }) {
   );
 }
 
+type SendState =
+  | { status: "idle" | "sending" }
+  | { failed: string[]; sent: string[]; status: "sent" };
+
+// Emails the link just generated to the client's decider and reviewers
+// (NOTIF-01): only possible while its token is on screen.
+function SendLinkEmail({
+  messages,
+  projectId,
+  token,
+}: {
+  messages: LinkMessages;
+  projectId: string;
+  token: string;
+}) {
+  const [state, setState] = useState<SendState>({ status: "idle" });
+  const send = useCallback(async () => {
+    setState({ status: "sending" });
+    try {
+      const result = await client.reviewLink.sendEmail({ projectId, token });
+      setState({ ...result, status: "sent" });
+      toast.success(
+        formatMessage(messages.email.sent, { emails: result.sent.join(", ") })
+      );
+    } catch {
+      setState({ status: "idle" });
+      toast.error(messages.email.error);
+    }
+  }, [messages.email, projectId, token]);
+  let label = messages.email.send;
+  if (state.status === "sending") {
+    label = messages.email.sending;
+  } else if (state.status === "sent") {
+    label = messages.email.resend;
+  }
+  return (
+    <div className="flex flex-col gap-2">
+      <Button
+        className="self-start"
+        disabled={state.status === "sending"}
+        onClick={send}
+        type="button"
+        variant="outline"
+      >
+        <MailIcon aria-hidden="true" data-icon="inline-start" />
+        {label}
+      </Button>
+      {state.status === "sent" ? (
+        <p className="text-muted-foreground text-xs" role="status">
+          {formatMessage(messages.email.sent, {
+            emails: state.sent.join(", "),
+          })}
+        </p>
+      ) : null}
+      {state.status === "sent" && state.failed.length > 0 ? (
+        <Alert variant="warning">
+          <TriangleAlertIcon aria-hidden="true" />
+          <AlertDescription>
+            {formatMessage(messages.email.failed, {
+              emails: state.failed.join(", "),
+            })}
+          </AlertDescription>
+        </Alert>
+      ) : null}
+    </div>
+  );
+}
+
 type Confirm = "regenerate" | "revoke";
 
 function ActiveLink({
   busy,
-  issuedUrl,
+  issuedToken,
   link,
   locale,
   messages,
   onConfirm,
   onExpiryChange,
+  projectId,
 }: {
   busy: boolean;
-  issuedUrl: string | null;
+  issuedToken: string | null;
   link: ReviewLink;
   locale: Locale;
   messages: LinkMessages;
   onConfirm: (action: Confirm) => void;
   onExpiryChange: (preset: ExpiryPreset) => void;
+  projectId: string;
 }) {
   const date = new Intl.DateTimeFormat(locale, { dateStyle: "long" });
   const regenerate = useCallback(() => onConfirm("regenerate"), [onConfirm]);
@@ -179,8 +250,17 @@ function ActiveLink({
           })}
         </span>
       </div>
-      {issuedUrl ? (
-        <IssuedUrl messages={messages} url={issuedUrl} />
+      {issuedToken ? (
+        <>
+          <IssuedUrl messages={messages} url={reviewUrl(issuedToken)} />
+          {link.expired ? null : (
+            <SendLinkEmail
+              messages={messages}
+              projectId={projectId}
+              token={issuedToken}
+            />
+          )}
+        </>
       ) : (
         <p className="text-muted-foreground text-sm">
           {messages.hiddenDescription}
@@ -331,7 +411,7 @@ function ReviewLinkPanel({
       meta: { inlineError: true },
     })
   );
-  const [issuedUrl, setIssuedUrl] = useState<string | null>(null);
+  const [issuedToken, setIssuedToken] = useState<string | null>(null);
   const [confirm, setConfirm] = useState<Confirm | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -359,7 +439,7 @@ function ReviewLinkPanel({
           expiresAt: expiryDate(preset),
           projectId,
         });
-        setIssuedUrl(reviewUrl(token));
+        setIssuedToken(token);
       }),
     [projectId, run]
   );
@@ -379,7 +459,7 @@ function ReviewLinkPanel({
     if (confirm === "revoke") {
       await run(async () => {
         await client.reviewLink.revoke({ projectId });
-        setIssuedUrl(null);
+        setIssuedToken(null);
         toast.success(messages.revoked);
       });
     } else {
@@ -391,7 +471,7 @@ function ReviewLinkPanel({
             current?.expiresAt && !current.expired ? current.expiresAt : null,
           projectId,
         });
-        setIssuedUrl(reviewUrl(token));
+        setIssuedToken(token);
       });
     }
     setConfirm(null);
@@ -439,12 +519,13 @@ function ReviewLinkPanel({
   return link.data ? (
     <ActiveLink
       busy={busy}
-      issuedUrl={issuedUrl}
+      issuedToken={issuedToken}
       link={link.data}
       locale={locale}
       messages={messages}
       onConfirm={setConfirm}
       onExpiryChange={changeExpiry}
+      projectId={projectId}
     />
   ) : (
     <NewLink busy={busy} messages={messages} onGenerate={generate} />

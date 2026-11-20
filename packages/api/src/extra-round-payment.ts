@@ -11,6 +11,7 @@ import { and, eq, isNotNull, isNull, or } from "drizzle-orm";
 import type Stripe from "stripe";
 
 import type { Notifications } from "./context";
+import { notifyVersionEditor } from "./notifications";
 import { emailReceipt, findReceipt } from "./receipt";
 import { insertExtraRoundLine, type Transaction } from "./routers/billing";
 import { projectRoundPositions } from "./routers/round";
@@ -175,6 +176,12 @@ async function fulfillCheckoutSession(
   // find the offer already paid.
   if (paid) {
     await emailReceipt(db, notifications, receipt.id, "paid");
+    await notifyVersionEditor(
+      db,
+      receipt.agreement.project.version.id,
+      "payment_received",
+      [{ actorName: receipt.name, roundNumber: receipt.agreement.offer.round }]
+    );
   }
 }
 

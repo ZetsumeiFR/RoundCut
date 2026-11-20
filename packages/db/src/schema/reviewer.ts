@@ -17,6 +17,9 @@ export const reviewer = pgTable(
   "reviewer",
   {
     createdAt: timestamp("created_at").defaultNow().notNull(),
+    // Last grouped email of the editor's replies and status changes
+    // (NOTIF-01): later ones go in the next.
+    digestSentAt: timestamp("digest_sent_at"),
     email: text("email").notNull(),
     id: text("id")
       .primaryKey()

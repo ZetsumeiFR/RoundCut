@@ -42,6 +42,9 @@ export const comment = pgTable(
       onDelete: "set null",
     }),
     status: text("status").$type<CommentStatus>().default("open").notNull(),
+    // When the editor last set the status (REV-04), for the reviewers'
+    // grouped email (NOTIF-01).
+    statusChangedAt: timestamp("status_changed_at"),
     timecodeMs: integer("timecode_ms").notNull(),
     updatedAt: timestamp("updated_at")
       .defaultNow()

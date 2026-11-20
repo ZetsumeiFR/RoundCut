@@ -34,7 +34,7 @@ services:
       start_period: 10s
     restart: unless-stopped
 
-  # Scheduled jobs (ROUND-04 and ROUND-05 reminders): calls the web app's cron route every
+  # Scheduled jobs (ROUND-04 and ROUND-05 reminders, NOTIF-01 comment digests): calls the web app's cron route every
   # 15 minutes with CRON_SECRET from apps/web/.env.
   cron:
     image: curlimages/curl:8.17.0

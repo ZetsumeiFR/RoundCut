@@ -1,7 +1,11 @@
 import { ORPCError } from "@orpc/server";
+import { reviewLinkEmail, sendEmail } from "@roundcut/auth/email";
+import { resolveLocale } from "@roundcut/auth/locale";
 import type { Database } from "@roundcut/db";
+import { client } from "@roundcut/db/schema/client";
 import { project } from "@roundcut/db/schema/project";
 import { reviewLink } from "@roundcut/db/schema/review-link";
+import { workspace } from "@roundcut/db/schema/workspace";
 import { and, eq, isNull } from "drizzle-orm";
 import z from "zod";
 
@@ -11,6 +15,8 @@ import {
   hashReviewToken,
   isReviewLinkExpired,
   reviewLinkSchema,
+  reviewTokenSchema,
+  sameTokenHash,
 } from "../review-link";
 import { getOrCreateWorkspace } from "./workspace";
 
@@ -33,13 +39,11 @@ export async function findOwnedProject(
   user: { id: string; name: string },
   projectId: string
 ) {
-  const workspace = await getOrCreateWorkspace(db, user);
+  const owner = await getOrCreateWorkspace(db, user);
   const [row] = await db
     .select({ id: project.id })
     .from(project)
-    .where(
-      and(eq(project.id, projectId), eq(project.workspaceId, workspace.id))
-    );
+    .where(and(eq(project.id, projectId), eq(project.workspaceId, owner.id)));
   // Other workspaces' projects read as missing so their ids leak nothing.
   if (!row) {
     throw new ORPCError("NOT_FOUND", { message: "Project not found" });
@@ -114,6 +118,80 @@ export const reviewLinkRouter = {
         .where(activeLinkOf(owned.id))
         .returning({ id: reviewLink.id });
       return { revoked: revoked.length > 0 };
+    }),
+  // Emails the link just generated (NOTIF-01) to the client's decider and
+  // reviewers. Only the active link's hash is stored, so the token sent back
+  // by the editor's dialog must match it.
+  sendEmail: protectedProcedure
+    .input(projectInput.extend({ token: reviewTokenSchema }))
+    .handler(async ({ context, input: { projectId, token } }) => {
+      const owned = await findOwnedProject(
+        context.db,
+        context.session.user,
+        projectId
+      );
+      const [row] = await context.db
+        .select({
+          deciderEmail: client.deciderEmail,
+          expiresAt: reviewLink.expiresAt,
+          locale: workspace.locale,
+          projectName: project.name,
+          reviewerEmails: client.reviewerEmails,
+          studioName: workspace.name,
+          timezone: workspace.timezone,
+          tokenHash: reviewLink.tokenHash,
+        })
+        .from(reviewLink)
+        .innerJoin(project, eq(reviewLink.projectId, project.id))
+        .innerJoin(client, eq(project.clientId, client.id))
+        .innerJoin(workspace, eq(project.workspaceId, workspace.id))
+        .where(activeLinkOf(owned.id));
+      if (!(row && sameTokenHash(row.tokenHash, hashReviewToken(token)))) {
+        throw new ORPCError("NOT_FOUND", { message: "Review link not found" });
+      }
+      if (isReviewLinkExpired(row)) {
+        throw new ORPCError("CONFLICT", { message: "The review link expired" });
+      }
+      const locale = resolveLocale(row.locale);
+      const details = {
+        expiresOn: row.expiresAt
+          ? new Intl.DateTimeFormat(locale, {
+              dateStyle: "long",
+              timeZone: row.timezone,
+            }).format(row.expiresAt)
+          : null,
+        projectName: row.projectName,
+        studioName: row.studioName,
+        url: `${context.notifications.appUrl}/r/${token}`,
+      };
+      const recipients = [
+        ...new Set([row.deciderEmail, ...row.reviewerEmails]),
+      ];
+      const results = await Promise.allSettled(
+        recipients.map((to) =>
+          sendEmail(
+            context.notifications.email,
+            reviewLinkEmail(locale, to, details)
+          )
+        )
+      );
+      const sent = recipients.filter(
+        (_, index) => results[index]?.status === "fulfilled"
+      );
+      for (const result of results) {
+        if (result.status === "rejected") {
+          console.error("Review link email failed", result.reason);
+        }
+      }
+      if (sent.length === 0) {
+        throw new ORPCError("INTERNAL_SERVER_ERROR", {
+          message: "Couldn't email the review link",
+        });
+      }
+      return {
+        failed: recipients.filter((to) => !sent.includes(to)),
+        sent,
+      };
     }),
   updateExpiry: protectedProcedure
     .input(reviewLinkSchema)

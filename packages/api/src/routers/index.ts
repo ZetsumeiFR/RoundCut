@@ -6,6 +6,7 @@ import { clientRouter } from "./client";
 import { commentRouter } from "./comment";
 import { deliverableRouter } from "./deliverable";
 import { extraRoundRouter } from "./extra-round";
+import { notificationRouter } from "./notification";
 import { paymentsRouter } from "./payments";
 import { projectRouter } from "./project";
 import { receiptRouter } from "./receipt";
@@ -24,6 +25,7 @@ export const appRouter = {
   deliverable: deliverableRouter,
   extraRound: extraRoundRouter,
   healthCheck: publicProcedure.handler(() => "OK"),
+  notification: notificationRouter,
   payments: paymentsRouter,
   privateData: protectedProcedure.handler(({ context }) => ({
     message: "This is private",
