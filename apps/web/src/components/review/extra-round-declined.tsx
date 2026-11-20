@@ -3,7 +3,6 @@
 import { ORPCError } from "@orpc/client";
 import type { Locale } from "@roundcut/auth/locale";
 import { EXTRA_ROUND_CONTACT_MAX_LENGTH } from "@roundcut/db/extra-round";
-import { REVIEWER_CODE_LENGTH } from "@roundcut/db/reviewer-code";
 import { Button } from "@roundcut/ui/components/button";
 import {
   Field,
@@ -14,12 +13,7 @@ import {
 import { Alert, AlertDescription } from "@roundcut/ui/components/reui/alert";
 import { Textarea } from "@roundcut/ui/components/textarea";
 import { useQueryClient } from "@tanstack/react-query";
-import {
-  BadgeCheckIcon,
-  CircleXIcon,
-  MailIcon,
-  TriangleAlertIcon,
-} from "lucide-react";
+import { BadgeCheckIcon, CircleXIcon, MailIcon } from "lucide-react";
 import {
   type ChangeEvent,
   type FormEvent,
@@ -32,135 +26,11 @@ import {
 import { formatMessage, type Messages } from "@/i18n/messages";
 import { client as api, orpc } from "@/utils/orpc";
 
-import {
-  CodeConsentForm,
-  errorMessage,
-  type Offer,
-} from "./extra-round-agreement";
+import { ApproveVersion, ErrorAlert } from "./approve-version";
+import { errorMessage, type Offer } from "./extra-round-agreement";
 
 type AnswerMessages = Messages["review"]["extraRound"]["answer"];
 type Choice = "idle" | "approve" | "contact";
-
-function ErrorAlert({ children }: { children: string | null }) {
-  if (!children) {
-    return null;
-  }
-  return (
-    <Alert role="alert" variant="destructive">
-      <TriangleAlertIcon aria-hidden="true" />
-      <AlertDescription>{children}</AlertDescription>
-    </Alert>
-  );
-}
-
-// "Approve the current version" (EXTRA-06): the decider gets an emailed
-// code, ticks the approval and types the code; the version becomes final.
-function ApproveVersion({
-  locale,
-  messages,
-  onCancel,
-  sentTo,
-  token,
-  versionId,
-  workspaceName,
-}: {
-  locale: Locale;
-  messages: AnswerMessages;
-  onCancel: () => void;
-  sentTo: string;
-  token: string;
-  versionId: string;
-  workspaceName: string;
-}) {
-  const queryClient = useQueryClient();
-  const { decline } = messages;
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [code, setCode] = useState("");
-  const [consent, setConsent] = useState(false);
-  const [email, setEmail] = useState(sentTo);
-  const description = formatMessage(decline.approveDescription, {
-    workspace: workspaceName,
-  });
-
-  const handleResend = useCallback(async () => {
-    setBusy(true);
-    setError(null);
-    try {
-      const sent = await api.review.requestOtp({ purpose: "approval", token });
-      setEmail(sent.email);
-      setCode("");
-    } catch (failure) {
-      setError(errorMessage(failure, messages, locale));
-    } finally {
-      setBusy(false);
-    }
-  }, [locale, messages, token]);
-
-  const handleSubmit = useCallback(
-    async (event: FormEvent<HTMLFormElement>) => {
-      event.preventDefault();
-      if (!consent || code.length < REVIEWER_CODE_LENGTH) {
-        return;
-      }
-      setBusy(true);
-      setError(null);
-      try {
-        await api.review.approveVersion({
-          agreed: true,
-          code,
-          shown: { lines: [description, decline.approveConsent], locale },
-          token,
-          versionId,
-        });
-        // The round banner shows the approval; the offer goes away.
-        await Promise.all([
-          queryClient.invalidateQueries({ queryKey: orpc.review.round.key() }),
-          queryClient.invalidateQueries({
-            queryKey: orpc.extraRound.getOffer.key(),
-          }),
-        ]);
-      } catch (failure) {
-        setError(errorMessage(failure, messages, locale));
-        setCode("");
-      } finally {
-        setBusy(false);
-      }
-    },
-    [
-      code,
-      consent,
-      decline.approveConsent,
-      description,
-      locale,
-      messages,
-      queryClient,
-      token,
-      versionId,
-    ]
-  );
-
-  return (
-    <div className="flex flex-col gap-3">
-      <p className="text-sm">{description}</p>
-      <CodeConsentForm
-        busy={busy}
-        code={code}
-        confirmLabel={decline.approveConfirm}
-        consent={consent}
-        consentLabel={decline.approveConsent}
-        error={<ErrorAlert>{error}</ErrorAlert>}
-        messages={messages}
-        onCancel={onCancel}
-        onCodeChange={setCode}
-        onConsentChange={setConsent}
-        onResend={handleResend}
-        onSubmit={handleSubmit}
-        sentTo={email}
-      />
-    </div>
-  );
-}
 
 // "Write to the editor" (EXTRA-06): one message, emailed to the editor and
 // kept in the project history.

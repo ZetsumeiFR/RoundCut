@@ -165,6 +165,38 @@ export function batchSubmittedEmail(
   return { to, ...batchSubmittedEmails[locale](details) };
 }
 
+export interface VersionApprovedDetails {
+  approverName: string;
+  deliverableTitle: string;
+  projectName: string;
+  snapshotHash: string;
+  url: string;
+  versionNumber: number;
+}
+
+const versionApprovedEmails = {
+  en: (details: VersionApprovedDetails) => ({
+    subject: `${details.projectName}: ${details.deliverableTitle} V${details.versionNumber} approved`,
+    text: `${details.approverName} approved ${details.deliverableTitle} V${details.versionNumber} (${details.projectName}) as the final version, with an email code.\n\nAgreement record fingerprint (SHA-256): ${details.snapshotHash}\n\nOpen the version:\n${details.url}`,
+  }),
+  fr: (details: VersionApprovedDetails) => ({
+    subject: `${details.projectName} : ${details.deliverableTitle} V${details.versionNumber} validée`,
+    text: `${details.approverName} a validé ${details.deliverableTitle} V${details.versionNumber} (${details.projectName}) comme version finale, avec un code reçu par email.\n\nEmpreinte du journal d'accord (SHA-256) : ${details.snapshotHash}\n\nOuvrir la version :\n${details.url}`,
+  }),
+} satisfies Record<
+  Locale,
+  (details: VersionApprovedDetails) => Omit<EmailMessage, "to">
+>;
+
+// Tells the editor the decider approved a version as final (APPR-01).
+export function versionApprovedEmail(
+  locale: Locale,
+  to: string,
+  details: VersionApprovedDetails
+): EmailMessage {
+  return { to, ...versionApprovedEmails[locale](details) };
+}
+
 export interface UnsubmittedFeedbackDetails {
   count: number;
   projectName: string;

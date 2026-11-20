@@ -4,6 +4,7 @@ import {
   batchSubmittedEmail,
   extraRoundCodeEmail,
   sendEmail,
+  versionApprovedEmail,
 } from "@roundcut/auth/email";
 import { resolveLocale } from "@roundcut/auth/locale";
 import type { Database } from "@roundcut/db";
@@ -139,20 +140,9 @@ export async function pendingSize(db: Database, versionId: string) {
   return row?.total ?? 0;
 }
 
-// Emails the workspace owner, in the workspace language, that a client
-// submitted a batch. The submission is already saved: a mail failure is
-// logged rather than reported to the client, who could not submit again.
-async function notifyBatchSubmitted(
-  db: Database,
-  notifications: Notifications,
-  batch: {
-    count: number;
-    projectId: string;
-    reviewerName: string;
-    roundNumber: number;
-    versionId: string;
-  }
-) {
+// The editor to tell about a client's move on a version: the workspace owner,
+// written to in the workspace language.
+async function versionEditor(db: Database, versionId: string) {
   const [row] = await db
     .select({
       deliverableTitle: deliverable.title,
@@ -166,7 +156,25 @@ async function notifyBatchSubmitted(
     .innerJoin(project, eq(deliverable.projectId, project.id))
     .innerJoin(workspace, eq(project.workspaceId, workspace.id))
     .innerJoin(user, eq(workspace.ownerUserId, user.id))
-    .where(eq(version.id, batch.versionId));
+    .where(eq(version.id, versionId));
+  return row ?? null;
+}
+
+// Emails the editor that a client submitted a batch. The submission is
+// already saved: a mail failure is logged rather than reported to the client,
+// who could not submit again.
+async function notifyBatchSubmitted(
+  db: Database,
+  notifications: Notifications,
+  batch: {
+    count: number;
+    projectId: string;
+    reviewerName: string;
+    roundNumber: number;
+    versionId: string;
+  }
+) {
+  const row = await versionEditor(db, batch.versionId);
   if (!row) {
     return;
   }
@@ -188,13 +196,46 @@ async function notifyBatchSubmitted(
   }
 }
 
+// Emails the editor that the decider approved a version (APPR-01). The
+// approval is already sealed: a mail failure is only logged.
+async function notifyVersionApproved(
+  db: Database,
+  notifications: Notifications,
+  approval: {
+    approverName: string;
+    projectId: string;
+    snapshotHash: string;
+    versionId: string;
+  }
+) {
+  const row = await versionEditor(db, approval.versionId);
+  if (!row) {
+    return;
+  }
+  try {
+    await sendEmail(
+      notifications.email,
+      versionApprovedEmail(resolveLocale(row.locale), row.editorEmail, {
+        approverName: approval.approverName,
+        deliverableTitle: row.deliverableTitle,
+        projectName: row.projectName,
+        snapshotHash: approval.snapshotHash,
+        url: `${notifications.appUrl}/projects/${approval.projectId}/versions/${approval.versionId}`,
+        versionNumber: row.versionNumber,
+      })
+    );
+  } catch (error) {
+    console.error("Version approved email failed", error);
+  }
+}
+
 export const reviewRouter = {
   // The decider approves the version they review with an email code
-  // (EXTRA-06, after declining an extra round; APPR-01 extends it): the
+  // (APPR-01, also offered after declining an extra round in EXTRA-06): the
   // version and its deliverable turn approved, the version's round closes
-  // as approved, and the agreement record (kind "approval", one per
-  // version) seals who approved what, when and from where, with the text
-  // shown.
+  // as approved, the agreement record (kind "approval", one per version)
+  // seals who approved what, when and from where, with the text shown, and
+  // the editor is emailed.
   approveVersion: publicProcedure
     .input(
       versionInput.extend({
@@ -314,6 +355,12 @@ export const reviewRouter = {
       if (!record) {
         throw conflict;
       }
+      await notifyVersionApproved(context.db, context.notifications, {
+        approverName: record.approverName,
+        projectId,
+        snapshotHash: record.snapshotHash,
+        versionId: target.id,
+      });
       return record;
     }),
   // Clears the identity cookie so someone else can identify on this device.
