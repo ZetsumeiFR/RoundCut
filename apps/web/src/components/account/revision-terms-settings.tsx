@@ -7,7 +7,10 @@ import {
   revisionTermsSchema,
 } from "@roundcut/api/workspace";
 import type { Locale } from "@roundcut/auth/locale";
-import type { RevisionTerms } from "@roundcut/db/revision-terms";
+import {
+  lightExtraRoundPrice,
+  type RevisionTerms,
+} from "@roundcut/db/revision-terms";
 import { FieldGroup } from "@roundcut/ui/components/field";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useMemo, useState } from "react";
@@ -36,6 +39,8 @@ export interface TermsFormValues {
   extraRoundDelayDays: string;
   extraRoundPrice: string;
   includedRounds: string;
+  // Empty when the terms offer the full extra round only (EXTRA-08).
+  lightExtraRoundPrice: string;
   requirePayment: boolean;
   scope: string;
 }
@@ -53,6 +58,13 @@ export const toPriceCents = (value: string) =>
 
 export const isPrice = (value: string) =>
   PRICE_PATTERN.test(value.trim()) && parsePrice(value) <= PRICE_MAX;
+
+// The light round's price is optional (EXTRA-08): empty turns it off.
+export const isLightPrice = (value: string) =>
+  value.trim() === "" || isPrice(value);
+
+const toLightPriceCents = (value: string) =>
+  value.trim() === "" ? null : toPriceCents(value);
 
 export const isDelay = (value: string) =>
   DAYS_PATTERN.test(value.trim()) &&
@@ -73,6 +85,12 @@ const createFormSchema = (messages: TermsMessages, locale: Locale) =>
       })
     ),
     includedRounds: z.string(),
+    lightExtraRoundPrice: z.string().refine(
+      isLightPrice,
+      formatMessage(messages.lightPriceInvalid, {
+        max: new Intl.NumberFormat(locale).format(PRICE_MAX),
+      })
+    ),
     requirePayment: z.boolean(),
     scope: z.string(),
   });
@@ -81,6 +99,7 @@ export const termsFormValuesSchema = z.object({
   extraRoundDelayDays: z.string(),
   extraRoundPrice: z.string(),
   includedRounds: z.string(),
+  lightExtraRoundPrice: z.string(),
   requirePayment: z.boolean(),
   scope: z.string(),
 });
@@ -100,6 +119,15 @@ export function addTermsIssues(
         max: new Intl.NumberFormat(locale).format(PRICE_MAX),
       }),
       path: ["terms", "extraRoundPrice"],
+    });
+  }
+  if (!isLightPrice(values.lightExtraRoundPrice)) {
+    context.addIssue({
+      code: "custom",
+      message: formatMessage(messages.lightPriceInvalid, {
+        max: new Intl.NumberFormat(locale).format(PRICE_MAX),
+      }),
+      path: ["terms", "lightExtraRoundPrice"],
     });
   }
   if (!isDelay(values.extraRoundDelayDays)) {
@@ -140,6 +168,7 @@ export function RevisionTermsList({
   messages: TermsMessages;
   terms: RevisionTerms;
 }) {
+  const lightPrice = lightExtraRoundPrice(terms);
   const rows = [
     [messages.includedRounds, String(terms.includedRounds)],
     [
@@ -148,6 +177,15 @@ export function RevisionTermsList({
         messages.priceSuffix,
         { currency }
       )}`,
+    ],
+    [
+      messages.lightPrice,
+      lightPrice === null
+        ? messages.lightPriceNone
+        : `${formatPrice(lightPrice, locale)} ${formatMessage(
+            messages.priceSuffix,
+            { currency }
+          )}`,
     ],
     [
       messages.delay,
@@ -186,6 +224,10 @@ export const toTermsFormValues = (
   extraRoundDelayDays: String(terms.extraRoundDelayDays),
   extraRoundPrice: formatPrice(terms.extraRoundPriceCents, locale),
   includedRounds: String(terms.includedRounds),
+  lightExtraRoundPrice: (() => {
+    const cents = lightExtraRoundPrice(terms);
+    return cents === null ? "" : formatPrice(cents, locale);
+  })(),
   requirePayment: terms.requirePayment,
   scope: terms.scope,
 });
@@ -195,6 +237,7 @@ export const toRevisionTerms = (value: TermsFormValues) =>
     extraRoundDelayDays: Number(value.extraRoundDelayDays.trim()),
     extraRoundPriceCents: toPriceCents(value.extraRoundPrice),
     includedRounds: Number(value.includedRounds),
+    lightExtraRoundPriceCents: toLightPriceCents(value.lightExtraRoundPrice),
     requirePayment: value.requirePayment,
     scope: value.scope,
   });
@@ -280,6 +323,16 @@ function RevisionTermsForm({
                   inputMode="decimal"
                   suffix={formatMessage(messages.priceSuffix, { currency })}
                   title={messages.price}
+                />
+              )}
+            </form.AppField>
+            <form.AppField name="lightExtraRoundPrice">
+              {(field) => (
+                <field.TextSettingField
+                  description={messages.lightPriceDescription}
+                  inputMode="decimal"
+                  suffix={formatMessage(messages.priceSuffix, { currency })}
+                  title={messages.lightPrice}
                 />
               )}
             </form.AppField>

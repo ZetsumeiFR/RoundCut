@@ -773,6 +773,19 @@ function ProjectForm({
                     />
                   )}
                 </form.AppField>
+                <form.AppField name="terms.lightExtraRoundPrice">
+                  {(field) => (
+                    <field.TextField
+                      autoComplete="off"
+                      description={terms.lightPriceDescription}
+                      inputMode="decimal"
+                      label={terms.lightPrice}
+                      suffix={formatMessage(terms.priceSuffix, {
+                        currency: workspace.currency,
+                      })}
+                    />
+                  )}
+                </form.AppField>
                 <form.AppField name="terms.extraRoundDelayDays">
                   {(field) => (
                     <field.TextField

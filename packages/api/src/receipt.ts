@@ -2,6 +2,7 @@ import { ORPCError } from "@orpc/server";
 import { agreementReceiptEmail, sendEmail } from "@roundcut/auth/email";
 import { LOCALES, type Locale, resolveLocale } from "@roundcut/auth/locale";
 import type { Database } from "@roundcut/db";
+import { EXTRA_ROUND_SIZES } from "@roundcut/db/extra-round";
 import { user } from "@roundcut/db/schema/auth";
 import { consentRecord } from "@roundcut/db/schema/consent-record";
 import { extraRoundOffer } from "@roundcut/db/schema/extra-round-offer";
@@ -41,6 +42,8 @@ const agreementSnapshotSchema = z.object({
     grossCents: z.number(),
     netCents: z.number(),
     round: z.number(),
+    // Records sealed before EXTRA-08 are full rounds.
+    size: z.enum(EXTRA_ROUND_SIZES).default("full"),
     vatCents: z.number(),
     vatRateBps: z.number(),
   }),
@@ -128,6 +131,7 @@ const labels = {
     ip: "Connection",
     item: "Extra round {round}",
     itemDetail: "{deliverable} · Version {version}",
+    itemLight: "Light extra round {round}",
     net: "Total excl. VAT",
     paid: "Paid",
     paidOn: "Paid online on {date}.",
@@ -158,6 +162,7 @@ const labels = {
     ip: "Connexion",
     item: "Tour supplémentaire {round}",
     itemDetail: "{deliverable} · Version {version}",
+    itemLight: "Tour supplémentaire léger {round}",
     net: "Total HT",
     paid: "Payé",
     paidOn: "Payé en ligne le {date}.",
@@ -502,11 +507,17 @@ export async function renderReceiptPdf(receipt: Receipt, locale: Locale) {
     size: 9,
   });
   main.label(text.subject, fonts);
-  main.row(fill(text.item, { round: offer.round }), amount(offer.netCents), {
-    font: fonts.bold,
-    size: 10.5,
-    strong: true,
-  });
+  main.row(
+    fill(offer.size === "light" ? text.itemLight : text.item, {
+      round: offer.round,
+    }),
+    amount(offer.netCents),
+    {
+      font: fonts.bold,
+      size: 10.5,
+      strong: true,
+    }
+  );
   main.text(
     fill(text.itemDetail, {
       deliverable: agreement.project.deliverable.title,

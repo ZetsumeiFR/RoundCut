@@ -20,6 +20,12 @@ export type ExtraRoundOfferStatus = (typeof EXTRA_ROUND_OFFER_STATUSES)[number];
 
 export const EXTRA_ROUND_OFFER_VALIDITY_DAYS = 14;
 
+// The extra round the decider chooses when the terms price a light round
+// besides the full one (EXTRA-08).
+export const EXTRA_ROUND_SIZES = ["full", "light"] as const;
+
+export type ExtraRoundSize = (typeof EXTRA_ROUND_SIZES)[number];
+
 // The decider's message to the editor after declining an offer (EXTRA-06).
 export const EXTRA_ROUND_CONTACT_MAX_LENGTH = 2000;
 

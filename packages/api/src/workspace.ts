@@ -39,6 +39,12 @@ export const revisionTermsSchema = z.object({
   extraRoundDelayDays: z.int().min(0).max(EXTRA_ROUND_DELAY_MAX_DAYS),
   extraRoundPriceCents: z.int().min(0).max(EXTRA_ROUND_PRICE_MAX_CENTS),
   includedRounds: z.int().min(0).max(INCLUDED_ROUNDS_MAX),
+  lightExtraRoundPriceCents: z
+    .int()
+    .min(0)
+    .max(EXTRA_ROUND_PRICE_MAX_CENTS)
+    .nullable()
+    .default(null),
   requirePayment: z.boolean(),
   scope: z.enum(REVISION_SCOPES),
 });

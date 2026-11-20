@@ -1,6 +1,7 @@
 "use client";
 
 import type { Locale } from "@roundcut/auth/locale";
+import type { ExtraRoundSize } from "@roundcut/db/extra-round";
 import { Button } from "@roundcut/ui/components/button";
 import { Alert, AlertDescription } from "@roundcut/ui/components/reui/alert";
 import { Badge } from "@roundcut/ui/components/reui/badge";
@@ -16,12 +17,18 @@ import { cn } from "@roundcut/ui/lib/utils";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { InfoIcon, TriangleAlertIcon } from "lucide-react";
 import { useSearchParams } from "next/navigation";
-import { useCallback, useEffect } from "react";
+import {
+  type ChangeEvent,
+  useCallback,
+  useEffect,
+  useId,
+  useState,
+} from "react";
 
 import { formatMessage, type Messages } from "@/i18n/messages";
 import { type client, orpc } from "@/utils/orpc";
 
-import { ExtraRoundAgreement } from "./extra-round-agreement";
+import { ExtraRoundAgreement, type Offer } from "./extra-round-agreement";
 import { ExtraRoundDeclined } from "./extra-round-declined";
 import {
   ExtraRoundPayment,
@@ -78,6 +85,91 @@ function AmountRow({
   );
 }
 
+type Amounts = Pick<Offer, "grossCents" | "netCents" | "vatCents">;
+
+const formatCents = (money: Intl.NumberFormat, cents: number) =>
+  money.format(cents / CENTS_PER_UNIT);
+
+// While proposed with a light round, the decider's pick sets the amounts
+// and text they agree to (EXTRA-08); once accepted, the offer holds the
+// chosen size and its amounts.
+function chosenRound(offer: Offer, picked: ExtraRoundSize) {
+  const choice = offer.status === "proposed" ? offer.light : null;
+  if (!choice) {
+    return { amounts: offer, choice, size: offer.size ?? "full" } as const;
+  }
+  return {
+    amounts: picked === "light" ? choice : offer,
+    choice,
+    size: picked,
+  } as const;
+}
+
+// The light or full round the decider picks when the terms price both
+// (EXTRA-08), each with its total including VAT.
+function SizeChoice({
+  light,
+  messages,
+  money,
+  offer,
+  onChange,
+  size,
+}: {
+  light: Amounts;
+  messages: OfferMessages["size"];
+  money: Intl.NumberFormat;
+  offer: Amounts;
+  onChange: (size: ExtraRoundSize) => void;
+  size: ExtraRoundSize;
+}) {
+  const name = useId();
+  const handleChange = useCallback(
+    (event: ChangeEvent<HTMLInputElement>) =>
+      onChange(event.target.value === "light" ? "light" : "full"),
+    [onChange]
+  );
+  const options = [
+    { amounts: light, value: "light" },
+    { amounts: offer, value: "full" },
+  ] as const;
+  return (
+    <fieldset className="flex flex-col gap-2">
+      <legend className="mb-2 font-medium text-sm">{messages.legend}</legend>
+      <div className="grid gap-2 sm:grid-cols-2">
+        {options.map(({ amounts, value }) => (
+          <label
+            className="flex cursor-pointer items-start gap-3 rounded-md border p-3 text-sm transition-colors hover:bg-muted/50 has-checked:border-primary has-checked:bg-primary/5 has-focus-visible:ring-2 has-focus-visible:ring-ring"
+            key={value}
+          >
+            <input
+              checked={size === value}
+              className="mt-0.5 size-4 shrink-0 accent-primary"
+              name={name}
+              onChange={handleChange}
+              type="radio"
+              value={value}
+            />
+            <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+              <span className="flex flex-wrap items-baseline justify-between gap-x-3">
+                <span className="font-medium">{messages[value]}</span>
+                <span className="tabular-nums">
+                  {formatMessage(messages.amount, {
+                    gross: formatCents(money, amounts.grossCents),
+                    net: formatCents(money, amounts.netCents),
+                  })}
+                </span>
+              </span>
+              <span className="text-muted-foreground text-xs">
+                {messages[`${value}Description`]}
+              </span>
+            </span>
+          </label>
+        ))}
+      </div>
+    </fieldset>
+  );
+}
+
 // The extra round offer shown to the client once the included rounds are used
 // up and a new batch has started (EXTRA-01, E12): price excluding VAT, VAT,
 // total, delay and the agreement text, then the decider's answer (EXTRA-02).
@@ -95,6 +187,7 @@ export function ExtraRoundOffer({
   workspaceName: string;
 }) {
   const queryClient = useQueryClient();
+  const [size, setSize] = useState<ExtraRoundSize>("full");
   const paymentReturn = toPaymentReturn(useSearchParams().get("payment"));
   const offer = useQuery(
     orpc.extraRound.getOffer.queryOptions({
@@ -149,13 +242,14 @@ export function ExtraRoundOffer({
   }
 
   const current = offer.data;
+  const { amounts, choice, size: chosenSize } = chosenRound(current, size);
   const money = new Intl.NumberFormat(locale, {
     currency: current.currency,
     style: "currency",
   });
-  const amount = (cents: number) => money.format(cents / CENTS_PER_UNIT);
-  const net = amount(current.netCents);
-  const gross = amount(current.grossCents);
+  const amount = (cents: number) => formatCents(money, cents);
+  const net = amount(amounts.netCents);
+  const gross = amount(amounts.grossCents);
   const delay = formatMessage(
     new Intl.PluralRules(locale).select(current.delayDays) === "one"
       ? messages.delayOne
@@ -166,19 +260,25 @@ export function ExtraRoundOffer({
     maximumFractionDigits: 2,
     style: "percent",
   }).format(current.vatRateBps / BASIS_POINTS);
-  const title = formatMessage(messages.title, { round: current.round });
+  const title = formatMessage(
+    current.size === "light" ? messages.titleLight : messages.title,
+    { round: current.round }
+  );
   const description = formatMessage(messages.description, {
     workspace: workspaceName,
   });
   const vatLabel = formatMessage(messages.vat, { rate });
-  const vat = amount(current.vatCents);
-  const agreement = formatMessage(messages.agreement, {
-    delay,
-    gross,
-    net,
-    round: current.round,
-    workspace: workspaceName,
-  });
+  const vat = amount(amounts.vatCents);
+  const agreement = formatMessage(
+    chosenSize === "light" ? messages.agreementLight : messages.agreement,
+    {
+      delay,
+      gross,
+      net,
+      round: current.round,
+      workspace: workspaceName,
+    }
+  );
   const payment = current.requirePayment
     ? messages.paymentRequired
     : formatMessage(messages.paymentNotRequired, { workspace: workspaceName });
@@ -186,6 +286,13 @@ export function ExtraRoundOffer({
   const shownLines = [
     title,
     description,
+    ...(choice
+      ? [
+          `${messages.size.legend} ${messages.size[chosenSize]} (${
+            messages.size[`${chosenSize}Description`]
+          })`,
+        ]
+      : []),
     `${messages.net}: ${net}`,
     `${vatLabel}: ${vat}`,
     `${messages.total}: ${gross}`,
@@ -205,6 +312,16 @@ export function ExtraRoundOffer({
         </FrameHeader>
         <FramePanel className="flex flex-col gap-3">
           <p className="text-sm">{description}</p>
+          {choice ? (
+            <SizeChoice
+              light={choice}
+              messages={messages.size}
+              money={money}
+              offer={current}
+              onChange={setSize}
+              size={size}
+            />
+          ) : null}
           <dl className="flex flex-col gap-1.5 text-sm">
             <AmountRow label={messages.net} value={net} />
             <AmountRow label={vatLabel} value={vat} />
@@ -244,6 +361,7 @@ export function ExtraRoundOffer({
               messages={messages.answer}
               offer={current}
               shownLines={shownLines}
+              size={chosenSize}
               token={token}
               versionId={versionId}
               workspaceName={workspaceName}

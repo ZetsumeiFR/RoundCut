@@ -172,6 +172,12 @@ const en = {
         "Defaults applied to your new clients and projects. You can still adjust them per client or per project.",
       includedRounds: "Included rounds",
       includedRoundsDescription: "Revision rounds covered by the flat fee.",
+      lightPrice: "Light round price",
+      lightPriceDescription:
+        "Excluding VAT. Optional: the client can then choose a light round (small tweaks, no re-edit) instead of a full one. Leave empty to offer the full round only.",
+      lightPriceInvalid:
+        "Leave empty or enter an amount between 0 and {max} with at most two decimals.",
+      lightPriceNone: "Not offered",
       loadErrorDescription: "Check your connection and try again.",
       loadErrorTitle: "Couldn't load your plan terms",
       payments: {
@@ -1293,6 +1299,8 @@ const en = {
         "Round {round} opens when {workspace} publishes the next version. {workspace} invoices it to you.",
       agreement:
         "By accepting, you order extra round {round} for {net} excl. VAT ({gross} incl. VAT). {workspace} delivers the next version within {delay} of receiving your feedback.",
+      agreementLight:
+        "By accepting, you order light extra round {round} (small tweaks, no re-edit) for {net} excl. VAT ({gross} incl. VAT). {workspace} delivers the next version within {delay} of receiving your feedback.",
       answer: {
         accept: "Accept this round",
         accepted: "Extra round {round} accepted on {date} by {name}.",
@@ -1389,7 +1397,17 @@ const en = {
         "The round opens as soon as it is agreed; {workspace} will invoice it.",
       paymentRequired: "Online payment is requested before the round opens.",
       retry: "Try again",
+      size: {
+        amount: "{net} excl. VAT · {gross} incl. VAT",
+        full: "Full round",
+        fullDescription: "Any change to the video, including re-editing.",
+        legend: "Choose your round:",
+        light: "Light round",
+        lightDescription:
+          "Small tweaks (text, sound, colors, trims), no re-edit.",
+      },
       title: "Extra round {round}",
+      titleLight: "Light extra round {round}",
       total: "Total incl. VAT",
       validUntil: "Offer valid until {date}",
       vat: "VAT ({rate})",
@@ -1653,6 +1671,12 @@ const fr: Messages = {
       includedRounds: "Tours inclus",
       includedRoundsDescription:
         "Nombre de tours de révision couverts par le forfait.",
+      lightPrice: "Prix du tour léger",
+      lightPriceDescription:
+        "Hors taxes. Facultatif : le client peut alors choisir un tour léger (petits ajustements, sans re-montage) au lieu d'un tour complet. Laissez vide pour ne proposer que le tour complet.",
+      lightPriceInvalid:
+        "Laissez vide ou saisissez un montant entre 0 et {max}, avec au plus deux décimales.",
+      lightPriceNone: "Non proposé",
       loadErrorDescription: "Vérifiez votre connexion et réessayez.",
       loadErrorTitle: "Impossible de charger vos conditions de forfait",
       payments: {
@@ -2798,6 +2822,8 @@ const fr: Messages = {
         "Le tour {round} s'ouvre dès que {workspace} publie la prochaine version. {workspace} vous le facturera.",
       agreement:
         "En acceptant, vous commandez le tour supplémentaire {round} pour {net} HT ({gross} TTC). {workspace} livre la version suivante sous {delay} après réception de vos retours.",
+      agreementLight:
+        "En acceptant, vous commandez le tour supplémentaire léger {round} (petits ajustements, sans re-montage) pour {net} HT ({gross} TTC). {workspace} livre la version suivante sous {delay} après réception de vos retours.",
       answer: {
         accept: "Accepter ce tour",
         accepted: "Tour supplémentaire {round} accepté le {date} par {name}.",
@@ -2896,7 +2922,17 @@ const fr: Messages = {
       paymentRequired:
         "Le paiement en ligne est demandé avant l'ouverture du tour.",
       retry: "Réessayer",
+      size: {
+        amount: "{net} HT · {gross} TTC",
+        full: "Tour complet",
+        fullDescription: "Toute modification de la vidéo, re-montage compris.",
+        legend: "Choisissez votre tour :",
+        light: "Tour léger",
+        lightDescription:
+          "Petits ajustements (textes, son, couleurs, coupes), sans re-montage.",
+      },
       title: "Tour supplémentaire {round}",
+      titleLight: "Tour supplémentaire léger {round}",
       total: "Total TTC",
       validUntil: "Proposition valable jusqu'au {date}",
       vat: "TVA ({rate})",
