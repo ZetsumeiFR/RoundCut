@@ -2,6 +2,7 @@
 
 import { ORPCError } from "@orpc/client";
 import type { Locale } from "@roundcut/auth/locale";
+import type { ExtraRoundSize } from "@roundcut/db/extra-round";
 import {
   REVIEWER_CODE_LENGTH,
   REVIEWER_CODE_VALIDITY_MINUTES,
@@ -295,6 +296,7 @@ export function ExtraRoundAgreement({
   messages,
   offer,
   shownLines,
+  size,
   token,
   versionId,
   workspaceName,
@@ -304,6 +306,8 @@ export function ExtraRoundAgreement({
   offer: Offer;
   // The offer's text and amounts as displayed, for the agreement record.
   shownLines: string[];
+  // The light or full round the decider picked (EXTRA-08).
+  size: ExtraRoundSize;
   token: string;
   versionId: string;
   workspaceName: string;
@@ -410,6 +414,7 @@ export function ExtraRoundAgreement({
           code,
           offerId: offer.id,
           shown: { lines: [...shownLines, messages.consent], locale },
+          size,
           token,
           versionId,
         });
@@ -440,6 +445,7 @@ export function ExtraRoundAgreement({
       queryClient,
       refreshOffer,
       shownLines,
+      size,
       token,
       versionId,
     ]

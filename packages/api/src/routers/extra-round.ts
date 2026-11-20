@@ -9,9 +9,12 @@ import type { Database } from "@roundcut/db";
 import {
   EXTRA_ROUND_CONTACT_MAX_LENGTH,
   EXTRA_ROUND_OFFER_VALIDITY_DAYS,
+  EXTRA_ROUND_SIZES,
+  type ExtraRoundSize,
   needsExtraRound,
   offerAmounts,
 } from "@roundcut/db/extra-round";
+import { lightExtraRoundPrice } from "@roundcut/db/revision-terms";
 import { user } from "@roundcut/db/schema/auth";
 import { billableLine } from "@roundcut/db/schema/billable-line";
 import { client } from "@roundcut/db/schema/client";
@@ -59,6 +62,7 @@ const offerInput = z.object({
 interface OfferTerms {
   currency: string;
   delayDays: number;
+  lightPriceCents: number | null;
   priceCents: number;
   requirePayment: boolean;
   vatRateBps: number;
@@ -208,6 +212,7 @@ async function currentOffer(
     (await proposeOffer(db, target.deliverableId, {
       currency: owner.currency,
       delayDays: terms.extraRoundDelayDays,
+      lightPriceCents: lightExtraRoundPrice(terms),
       priceCents: terms.extraRoundPriceCents,
       // Online payment needs the editor's connected Stripe account
       // (EXTRA-04); without it the editor invoices the round.
@@ -237,10 +242,17 @@ async function currentOffer(
     expiresAt: offer.expiresAt,
     forwardedAt: offer.forwardedAt,
     id: offer.id,
+    // The light round the decider can choose instead (EXTRA-08); once
+    // accepted, the amounts above are those of the chosen size.
+    light:
+      offer.status !== "accepted" && offer.lightPriceCents !== null
+        ? offerAmounts(offer.lightPriceCents, offer.vatRateBps)
+        : null,
     paidAt: offer.paidAt,
     requirePayment: offer.requirePayment,
     // The round the agreement grants: the open one, or the next.
     round: opensBatch ? position : position + 1,
+    size: offer.size,
     status: offer.status,
     vatRateBps: offer.vatRateBps,
   };
@@ -348,6 +360,7 @@ async function agreementSnapshot(
       netCents: offer.netCents,
       requirePayment: offer.requirePayment,
       round: offer.round,
+      size: offer.size ?? "full",
       vatCents: offer.vatCents,
       vatRateBps: offer.vatRateBps,
     },
@@ -390,17 +403,19 @@ async function offerOwner(db: Database, deliverableId: string) {
   return row;
 }
 
+const ROUND_LABELS = {
+  en: { full: "Extra round", light: "Light extra round" },
+  fr: { full: "Tour supplémentaire", light: "Tour supplémentaire léger" },
+} as const satisfies Record<Locale, Record<ExtraRoundSize, string>>;
+
 // The extra round's label on the Stripe payment and the billable line, in
-// the workspace language.
+// the workspace language, naming the light round the decider chose.
 function extraRoundLabel(
   locale: Locale,
   offer: Offer,
   owner: { deliverableTitle: string; projectName: string }
 ) {
-  const round =
-    locale === "fr"
-      ? `Tour supplémentaire ${offer.round}`
-      : `Extra round ${offer.round}`;
+  const round = `${ROUND_LABELS[locale][offer.size ?? "full"]} ${offer.round}`;
   return `${round} · ${owner.projectName} · ${owner.deliverableTitle}`;
 }
 
@@ -454,13 +469,29 @@ export const extraRoundRouter = {
         agreed: z.literal(true),
         code: reviewerCodeSchema,
         shown: consentShownSchema,
+        // The size the decider chose (EXTRA-08); full when the terms price
+        // no light round.
+        size: z.enum(EXTRA_ROUND_SIZES).default("full"),
       })
     )
     .use(requireReviewLink)
     .handler(async ({ context, input }) => {
       const decider = requireDecider(context.reviewer, context.reviewerClient);
       const { projectId } = context.reviewLink;
-      const offer = await openOffer(context, projectId, input);
+      const proposed = await openOffer(context, projectId, input);
+      const chosen = input.size === "light" ? proposed.light : proposed;
+      if (!chosen) {
+        throw new ORPCError("BAD_REQUEST", {
+          message: "This offer has no light round",
+        });
+      }
+      // From here on the offer is the round agreed: its size and amounts.
+      const offer: Offer = {
+        ...proposed,
+        ...offerAmounts(chosen.netCents, proposed.vatRateBps),
+        light: null,
+        size: input.size,
+      };
       await consumeReviewerCode(
         context.db,
         decider.id,
@@ -486,6 +517,8 @@ export const extraRoundRouter = {
           .set({
             acceptedAt: now,
             acceptedByReviewerId: decider.id,
+            priceCents: offer.netCents,
+            size: offer.size,
             status: "accepted",
           })
           .where(

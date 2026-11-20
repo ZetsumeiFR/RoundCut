@@ -8,7 +8,7 @@ import {
   uniqueIndex,
 } from "drizzle-orm/pg-core";
 
-import type { ExtraRoundOfferStatus } from "../extra-round";
+import type { ExtraRoundOfferStatus, ExtraRoundSize } from "../extra-round";
 import { deliverable } from "./deliverable";
 import { reviewer } from "./reviewer";
 import { round } from "./round";
@@ -53,10 +53,15 @@ export const extraRoundOffer = pgTable(
     id: text("id")
       .primaryKey()
       .$defaultFn(() => crypto.randomUUID()),
+    // The light round's price (EXTRA-08), excluding VAT, in cents; null when
+    // the terms offer the full round only.
+    lightPriceCents: integer("light_price_cents"),
     // When the client's payment of the offer was confirmed by Stripe
     // (EXTRA-04, checkout.session.completed); null while unpaid.
     paidAt: timestamp("paid_at"),
-    // Excluding VAT, in cents.
+    // Excluding VAT, in cents: the full round's price while proposed, then
+    // the price of the size the decider accepted, which is what is paid,
+    // invoiced and shown on the receipt.
     priceCents: integer("price_cents").notNull(),
     requirePayment: boolean("require_payment").notNull(),
     // The round an accepted offer opened (EXTRA-04, EXTRA-05); null while
@@ -64,6 +69,8 @@ export const extraRoundOffer = pgTable(
     roundId: text("round_id").references(() => round.id, {
       onDelete: "set null",
     }),
+    // The size the decider accepted (EXTRA-08); null until accepted.
+    size: text("size").$type<ExtraRoundSize>(),
     status: text("status")
       .$type<ExtraRoundOfferStatus>()
       .default("proposed")
