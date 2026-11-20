@@ -1,14 +1,18 @@
 import { ORPCError } from "@orpc/server";
 import { type Locale, resolveLocale } from "@roundcut/auth/locale";
 import type { Database } from "@roundcut/db";
+import {
+  type BillableLineStatus,
+  billableLineStatusSources,
+} from "@roundcut/db/billing";
 import type { ExtraRoundSize } from "@roundcut/db/extra-round";
 import { billableLine } from "@roundcut/db/schema/billable-line";
 import { client } from "@roundcut/db/schema/client";
 import { project } from "@roundcut/db/schema/project";
 import { workspace } from "@roundcut/db/schema/workspace";
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, inArray } from "drizzle-orm";
 
-import { manualLineSchema } from "../billing";
+import { lineStatusSchema, manualLineSchema } from "../billing";
 import { protectedProcedure } from "../index";
 import { getOrCreateWorkspace } from "./workspace";
 
@@ -116,6 +120,13 @@ export async function insertExtraRoundLine(
     .onConflictDoNothing({ target: billableLine.consentRecordId });
 }
 
+// When a line was exported or paid (BILL-02): marking it back "to invoice"
+// clears the export, paying it keeps when it was exported.
+const lineStatusTimestamps = (status: BillableLineStatus, now: Date) =>
+  status === "paid"
+    ? { paidAt: now }
+    : { exportedAt: status === "exported" ? now : null };
+
 // The editor's billable lines (BILL, E14), exported to their own invoicing
 // tool: flat fees, agreed extra rounds and manual fees.
 export const billingRouter = {
@@ -165,6 +176,7 @@ export const billingRouter = {
           client: { id: client.id, name: client.name },
           createdAt: billableLine.createdAt,
           currency: billableLine.currency,
+          exportedAt: billableLine.exportedAt,
           id: billableLine.id,
           label: billableLine.label,
           paidAt: billableLine.paidAt,
@@ -181,5 +193,50 @@ export const billingRouter = {
         .where(eq(billableLine.workspaceId, owner.id))
         .orderBy(desc(billableLine.createdAt), desc(billableLine.id));
     }),
+    // The editor marks a line exported or paid by hand (BILL-02); Stripe
+    // writes paid extra rounds' lines as paid on its own (EXTRA-04).
+    updateStatus: protectedProcedure
+      .input(lineStatusSchema)
+      .handler(async ({ context, input: { id, status } }) => {
+        const owner = await getOrCreateWorkspace(
+          context.db,
+          context.session.user
+        );
+        const ownLine = and(
+          eq(billableLine.id, id),
+          eq(billableLine.workspaceId, owner.id)
+        );
+        // The allowed source statuses are part of the update itself, so two
+        // concurrent marks can never reopen a paid line.
+        const sources = billableLineStatusSources(status);
+        const now = new Date();
+        const [updated] =
+          sources.length > 0
+            ? await context.db
+                .update(billableLine)
+                .set({ ...lineStatusTimestamps(status, now), status })
+                .where(and(ownLine, inArray(billableLine.status, sources)))
+                .returning({
+                  exportedAt: billableLine.exportedAt,
+                  id: billableLine.id,
+                  paidAt: billableLine.paidAt,
+                  status: billableLine.status,
+                })
+            : [];
+        if (updated) {
+          return updated;
+        }
+        // Other workspaces' lines read as missing so their ids leak nothing.
+        const [current] = await context.db
+          .select({ status: billableLine.status })
+          .from(billableLine)
+          .where(ownLine);
+        if (!current) {
+          throw new ORPCError("NOT_FOUND", { message: "Line not found" });
+        }
+        throw new ORPCError("CONFLICT", {
+          message: `Cannot mark a ${current.status} line ${status}`,
+        });
+      }),
   },
 };

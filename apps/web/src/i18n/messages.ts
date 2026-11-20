@@ -469,6 +469,18 @@ const en = {
       flat_fee: "Flat fee",
       manual: "Fee",
     },
+    statusChange: {
+      actions: "Change the status of {label}, currently {status}",
+      cancel: "Cancel",
+      changed: "{label}: {status}",
+      error: "Couldn't change this line's status. Try again.",
+      moveTo: "Mark as “{status}”",
+      pay: "Mark as paid",
+      payDescription:
+        "{label} will be marked paid. A paid line can no longer change status.",
+      paying: "Saving…",
+      payTitle: "Mark this line as paid?",
+    },
     statuses: {
       exported: "Exported",
       paid: "Paid",
@@ -2068,6 +2080,18 @@ const fr: Messages = {
       extra_round: "Tour sup.",
       flat_fee: "Forfait",
       manual: "Frais",
+    },
+    statusChange: {
+      actions: "Changer le statut de {label}, actuellement {status}",
+      cancel: "Annuler",
+      changed: "{label} : {status}",
+      error: "Impossible de changer le statut de cette ligne. Réessayez.",
+      moveTo: "Passer en « {status} »",
+      pay: "Marquer comme payée",
+      payDescription:
+        "{label} sera marquée payée. Une ligne payée ne peut plus changer de statut.",
+      paying: "Enregistrement…",
+      payTitle: "Marquer cette ligne comme payée ?",
     },
     statuses: {
       exported: "Exportée",
