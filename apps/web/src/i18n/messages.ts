@@ -789,6 +789,7 @@ const en = {
     },
     none: "None",
     player: {
+      approved: "Approved",
       back: "Back to {project}",
       compare: {
         action: "Compare",
@@ -844,6 +845,7 @@ const en = {
         emptyDescription:
           "Your client's timestamped comments on this version will appear here and as markers on the timeline.",
         emptyTitle: "No feedback yet",
+        frozen: "This version is approved: its comments are closed.",
         loadError: "Couldn't load the feedback.",
         loading: "Loading the feedback…",
         markDone: "Mark as done",
@@ -2311,6 +2313,7 @@ const fr: Messages = {
     },
     none: "Aucun",
     player: {
+      approved: "Validée",
       back: "Retour à {project}",
       compare: {
         action: "Comparer",
@@ -2367,6 +2370,7 @@ const fr: Messages = {
         emptyDescription:
           "Les commentaires horodatés de votre client sur cette version apparaîtront ici et en marqueurs sur la barre de temps.",
         emptyTitle: "Aucun retour pour l'instant",
+        frozen: "Cette version est validée : les commentaires sont clos.",
         loadError: "Impossible de charger les retours.",
         loading: "Chargement des retours…",
         markDone: "Marquer traité",

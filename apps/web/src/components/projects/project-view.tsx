@@ -250,27 +250,35 @@ function buildColumns(
         deliverable.review.latestVersion?.number ?? 0,
       cell: ({ row }) => {
         const version = row.original.review.latestVersion;
-        return version ? (
-          <Link
-            aria-label={formatMessage(view.openVersion, {
-              number: version.number,
-              title: row.original.title,
-            })}
-            className="inline-flex items-center gap-1.5 text-sm tabular-nums underline-offset-4 transition-colors hover:text-primary hover:underline"
-            href={`/projects/${projectId}/versions/${version.id}`}
-          >
-            <VersionThumbnail
-              alt=""
-              className="aspect-video w-12 shrink-0 border object-cover"
-              fallback={<PlayIcon aria-hidden="true" className="size-3.5" />}
-              src={version.thumbnailUrl}
-            />
-            {formatMessage(view.version, { number: version.number })}
-          </Link>
-        ) : (
-          <span className="text-muted-foreground text-sm">
-            {view.noVersion}
-          </span>
+        if (!version) {
+          return (
+            <span className="text-muted-foreground text-sm">
+              {view.noVersion}
+            </span>
+          );
+        }
+        return (
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+            <Link
+              aria-label={formatMessage(view.openVersion, {
+                number: version.number,
+                title: row.original.title,
+              })}
+              className="inline-flex items-center gap-1.5 text-sm tabular-nums underline-offset-4 transition-colors hover:text-primary hover:underline"
+              href={`/projects/${projectId}/versions/${version.id}`}
+            >
+              <VersionThumbnail
+                alt=""
+                className="aspect-video w-12 shrink-0 border object-cover"
+                fallback={<PlayIcon aria-hidden="true" className="size-3.5" />}
+                src={version.thumbnailUrl}
+              />
+              {formatMessage(view.version, { number: version.number })}
+            </Link>
+            {version.status === "approved" ? (
+              <Badge variant="success-light">{messages.player.approved}</Badge>
+            ) : null}
+          </div>
         );
       },
       header: ({ column }) => <SortableHeader column={column} />,

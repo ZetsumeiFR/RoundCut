@@ -516,6 +516,7 @@ export const reviewRouter = {
                   id: current.id,
                   number: current.number,
                   playbackUrl: await context.storage.signGet(current.r2Key),
+                  status: current.status,
                   thumbnailUrl: await thumbnailUrl(
                     context.storage,
                     current.thumbnailKey

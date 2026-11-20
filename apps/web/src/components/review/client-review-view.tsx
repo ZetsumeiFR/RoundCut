@@ -64,11 +64,13 @@ export function ClientReviewSkeleton({ label }: { label?: string }) {
 }
 
 function DeliverableItem({
+  approvedLabel,
   deliverable,
   messages,
   onSelect,
   selected,
 }: {
+  approvedLabel: string;
   deliverable: LinkedDeliverable;
   messages: ReviewMessages;
   onSelect: (id: string) => void;
@@ -102,10 +104,15 @@ function DeliverableItem({
           <span className="truncate font-medium text-sm">
             {deliverable.title}
           </span>
-          <span className="text-muted-foreground text-xs">
+          <span className="flex flex-wrap items-center gap-2 text-muted-foreground text-xs">
             {version
               ? formatMessage(messages.version, { number: version.number })
               : messages.noVersion}
+            {version?.status === "approved" ? (
+              <Badge size="sm" variant="success-light">
+                {approvedLabel}
+              </Badge>
+            ) : null}
           </span>
         </span>
       </button>
@@ -196,6 +203,8 @@ function LinkedReview({
   const selected =
     playable.find((item) => item.id === selectedId) ?? playable[0];
   const version = selected?.latestVersion;
+  // An approved version is frozen (APPR-02): read-only thread, no composer.
+  const approved = version?.status === "approved";
   const playerRef = useRef<PlayerHandle | null>(null);
   const comments = useQuery(
     orpc.comment.listForReview.queryOptions({
@@ -240,9 +249,14 @@ function LinkedReview({
                 number: version.number,
               })}
             </h2>
-            <Badge variant="info-light">
-              {formatMessage(messages.version, { number: version.number })}
-            </Badge>
+            <div className="flex shrink-0 items-center gap-2">
+              {approved ? (
+                <Badge variant="success-light">{player.approved}</Badge>
+              ) : null}
+              <Badge variant="info-light">
+                {formatMessage(messages.version, { number: version.number })}
+              </Badge>
+            </div>
           </div>
           <SubmitBatch
             isDecider={project.reviewer.isDecider}
@@ -267,25 +281,33 @@ function LinkedReview({
               src={version.playbackUrl}
             />
           </div>
-          <CommentComposer
-            durationMs={version.durationMs}
-            frameRate={version.frameRate}
-            key={version.id}
-            locale={locale}
-            messages={messages.comments}
-            playerRef={playerRef}
-            token={token}
-            versionId={version.id}
-          />
-          <PasteFeedback
-            durationMs={version.durationMs}
-            frameRate={version.frameRate}
-            key={`paste-${version.id}`}
-            locale={locale}
-            messages={messages.comments.paste}
-            token={token}
-            versionId={version.id}
-          />
+          {approved ? (
+            <p className="text-muted-foreground text-sm">
+              {player.feedback.frozen}
+            </p>
+          ) : (
+            <>
+              <CommentComposer
+                durationMs={version.durationMs}
+                frameRate={version.frameRate}
+                key={version.id}
+                locale={locale}
+                messages={messages.comments}
+                playerRef={playerRef}
+                token={token}
+                versionId={version.id}
+              />
+              <PasteFeedback
+                durationMs={version.durationMs}
+                frameRate={version.frameRate}
+                key={`paste-${version.id}`}
+                locale={locale}
+                messages={messages.comments.paste}
+                token={token}
+                versionId={version.id}
+              />
+            </>
+          )}
           <h2 className="pt-2 font-medium text-sm">
             {messages.comments.thread}
           </h2>
@@ -298,7 +320,7 @@ function LinkedReview({
               isError={comments.isError}
               locale={locale}
               messages={player.feedback}
-              onReply={handleReply}
+              onReply={approved ? undefined : handleReply}
               onRetry={handleRetryComments}
               onSeek={handleSeek}
               retryLabel={messages.retry}
@@ -320,6 +342,7 @@ function LinkedReview({
           <ul className="grid gap-2 sm:grid-cols-2">
             {project.deliverables.map((item) => (
               <DeliverableItem
+                approvedLabel={player.approved}
                 deliverable={item}
                 key={item.id}
                 messages={messages}

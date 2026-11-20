@@ -7,6 +7,7 @@ import { deliverable } from "@roundcut/db/schema/deliverable";
 import { project } from "@roundcut/db/schema/project";
 import { round } from "@roundcut/db/schema/round";
 import { version } from "@roundcut/db/schema/version";
+import type { VersionStatus } from "@roundcut/db/version";
 import { and, asc, count, desc, eq, inArray, isNull, ne } from "drizzle-orm";
 import z from "zod";
 
@@ -35,6 +36,7 @@ export interface ReviewActivity {
   latestVersion: {
     id: string;
     number: number;
+    status: VersionStatus;
     thumbnailUrl: string | null;
   } | null;
   // Top-level comments of the latest version still to process (REV-04).
@@ -239,6 +241,7 @@ export const projectRouter = {
           deliverableId: version.deliverableId,
           id: version.id,
           number: version.number,
+          status: version.status,
           thumbnailKey: version.thumbnailKey,
         })
         .from(version)

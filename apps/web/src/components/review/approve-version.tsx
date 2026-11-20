@@ -1,5 +1,6 @@
 "use client";
 
+import type { AppRouterClient } from "@roundcut/api/routers/index";
 import type { Locale } from "@roundcut/auth/locale";
 import { REVIEWER_CODE_LENGTH } from "@roundcut/db/reviewer-code";
 import { Button } from "@roundcut/ui/components/button";
@@ -14,6 +15,31 @@ import { client as api, orpc } from "@/utils/orpc";
 import { CodeConsentForm, errorMessage } from "./extra-round-agreement";
 
 type AnswerMessages = Messages["review"]["extraRound"]["answer"];
+type LinkedProject = Awaited<
+  ReturnType<AppRouterClient["review"]["resolveLink"]>
+>;
+
+// Marks the version approved in the cached review link, which freezes its
+// thread (APPR-02) without refetching: that would re-sign the playback URL
+// and restart the video.
+const markApproved =
+  (versionId: string) =>
+  (data: LinkedProject | undefined): LinkedProject | undefined => {
+    if (!data?.reviewer) {
+      return data;
+    }
+    return {
+      ...data,
+      deliverables: data.deliverables.map((item) =>
+        item.latestVersion?.id === versionId
+          ? {
+              ...item,
+              latestVersion: { ...item.latestVersion, status: "approved" },
+            }
+          : item
+      ),
+    };
+  };
 
 export function ErrorAlert({ children }: { children: string | null }) {
   if (!children) {
@@ -95,6 +121,10 @@ export function ApproveVersion({
             queryKey: orpc.extraRound.getOffer.key(),
           }),
         ]);
+        queryClient.setQueriesData<LinkedProject>(
+          { queryKey: orpc.review.resolveLink.key() },
+          markApproved(versionId)
+        );
       } catch (failure) {
         setError(errorMessage(failure, messages, locale));
         setCode("");
