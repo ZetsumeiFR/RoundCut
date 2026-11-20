@@ -92,14 +92,14 @@ export type Project = Awaited<
 >[number];
 
 const CENTS_PER_UNIT = 100;
-const FLAT_FEE_MAX = PROJECT_FLAT_FEE_MAX_CENTS / CENTS_PER_UNIT;
+export const FLAT_FEE_MAX = PROJECT_FLAT_FEE_MAX_CENTS / CENTS_PER_UNIT;
 const FLAT_FEE_PATTERN = /^\d{1,7}(?:[.,]\d{1,2})?$/;
 const FRIDAY = 5;
 const DAYS_PER_WEEK = 7;
 const TWO_WEEKS_DAYS = 14;
 const CALENDAR_LOCALES = { en: enUS, fr } as const;
 
-const isFlatFee = (value: string) =>
+export const isFlatFee = (value: string) =>
   value.trim() === "" ||
   (FLAT_FEE_PATTERN.test(value.trim()) && parsePrice(value) <= FLAT_FEE_MAX);
 

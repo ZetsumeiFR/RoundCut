@@ -11,11 +11,9 @@ import { and, eq, isNotNull, isNull, or } from "drizzle-orm";
 import type Stripe from "stripe";
 
 import type { Notifications } from "./context";
-import { emailReceipt } from "./receipt";
-
+import { emailReceipt, findReceipt } from "./receipt";
+import { insertExtraRoundLine, type Transaction } from "./routers/billing";
 import { projectRoundPositions } from "./routers/round";
-
-type Transaction = Parameters<Parameters<Database["transaction"]>[0]>[0];
 
 // An accepted offer is settled once paid (EXTRA-04), or right away when it
 // doesn't ask for payment (EXTRA-05): it then grants its round.
@@ -162,16 +160,21 @@ async function fulfillCheckoutSession(
   // Also run on redeliveries, so a round left closed by a failure between
   // the two steps still opens.
   await openAgreedRound(db, offerId);
+  const receipt = await findReceipt(db, eq(consentRecord.offerId, offerId));
+  // The paid round's billable line (BILL-01): also written on redeliveries,
+  // which add nothing once it exists.
+  if (receipt.paidAt) {
+    await insertExtraRoundLine(db, {
+      agreement: receipt.agreement,
+      consentRecordId: receipt.id,
+      paidAt: receipt.paidAt,
+      projectId: receipt.projectId,
+    });
+  }
   // The receipt goes out again marked paid (EXTRA-07), once: redeliveries
   // find the offer already paid.
   if (paid) {
-    const [consent] = await db
-      .select({ id: consentRecord.id })
-      .from(consentRecord)
-      .where(eq(consentRecord.offerId, paid.id));
-    if (consent) {
-      await emailReceipt(db, notifications, consent.id, "paid");
-    }
+    await emailReceipt(db, notifications, receipt.id, "paid");
   }
 }
 
