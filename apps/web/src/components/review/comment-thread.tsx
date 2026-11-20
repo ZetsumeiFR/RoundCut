@@ -308,7 +308,7 @@ function CommentItem({
   dateFormat: Intl.DateTimeFormat;
   frameRate: FrameRate;
   messages: FeedbackMessages;
-  onReply: ReplyHandler;
+  onReply?: ReplyHandler;
   onSeek: (ms: number) => void;
   onStatusChange?: StatusHandler;
 }) {
@@ -322,7 +322,7 @@ function CommentItem({
   const close = useCallback(() => setMode("idle"), []);
   const sendReply = useCallback(
     async (text: string) => {
-      await onReply(comment.id, text);
+      await onReply?.(comment.id, text);
       setMode("idle");
     },
     [comment.id, onReply]
@@ -416,7 +416,7 @@ function CommentItem({
                 onStatusChange={onStatusChange}
               />
             ) : null}
-            {mode === "idle" ? (
+            {onReply && mode === "idle" ? (
               <Button
                 onClick={showReply}
                 size="xs"
@@ -485,7 +485,8 @@ function CommentItem({
 // The timestamped thread of a version, oldest timecode first, with replies and
 // statuses (REV-03, REV-04): shared by the editor's review page, where
 // onStatusChange lets the editor process feedback, and the client's review
-// link.
+// link. Without onReply the thread is read-only: an approved version takes
+// no more replies (APPR-02).
 export function CommentThread({
   comments,
   emptyDescription,
@@ -507,7 +508,7 @@ export function CommentThread({
   isError: boolean;
   locale: Locale;
   messages: FeedbackMessages;
-  onReply: ReplyHandler;
+  onReply?: ReplyHandler;
   onRetry: () => void;
   onSeek: (ms: number) => void;
   onStatusChange?: StatusHandler;

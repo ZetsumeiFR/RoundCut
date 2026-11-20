@@ -171,6 +171,16 @@ async function listComments(db: Database, storage: Storage, versionId: string) {
     .map((item) => ({ ...item, replies: replies.get(item.id) ?? [] }));
 }
 
+// An approved version is frozen (APPR-02): its thread takes no more
+// comments, replies or attachments, from either side.
+const assertNotApproved = (target: { status: string }) => {
+  if (target.status === "approved") {
+    throw new ORPCError("CONFLICT", {
+      message: "This version is approved: its feedback is closed",
+    });
+  }
+};
+
 // A comment with the project it belongs to, so each side can check access.
 async function findThreadComment(db: Database, id: string) {
   const [row] = await db
@@ -285,6 +295,7 @@ export const commentRouter = {
         projectId,
         input.versionId
       );
+      assertNotApproved(target);
       if (
         !(
           isWithin(target.durationMs, input.timecodeMs) &&
@@ -332,6 +343,7 @@ export const commentRouter = {
         context.reviewLink.projectId,
         input.versionId
       );
+      assertNotApproved(target);
       if (
         !input.comments.every((item) =>
           isWithin(target.durationMs, item.timecodeMs)
@@ -390,10 +402,12 @@ export const commentRouter = {
         context.session.user
       );
       const target = await findThreadComment(context.db, input.parentId);
-      await findOwnedVersion(
-        context.db,
-        workspace.id,
-        target.comment.versionId
+      assertNotApproved(
+        await findOwnedVersion(
+          context.db,
+          workspace.id,
+          target.comment.versionId
+        )
       );
       const saved = await insertReply(
         context.db,
@@ -419,7 +433,9 @@ export const commentRouter = {
       if (target.projectId !== projectId) {
         throw new ORPCError("NOT_FOUND", { message: "Comment not found" });
       }
-      await findReviewVersion(context.db, projectId, target.comment.versionId);
+      assertNotApproved(
+        await findReviewVersion(context.db, projectId, target.comment.versionId)
+      );
       const saved = await insertReply(
         context.db,
         target.comment,
@@ -441,7 +457,9 @@ export const commentRouter = {
     .handler(async ({ context, input: { contentType, versionId } }) => {
       requireReviewer(context.reviewer);
       const { projectId } = context.reviewLink;
-      await findReviewVersion(context.db, projectId, versionId);
+      assertNotApproved(
+        await findReviewVersion(context.db, projectId, versionId)
+      );
       const key = `${attachmentPrefix(projectId)}${crypto.randomUUID()}.${COMMENT_ATTACHMENT_TYPES[contentType]}`;
       return { key, url: await context.storage.signPut(key, contentType) };
     }),

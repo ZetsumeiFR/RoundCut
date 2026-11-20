@@ -96,6 +96,47 @@ export function ReviewState({
   );
 }
 
+// The version's place in the review: approved (APPR-02), its round in the
+// included count and whether its batch was submitted.
+function ReviewStatusBadges({
+  approved,
+  currentRound,
+  includedRounds,
+  messages,
+}: {
+  approved: boolean;
+  currentRound: { position: number; status: string } | null;
+  includedRounds: number;
+  messages: ProjectsMessages["player"];
+}) {
+  const position = currentRound?.position ?? 0;
+  return (
+    <>
+      {approved ? (
+        <Badge size="lg" variant="success-light">
+          {messages.approved}
+        </Badge>
+      ) : null}
+      {position > 0 ? (
+        <Badge
+          size="lg"
+          variant={position > includedRounds ? "warning-light" : "info-light"}
+        >
+          {formatMessage(messages.round, {
+            current: position,
+            included: includedRounds,
+          })}
+        </Badge>
+      ) : null}
+      {currentRound?.status === "submitted" ? (
+        <Badge size="lg" variant="info-light">
+          {formatMessage(messages.roundSubmitted, { current: position })}
+        </Badge>
+      ) : null}
+    </>
+  );
+}
+
 export function ReviewViewSkeleton({ label }: { label?: string }) {
   return (
     <div aria-label={label} className="flex flex-col gap-4" role="status">
@@ -113,6 +154,7 @@ export function ReviewViewSkeleton({ label }: { label?: string }) {
 function FeedbackPanel({
   comments,
   frameRate,
+  frozen,
   isError,
   locale,
   messages,
@@ -123,6 +165,8 @@ function FeedbackPanel({
 }: {
   comments: FeedbackComment[] | undefined;
   frameRate: FrameRate | null;
+  // An approved version (APPR-02): the thread is read-only.
+  frozen: boolean;
   isError: boolean;
   locale: Locale;
   messages: ProjectsMessages;
@@ -143,6 +187,11 @@ function FeedbackPanel({
         ) : null}
       </FrameHeader>
       <FramePanel className="p-0 lg:max-h-[70vh] lg:overflow-y-auto">
+        {frozen ? (
+          <p className="border-b p-3 text-muted-foreground text-xs">
+            {feedback.frozen}
+          </p>
+        ) : null}
         <CommentThread
           comments={comments}
           emptyDescription={feedback.emptyDescription}
@@ -151,7 +200,7 @@ function FeedbackPanel({
           isError={isError}
           locale={locale}
           messages={feedback}
-          onReply={onReply}
+          onReply={frozen ? undefined : onReply}
           onRetry={onRetry}
           onSeek={onSeek}
           onStatusChange={onStatusChange}
@@ -422,7 +471,7 @@ export function ReviewView({
   }
 
   const { includedRounds } = project.data.termsSnapshot;
-  const currentRound = deliverable.review.currentRound?.position ?? 0;
+  const approved = version.data.status === "approved";
   const readyVersions = (versions.data ?? []).filter(
     (item) => item.status !== "uploading"
   );
@@ -460,24 +509,12 @@ export function ReviewView({
           </div>
         </div>
         <div className="flex min-w-0 flex-wrap items-center gap-2">
-          {currentRound > 0 ? (
-            <Badge
-              size="lg"
-              variant={
-                currentRound > includedRounds ? "warning-light" : "info-light"
-              }
-            >
-              {formatMessage(player.round, {
-                current: currentRound,
-                included: includedRounds,
-              })}
-            </Badge>
-          ) : null}
-          {deliverable.review.currentRound?.status === "submitted" ? (
-            <Badge size="lg" variant="info-light">
-              {formatMessage(player.roundSubmitted, { current: currentRound })}
-            </Badge>
-          ) : null}
+          <ReviewStatusBadges
+            approved={approved}
+            currentRound={deliverable.review.currentRound}
+            includedRounds={includedRounds}
+            messages={player}
+          />
           <Select onValueChange={handleVersionChange} value={versionId}>
             <SelectTrigger
               aria-label={player.versionLabel}
@@ -558,6 +595,7 @@ export function ReviewView({
         <FeedbackPanel
           comments={playable ? comments.data : []}
           frameRate={version.data.frameRate}
+          frozen={approved}
           isError={comments.isError}
           locale={locale}
           messages={messages}
