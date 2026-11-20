@@ -403,6 +403,9 @@ async function announceOffer(
   await notifyEditor(db, editor, "extra_round_proposed", [
     { actorName: proposer.reviewerName, roundNumber: proposal.round },
   ]);
+  if (!editor.preferences.extra_round_proposed.email) {
+    return;
+  }
   const locale = resolveLocale(editor.locale);
   try {
     await sendEmail(

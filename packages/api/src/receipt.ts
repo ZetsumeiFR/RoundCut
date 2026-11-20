@@ -13,6 +13,7 @@ import { PDFDocument, rgb } from "pdf-lib";
 import z from "zod";
 
 import type { Notifications } from "./context";
+import { notificationPreferences } from "./notifications";
 import {
   type BadgeColors,
   Column,
@@ -74,6 +75,7 @@ const receiptColumns = {
   id: consentRecord.id,
   name: consentRecord.name,
   ownerEmail: user.email,
+  ownerUserId: user.id,
   paidAt: extraRoundOffer.paidAt,
   projectId: consentRecord.projectId,
   requirePayment: extraRoundOffer.requirePayment,
@@ -399,10 +401,22 @@ export async function emailReceipt(
   try {
     const receipt = await findReceipt(db, eq(consentRecord.id, consentId));
     const { agreement } = receipt;
+    // The editor's copy follows their choice for the matching notification
+    // (NOTIF-03); the decider always gets theirs.
+    const preferences = await notificationPreferences(db, receipt.ownerUserId);
+    const ownerWantsIt =
+      preferences[
+        event === "agreed" ? "extra_round_accepted" : "payment_received"
+      ].email;
     const recipients: [string, Locale][] = [
       [receipt.email, agreement.shown.locale],
-      [receipt.ownerEmail, resolveLocale(receipt.workspaceLocale)],
     ];
+    if (ownerWantsIt) {
+      recipients.push([
+        receipt.ownerEmail,
+        resolveLocale(receipt.workspaceLocale),
+      ]);
+    }
     const results = await Promise.allSettled(
       recipients.map(async ([to, locale]) => {
         const pdf = await renderReceiptPdf(receipt, locale);

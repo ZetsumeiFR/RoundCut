@@ -13,6 +13,24 @@ export const NOTIFICATION_TYPES = [
 
 export type NotificationType = (typeof NOTIFICATION_TYPES)[number];
 
+// Where an event reaches the editor (NOTIF-03): the in-app center
+// (NOTIF-02) and email (NOTIF-01, comments grouped every 15 minutes).
+export const NOTIFICATION_CHANNELS = ["email", "in_app"] as const;
+
+export type NotificationChannel = (typeof NOTIFICATION_CHANNELS)[number];
+
+export type NotificationPreferences = Record<
+  NotificationType,
+  Record<NotificationChannel, boolean>
+>;
+
+// Every type on every channel until the editor turns one off; only their
+// choices are stored.
+export const defaultNotificationPreferences = (): NotificationPreferences =>
+  Object.fromEntries(
+    NOTIFICATION_TYPES.map((type) => [type, { email: true, in_app: true }])
+  ) as NotificationPreferences;
+
 // What the event is about, copied when it happens so the row reads alone.
 export interface NotificationPayload {
   // Who acted: the reviewer, or the decider for agreements and approvals.

@@ -2,6 +2,7 @@
 
 import { cn } from "@roundcut/ui/lib/utils";
 import {
+  BellIcon,
   Building2Icon,
   MonitorSmartphoneIcon,
   RepeatIcon,
@@ -17,6 +18,7 @@ const SECTIONS = [
   { href: "/account/workspace", icon: Building2Icon, key: "workspace" },
   { href: "/account/terms", icon: RepeatIcon, key: "terms" },
   { href: "/account/team", icon: UsersIcon, key: "team" },
+  { href: "/account/notifications", icon: BellIcon, key: "notifications" },
   { href: "/account/security", icon: ShieldCheckIcon, key: "security" },
   { href: "/account/sessions", icon: MonitorSmartphoneIcon, key: "sessions" },
 ] as const;

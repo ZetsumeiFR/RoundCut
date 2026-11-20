@@ -173,6 +173,9 @@ async function notifyBatchSubmitted(
   await notifyEditor(db, row, "batch_submitted", [
     { actorName: batch.reviewerName, roundNumber: batch.roundNumber },
   ]);
+  if (!row.preferences.batch_submitted.email) {
+    return;
+  }
   try {
     await sendEmail(
       notifications.email,
@@ -210,6 +213,9 @@ async function notifyVersionApproved(
   await notifyEditor(db, row, "version_approved", [
     { actorName: approval.approverName },
   ]);
+  if (!row.preferences.version_approved.email) {
+    return;
+  }
   try {
     await sendEmail(
       notifications.email,
