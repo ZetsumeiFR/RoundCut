@@ -245,6 +245,7 @@ function LinkedReview({
             </Badge>
           </div>
           <SubmitBatch
+            isDecider={project.reviewer.isDecider}
             locale={locale}
             messages={messages.submit}
             offerMessages={messages.extraRound}

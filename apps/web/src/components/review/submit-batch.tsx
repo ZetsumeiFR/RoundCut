@@ -38,6 +38,7 @@ import { toast } from "sonner";
 
 import { formatMessage, type Messages } from "@/i18n/messages";
 import { client as api, orpc } from "@/utils/orpc";
+import { ApproveVersionAction } from "./approve-version";
 import { ExtraRoundOffer } from "./extra-round-offer";
 import { ReceiptDownloadButton } from "./receipt-download-button";
 
@@ -325,8 +326,11 @@ function SubmittedNotice({
 // button (REV-05). Once submitted, the batch is closed: new comments wait for
 // the next round (REV-06) and the submitted notice counts them. Beyond the
 // included rounds, the extra round offer (EXTRA-01) replaces the button as
-// soon as the client starts a new batch.
+// soon as the client starts a new batch. The decider can approve the version
+// whenever no extra round offer is on screen (APPR-01); a declined offer
+// carries its own approval (EXTRA-06).
 export function SubmitBatch({
+  isDecider,
   locale,
   messages,
   offerMessages,
@@ -334,6 +338,7 @@ export function SubmitBatch({
   versionId,
   workspaceName,
 }: {
+  isDecider: boolean;
   locale: Locale;
   messages: SubmitMessages;
   offerMessages: Messages["review"]["extraRound"];
@@ -444,15 +449,24 @@ export function SubmitBatch({
   if (approval || round === null) {
     return banner;
   }
+  const approve = isDecider ? (
+    <ApproveVersionAction
+      locale={locale}
+      messages={offerMessages.answer}
+      token={token}
+      versionId={versionId}
+      workspaceName={workspaceName}
+    />
+  ) : null;
   const extraRoundNeeded = needsExtraRound(round, includedRounds);
+  // Comments waiting beyond the included rounds bring the extra round offer.
+  const offerOrApprove = extraRoundNeeded && pendingCount > 0 ? offer : approve;
   if (round.status === "closed") {
-    return extraRoundNeeded && pendingCount > 0 ? (
+    return (
       <div className="flex flex-col gap-2">
         {banner}
-        {offer}
+        {offerOrApprove}
       </div>
-    ) : (
-      banner
     );
   }
 
@@ -468,7 +482,7 @@ export function SubmitBatch({
           submittedAt={round.submittedAt}
           workspaceName={workspaceName}
         />
-        {extraRoundNeeded && pendingCount > 0 ? offer : null}
+        {offerOrApprove}
       </div>
     );
   }
@@ -483,9 +497,12 @@ export function SubmitBatch({
         {count > 0 ? (
           offer
         ) : (
-          <p className="border p-2 text-muted-foreground text-xs">
-            {offerMessages.hint}
-          </p>
+          <>
+            <p className="border p-2 text-muted-foreground text-xs">
+              {offerMessages.hint}
+            </p>
+            {approve}
+          </>
         )}
       </div>
     );
@@ -518,6 +535,7 @@ export function SubmitBatch({
         roundNumber={round.position}
         workspaceName={workspaceName}
       />
+      {approve}
     </div>
   );
 }

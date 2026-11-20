@@ -1304,6 +1304,11 @@ const en = {
       answer: {
         accept: "Accept this round",
         accepted: "Extra round {round} accepted on {date} by {name}.",
+        approval: {
+          action: "Approve this version",
+          hint: "You're the decider: approve this version once it suits you.",
+          title: "Version approval",
+        },
         codeExpired:
           "This code expired or was tried too many times. Ask for a new one.",
         codeLabel: "Code received by email",
@@ -2827,6 +2832,11 @@ const fr: Messages = {
       answer: {
         accept: "Accepter ce tour",
         accepted: "Tour supplémentaire {round} accepté le {date} par {name}.",
+        approval: {
+          action: "Valider cette version",
+          hint: "Vous êtes le décideur : validez cette version quand elle vous convient.",
+          title: "Validation de la version",
+        },
         codeExpired:
           "Ce code a expiré ou a été essayé trop de fois. Demandez-en un nouveau.",
         codeLabel: "Code reçu par e-mail",
