@@ -1,4 +1,4 @@
-import { PLAN_MAX_FILE_BYTES } from "@roundcut/db/plan";
+import { PLAN_LIMITS } from "@roundcut/db/plan";
 import z from "zod";
 
 import { FRAME_RATES } from "./timecode";
@@ -9,7 +9,9 @@ import { FRAME_RATES } from "./timecode";
 export const MULTIPART_THRESHOLD_BYTES = 100 * 1024 * 1024;
 export const PART_SIZE_BYTES = 16 * 1024 * 1024;
 // The largest plan limit; the workspace's own plan narrows it.
-export const MAX_UPLOAD_BYTES = Math.max(...Object.values(PLAN_MAX_FILE_BYTES));
+export const MAX_UPLOAD_BYTES = Math.max(
+  ...Object.values(PLAN_LIMITS).map((limits) => limits.maxFileBytes)
+);
 export const MAX_SIGNED_PARTS = 20;
 export const UPLOAD_FILE_NAME_MAX_LENGTH = 255;
 

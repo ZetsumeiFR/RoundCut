@@ -13,6 +13,7 @@ import { receiptRouter } from "./receipt";
 import { reviewRouter } from "./review";
 import { reviewLinkRouter } from "./review-link";
 import { roundRouter } from "./round";
+import { subscriptionRouter } from "./subscription";
 import { teamRouter } from "./team";
 import { uploadRouter } from "./upload";
 import { versionRouter } from "./version";
@@ -36,6 +37,7 @@ export const appRouter = {
   review: reviewRouter,
   reviewLink: reviewLinkRouter,
   round: roundRouter,
+  subscription: subscriptionRouter,
   team: teamRouter,
   upload: uploadRouter,
   version: versionRouter,

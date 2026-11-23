@@ -7,7 +7,7 @@ import {
   timestamp,
 } from "drizzle-orm/pg-core";
 
-import { DEFAULT_PLAN, type Plan } from "../plan";
+import { type BillingInterval, DEFAULT_PLAN, type Plan } from "../plan";
 import { DEFAULT_REVISION_TERMS, type RevisionTerms } from "../revision-terms";
 import { user } from "./auth";
 
@@ -38,8 +38,14 @@ export const workspace = pgTable("workspace", {
     .notNull()
     .unique()
     .references(() => user.id, { onDelete: "cascade" }),
-  // Subscription plan (SUB-01); sets the upload limits (VER-02).
+  // Subscription plan (SUB-01); sets the upload limits (VER-02). Kept in
+  // sync with the RoundCut Stripe subscription by its webhook: its status,
+  // interval, next renewal and whether it carries the Founder coupon.
   plan: text("plan").$type<Plan>().default(DEFAULT_PLAN).notNull(),
+  planFounder: boolean("plan_founder").default(false).notNull(),
+  planInterval: text("plan_interval").$type<BillingInterval>(),
+  planRenewsAt: timestamp("plan_renews_at"),
+  planStatus: text("plan_status"),
   // Reminder emailed to a reviewer whose feedback still waits to be
   // submitted, this many hours after their last comment (ROUND-04).
   reviewerReminderEnabled: boolean("reviewer_reminder_enabled")
@@ -56,9 +62,13 @@ export const workspace = pgTable("workspace", {
   // where clients pay extra rounds, and whether it can take card payments
   // yet (last known status of its card_payments capability).
   stripeAccountId: text("stripe_account_id"),
+  // The workspace as a customer of RoundCut's own Stripe account (SUB-01),
+  // and its current subscription.
+  stripeCustomerId: text("stripe_customer_id").unique(),
   stripePaymentsActive: boolean("stripe_payments_active")
     .default(false)
     .notNull(),
+  stripeSubscriptionId: text("stripe_subscription_id").unique(),
   timezone: text("timezone").default("Europe/Paris").notNull(),
   updatedAt: timestamp("updated_at")
     .defaultNow()

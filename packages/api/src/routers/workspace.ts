@@ -1,6 +1,6 @@
 import { ORPCError } from "@orpc/server";
 import type { Database } from "@roundcut/db";
-import { hasWhiteLabel, PLAN_MAX_FILE_BYTES } from "@roundcut/db/plan";
+import { hasWhiteLabel, PLAN_LIMITS } from "@roundcut/db/plan";
 import { organization } from "@roundcut/db/schema/auth";
 import { workspace } from "@roundcut/db/schema/workspace";
 import { eq } from "drizzle-orm";
@@ -65,7 +65,7 @@ const toWorkspace = async (row: WorkspaceRow, storage: Storage) => ({
   defaultVatRate: row.defaultVatRateBps / BASIS_POINTS_PER_PERCENT,
   id: row.id,
   locale: row.locale,
-  maxUploadBytes: PLAN_MAX_FILE_BYTES[row.plan],
+  maxUploadBytes: PLAN_LIMITS[row.plan].maxFileBytes,
   name: row.name,
   onboardingCompletedAt: row.onboardingCompletedAt,
   plan: row.plan,

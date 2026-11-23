@@ -4,6 +4,7 @@ import { cn } from "@roundcut/ui/lib/utils";
 import {
   BellIcon,
   Building2Icon,
+  CreditCardIcon,
   MonitorSmartphoneIcon,
   RepeatIcon,
   ShieldCheckIcon,
@@ -16,6 +17,11 @@ import type { Messages } from "@/i18n/messages";
 
 const SECTIONS = [
   { href: "/account/workspace", icon: Building2Icon, key: "workspace" },
+  {
+    href: "/account/subscription",
+    icon: CreditCardIcon,
+    key: "subscription",
+  },
   { href: "/account/terms", icon: RepeatIcon, key: "terms" },
   { href: "/account/team", icon: UsersIcon, key: "team" },
   { href: "/account/notifications", icon: BellIcon, key: "notifications" },
