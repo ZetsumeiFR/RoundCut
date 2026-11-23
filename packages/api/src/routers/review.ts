@@ -512,7 +512,9 @@ export const reviewRouter = {
         clientName: client.name,
         name: project.name,
         plan: workspace.plan,
+        planStatus: workspace.planStatus,
         status: project.status,
+        trialEndsAt: workspace.trialEndsAt,
         workspaceName: workspace.name,
       })
       .from(project)

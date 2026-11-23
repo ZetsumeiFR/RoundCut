@@ -1,4 +1,8 @@
-import { hasRoundPayments, type Plan } from "@roundcut/db/plan";
+import {
+  hasRoundPayments,
+  type PlanState,
+  workspacePlan,
+} from "@roundcut/db/plan";
 import Stripe from "stripe";
 
 // Stripe Connect (EXTRA-04): RoundCut is the platform, each editor connects
@@ -31,13 +35,12 @@ export async function fetchPaymentsActive(
 // editor invoices the round themselves.
 export const canTakeRoundPayments = (
   stripe: StripeClient | null,
-  workspace: {
-    plan: Plan;
+  workspace: PlanState & {
     stripeAccountId: string | null;
     stripePaymentsActive: boolean;
   }
 ) =>
   stripe !== null &&
-  hasRoundPayments(workspace.plan) &&
+  hasRoundPayments(workspacePlan(workspace)) &&
   workspace.stripeAccountId !== null &&
   workspace.stripePaymentsActive;

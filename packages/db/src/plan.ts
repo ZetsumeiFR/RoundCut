@@ -88,3 +88,23 @@ export const LIVE_SUBSCRIPTION_STATUSES = [
 
 export const isLiveSubscription = (status: string | null) =>
   LIVE_SUBSCRIPTION_STATUSES.some((live) => live === status);
+
+// Free trial (SUB-02): every new workspace gets the Pro plan for 14 days,
+// without a card. Once it ends without a subscription, the workspace is back
+// on its stored plan (Solo).
+export const TRIAL_DAYS = 14;
+
+export const TRIAL_PLAN: Plan = "pro";
+
+export interface PlanState {
+  plan: Plan;
+  planStatus: string | null;
+  trialEndsAt: Date;
+}
+
+export const isTrialing = (state: PlanState, now = new Date()) =>
+  !isLiveSubscription(state.planStatus) && state.trialEndsAt > now;
+
+// The plan whose limits and features apply right now.
+export const workspacePlan = (state: PlanState, now = new Date()): Plan =>
+  isTrialing(state, now) ? TRIAL_PLAN : state.plan;

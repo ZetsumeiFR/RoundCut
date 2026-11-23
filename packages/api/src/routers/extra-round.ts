@@ -212,9 +212,11 @@ async function currentOffer(
       currency: workspace.currency,
       deciderName: client.deciderName,
       plan: workspace.plan,
+      planStatus: workspace.planStatus,
       stripeAccountId: workspace.stripeAccountId,
       stripePaymentsActive: workspace.stripePaymentsActive,
       termsSnapshot: project.termsSnapshot,
+      trialEndsAt: workspace.trialEndsAt,
       vatRateBps: workspace.defaultVatRateBps,
     })
     .from(project)
@@ -498,9 +500,11 @@ async function offerOwner(db: Database, deliverableId: string) {
       deliverableTitle: deliverable.title,
       locale: workspace.locale,
       plan: workspace.plan,
+      planStatus: workspace.planStatus,
       projectName: project.name,
       stripeAccountId: workspace.stripeAccountId,
       stripePaymentsActive: workspace.stripePaymentsActive,
+      trialEndsAt: workspace.trialEndsAt,
       workspaceId: workspace.id,
     })
     .from(deliverable)

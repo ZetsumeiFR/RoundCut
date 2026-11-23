@@ -1,5 +1,5 @@
 import { ORPCError } from "@orpc/server";
-import { hasRoundPayments } from "@roundcut/db/plan";
+import { hasRoundPayments, workspacePlan } from "@roundcut/db/plan";
 import { workspace } from "@roundcut/db/schema/workspace";
 import { and, eq, isNull } from "drizzle-orm";
 
@@ -26,7 +26,7 @@ const requireStripe = (stripe: StripeClient | null) => {
 
 // Online payment of extra rounds is a Pro and Studio feature (EXTRA-04).
 const requireRoundPayments = (row: WorkspaceRow) => {
-  if (!hasRoundPayments(row.plan)) {
+  if (!hasRoundPayments(workspacePlan(row))) {
     throw new ORPCError("FORBIDDEN", {
       message: "Online payments require the Pro or Studio plan",
     });
@@ -118,7 +118,7 @@ export const paymentsRouter = {
   // has Stripe, the plan includes it, and the connected account's status.
   status: protectedProcedure.handler(async ({ context }) => {
     const row = await getOrCreateWorkspace(context.db, context.session.user);
-    const locked = !hasRoundPayments(row.plan);
+    const locked = !hasRoundPayments(workspacePlan(row));
     const { stripe } = context;
     if (!stripe || locked || row.stripeAccountId === null) {
       return {

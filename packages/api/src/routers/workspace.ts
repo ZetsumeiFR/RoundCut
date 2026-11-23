@@ -1,6 +1,11 @@
 import { ORPCError } from "@orpc/server";
 import type { Database } from "@roundcut/db";
-import { hasWhiteLabel, PLAN_LIMITS } from "@roundcut/db/plan";
+import {
+  hasWhiteLabel,
+  PLAN_LIMITS,
+  type PlanState,
+  workspacePlan,
+} from "@roundcut/db/plan";
 import { organization } from "@roundcut/db/schema/auth";
 import { workspace } from "@roundcut/db/schema/workspace";
 import { eq } from "drizzle-orm";
@@ -40,9 +45,9 @@ type WorkspaceRow = typeof workspace.$inferSelect;
 // it, even when a logo or color was saved on a higher plan.
 export async function brandOf(
   storage: Storage,
-  row: Pick<WorkspaceRow, "brandAccentColor" | "brandLogoKey" | "plan">
+  row: Pick<WorkspaceRow, "brandAccentColor" | "brandLogoKey"> & PlanState
 ) {
-  if (!hasWhiteLabel(row.plan)) {
+  if (!hasWhiteLabel(workspacePlan(row))) {
     return null;
   }
   return {
@@ -51,32 +56,37 @@ export async function brandOf(
   };
 }
 
-const toWorkspace = async (row: WorkspaceRow, storage: Storage) => ({
-  branding: {
-    accentColor: row.brandAccentColor,
-    logoKey: row.brandLogoKey,
-    logoUrl: row.brandLogoKey ? await storage.signGet(row.brandLogoKey) : null,
-  },
-  currency: row.currency,
-  deciderReminders: {
-    delayDays: row.deciderReminderDays,
-    enabled: row.deciderReminderEnabled,
-  },
-  defaultVatRate: row.defaultVatRateBps / BASIS_POINTS_PER_PERCENT,
-  id: row.id,
-  locale: row.locale,
-  maxUploadBytes: PLAN_LIMITS[row.plan].maxFileBytes,
-  name: row.name,
-  onboardingCompletedAt: row.onboardingCompletedAt,
-  plan: row.plan,
-  reviewerReminders: {
-    delayHours: row.reviewerReminderHours,
-    enabled: row.reviewerReminderEnabled,
-  },
-  revisionTerms: row.revisionTerms,
-  timezone: row.timezone,
-  whiteLabel: hasWhiteLabel(row.plan),
-});
+const toWorkspace = async (row: WorkspaceRow, storage: Storage) => {
+  const plan = workspacePlan(row);
+  return {
+    branding: {
+      accentColor: row.brandAccentColor,
+      logoKey: row.brandLogoKey,
+      logoUrl: row.brandLogoKey
+        ? await storage.signGet(row.brandLogoKey)
+        : null,
+    },
+    currency: row.currency,
+    deciderReminders: {
+      delayDays: row.deciderReminderDays,
+      enabled: row.deciderReminderEnabled,
+    },
+    defaultVatRate: row.defaultVatRateBps / BASIS_POINTS_PER_PERCENT,
+    id: row.id,
+    locale: row.locale,
+    maxUploadBytes: PLAN_LIMITS[plan].maxFileBytes,
+    name: row.name,
+    onboardingCompletedAt: row.onboardingCompletedAt,
+    plan,
+    reviewerReminders: {
+      delayHours: row.reviewerReminderHours,
+      enabled: row.reviewerReminderEnabled,
+    },
+    revisionTerms: row.revisionTerms,
+    timezone: row.timezone,
+    whiteLabel: hasWhiteLabel(plan),
+  };
+};
 
 const toSettingsColumns = (settings: WorkspaceSettings) => ({
   currency: settings.currency,
@@ -138,7 +148,7 @@ async function upsertWorkspace(
 
 // White label is a Pro and Studio feature (REV-10).
 const requireWhiteLabel = (row: WorkspaceRow) => {
-  if (!hasWhiteLabel(row.plan)) {
+  if (!hasWhiteLabel(workspacePlan(row))) {
     throw new ORPCError("FORBIDDEN", {
       message: "White label requires the Pro or Studio plan",
     });
