@@ -2,6 +2,7 @@ import type { Database } from "@roundcut/db";
 import {
   BILLING_INTERVALS,
   type BillingInterval,
+  CANCELLATION_REASONS,
   DEFAULT_PLAN,
   FOUNDER_OFFER,
   isLiveSubscription,
@@ -139,7 +140,8 @@ export const isFounderChoice = (plan: Plan, interval: BillingInterval) =>
 // incomplete...) puts the workspace back on Solo. A subscription that isn't
 // the workspace's current one only takes over while it is live, so a late
 // event of an old canceled subscription can't downgrade a newer one.
-async function syncSubscription(
+// planCancelAt is the end of a scheduled cancellation (SUB-03).
+export async function syncSubscription(
   db: Database,
   subscription: Stripe.Subscription
 ) {
@@ -153,6 +155,9 @@ async function syncSubscription(
   const values = live
     ? {
         plan: choice.plan,
+        planCancelAt: subscription.cancel_at
+          ? new Date(subscription.cancel_at * 1000)
+          : null,
         planFounder: subscription.metadata.founder === "true",
         planInterval: choice.interval,
         planRenewsAt: new Date(item.current_period_end * 1000),
@@ -161,6 +166,7 @@ async function syncSubscription(
       }
     : {
         plan: DEFAULT_PLAN,
+        planCancelAt: null,
         planFounder: false,
         planInterval: null,
         planRenewsAt: null,
@@ -206,6 +212,69 @@ export async function syncLatestSubscription(
   if (latest) {
     await syncSubscription(db, latest);
   }
+}
+
+// The Customer Portal (SUB-03) where the owner updates the card, reads the
+// invoices and cancels at the end of the period, created on first use and
+// found again by its metadata, like the plans' products.
+const PORTAL_CONFIGURATION_KEY = "roundcut_subscription";
+
+async function portalConfigurationId(stripe: StripeClient) {
+  const { data } = await stripe.billingPortal.configurations.list({
+    active: true,
+    limit: 100,
+  });
+  const existing = data.find(
+    (candidate) => candidate.metadata?.roundcut === PORTAL_CONFIGURATION_KEY
+  );
+  if (existing) {
+    return existing.id;
+  }
+  const created = await stripe.billingPortal.configurations.create(
+    {
+      features: {
+        customer_update: {
+          allowed_updates: ["address", "email", "name", "tax_id"],
+          enabled: true,
+        },
+        invoice_history: { enabled: true },
+        payment_method_update: { enabled: true },
+        subscription_cancel: {
+          cancellation_reason: {
+            enabled: true,
+            options: [...CANCELLATION_REASONS],
+          },
+          enabled: true,
+          mode: "at_period_end",
+        },
+      },
+      metadata: { roundcut: PORTAL_CONFIGURATION_KEY },
+      name: "RoundCut subscriptions",
+    },
+    { idempotencyKey: `roundcut-portal-${PORTAL_CONFIGURATION_KEY}` }
+  );
+  return created.id;
+}
+
+export const PORTAL_FLOWS = ["payment_method_update"] as const;
+
+export async function portalSessionUrl(
+  stripe: StripeClient,
+  input: {
+    customer: string;
+    flow: (typeof PORTAL_FLOWS)[number] | null;
+    locale: string;
+    returnUrl: string;
+  }
+) {
+  const session = await stripe.billingPortal.sessions.create({
+    configuration: await portalConfigurationId(stripe),
+    customer: input.customer,
+    flow_data: input.flow ? { type: input.flow } : undefined,
+    locale: input.locale === "fr" ? "fr" : "en",
+    return_url: input.returnUrl,
+  });
+  return session.url;
 }
 
 // Events of RoundCut's own Stripe account (not of a connected account).

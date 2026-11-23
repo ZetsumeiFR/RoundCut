@@ -89,6 +89,23 @@ export const LIVE_SUBSCRIPTION_STATUSES = [
 export const isLiveSubscription = (status: string | null) =>
   LIVE_SUBSCRIPTION_STATUSES.some((live) => live === status);
 
+// Why the owner cancels (SUB-03): Stripe's cancellation feedback values,
+// stored on the subscription with an optional comment.
+export const CANCELLATION_REASONS = [
+  "too_expensive",
+  "missing_features",
+  "unused",
+  "switched_service",
+  "too_complex",
+  "low_quality",
+  "customer_service",
+  "other",
+] as const;
+
+export type CancellationReason = (typeof CANCELLATION_REASONS)[number];
+
+export const CANCELLATION_COMMENT_MAX_LENGTH = 500;
+
 // Free trial (SUB-02): every new workspace gets the Pro plan for 14 days,
 // without a card. Once it ends without a subscription, the workspace is back
 // on its stored plan (Solo).

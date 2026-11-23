@@ -128,6 +128,41 @@ const en = {
       unknownIp: "Unknown IP",
     },
     subscription: {
+      billing: {
+        cancel: "Cancel subscription",
+        manage: "Manage billing",
+        opening: "Opening Stripe…",
+        portalError: "Couldn't open the Stripe customer portal. Try again.",
+        resume: "Resume subscription",
+        resumed: "Your subscription renews again.",
+        resumeError: "Couldn't resume your subscription. Try again.",
+        resuming: "Resuming…",
+      },
+      cancel: {
+        comment: "Anything to add? (optional)",
+        commentDescription: "Read by the RoundCut team only.",
+        conflict: "This workspace has no subscription to cancel anymore.",
+        description:
+          "Your {plan} plan stays active until {date}, then your workspace goes back to the Solo limits. You can resume until then.",
+        error: "Couldn't cancel your subscription. Try again.",
+        keep: "Keep my subscription",
+        reason: "Why are you leaving?",
+        reasons: {
+          customer_service: "Customer service fell short",
+          low_quality: "The quality isn't there",
+          missing_features: "Some features are missing",
+          other: "Another reason",
+          switched_service: "I'm moving to another tool",
+          too_complex: "It's too complex",
+          too_expensive: "It's too expensive",
+          unused: "I don't use it enough",
+        },
+        saved: "Your subscription ends on {date}.",
+        submit: "Cancel subscription",
+        submitting: "Canceling…",
+        title: "Cancel your subscription",
+        tooLong: "{max} characters at most.",
+      },
       checkout: {
         cancelDescription:
           "No payment was taken. You can pick a plan again whenever you like.",
@@ -137,6 +172,34 @@ const en = {
         successTitle: "Subscription confirmed",
       },
       description: "Your RoundCut plan, its limits and its billing.",
+      ended: {
+        description:
+          "Your workspace is back on the Solo limits. Choose a plan to subscribe again.",
+        title: "Your subscription has ended",
+      },
+      invoices: {
+        amount: "Amount",
+        date: "Date",
+        description:
+          "Your last RoundCut invoices. Older ones are in the Stripe portal.",
+        download: "PDF",
+        downloadLabel: "Download invoice {number} as PDF",
+        empty: "No invoice yet",
+        emptyDescription: "Your invoices show up here once you subscribe.",
+        loadError: "Couldn't load your invoices.",
+        number: "Invoice",
+        status: "Status",
+        statuses: {
+          draft: "Draft",
+          open: "Due",
+          paid: "Paid",
+          uncollectible: "Uncollectible",
+          void: "Void",
+        },
+        title: "Invoices",
+        view: "View",
+        viewLabel: "View invoice {number}",
+      },
       limits: {
         activeProjects: "Active projects",
         activeProjectsDescription: "Projects not approved or archived yet",
@@ -152,6 +215,12 @@ const en = {
       },
       loadErrorDescription: "Check your connection and try again.",
       loadErrorTitle: "Couldn't load your subscription",
+      pastDue: {
+        action: "Update card",
+        description:
+          "Stripe will try your card again. Update it to keep your {plan} plan.",
+        title: "Your last payment failed",
+      },
       plans: {
         pro: { audience: "For established freelancers", name: "Pro" },
         solo: { audience: "For solo editors", name: "Solo" },
@@ -212,9 +281,12 @@ const en = {
       },
       summary: {
         billing: "Billing",
+        cancelNote:
+          "Canceled: your {plan} plan stays active until {date}, then your workspace goes back to the Solo limits.",
+        endsAt: "Ends on",
         founder: "Founder offer",
         liveNote:
-          "Card, invoices, plan changes and cancellation will be managed from the Stripe customer portal.",
+          "Your card, invoices and billing details are managed in the Stripe customer portal.",
         month: "Monthly",
         noSubscription:
           "Your workspace uses the Solo limits until you subscribe.",
@@ -1970,6 +2042,41 @@ const fr: Messages = {
       unknownIp: "IP inconnue",
     },
     subscription: {
+      billing: {
+        cancel: "Résilier l'abonnement",
+        manage: "Gérer la facturation",
+        opening: "Ouverture de Stripe…",
+        portalError: "Impossible d'ouvrir le portail client Stripe. Réessayez.",
+        resume: "Reprendre l'abonnement",
+        resumed: "Votre abonnement se renouvelle de nouveau.",
+        resumeError: "Impossible de reprendre votre abonnement. Réessayez.",
+        resuming: "Reprise…",
+      },
+      cancel: {
+        comment: "Un mot à ajouter ? (facultatif)",
+        commentDescription: "Lu uniquement par l'équipe RoundCut.",
+        conflict: "Cet espace n'a plus d'abonnement à résilier.",
+        description:
+          "Votre forfait {plan} reste actif jusqu'au {date}, puis votre espace revient aux limites Solo. Vous pouvez reprendre l'abonnement d'ici là.",
+        error: "Impossible de résilier votre abonnement. Réessayez.",
+        keep: "Garder mon abonnement",
+        reason: "Pourquoi partez-vous ?",
+        reasons: {
+          customer_service: "Le support n'a pas été à la hauteur",
+          low_quality: "La qualité n'est pas au rendez-vous",
+          missing_features: "Il manque des fonctions",
+          other: "Une autre raison",
+          switched_service: "Je passe à un autre outil",
+          too_complex: "C'est trop compliqué",
+          too_expensive: "C'est trop cher",
+          unused: "Je ne m'en sers pas assez",
+        },
+        saved: "Votre abonnement prend fin le {date}.",
+        submit: "Résilier l'abonnement",
+        submitting: "Résiliation…",
+        title: "Résilier votre abonnement",
+        tooLong: "{max} caractères maximum.",
+      },
       checkout: {
         cancelDescription:
           "Aucun paiement n'a été effectué. Vous pouvez choisir un forfait quand vous voulez.",
@@ -1979,6 +2086,34 @@ const fr: Messages = {
         successTitle: "Abonnement confirmé",
       },
       description: "Votre forfait RoundCut, ses limites et sa facturation.",
+      ended: {
+        description:
+          "Votre espace est revenu aux limites Solo. Choisissez un forfait pour vous réabonner.",
+        title: "Votre abonnement est terminé",
+      },
+      invoices: {
+        amount: "Montant",
+        date: "Date",
+        description:
+          "Vos dernières factures RoundCut. Les plus anciennes sont dans le portail Stripe.",
+        download: "PDF",
+        downloadLabel: "Télécharger la facture {number} en PDF",
+        empty: "Aucune facture pour l'instant",
+        emptyDescription: "Vos factures apparaissent ici dès votre abonnement.",
+        loadError: "Impossible de charger vos factures.",
+        number: "Facture",
+        status: "Statut",
+        statuses: {
+          draft: "Brouillon",
+          open: "À payer",
+          paid: "Payée",
+          uncollectible: "Irrécouvrable",
+          void: "Annulée",
+        },
+        title: "Factures",
+        view: "Voir",
+        viewLabel: "Voir la facture {number}",
+      },
       limits: {
         activeProjects: "Projets actifs",
         activeProjectsDescription: "Projets ni validés ni archivés",
@@ -1994,6 +2129,12 @@ const fr: Messages = {
       },
       loadErrorDescription: "Vérifiez votre connexion et réessayez.",
       loadErrorTitle: "Impossible de charger votre abonnement",
+      pastDue: {
+        action: "Mettre à jour la carte",
+        description:
+          "Stripe va retenter le prélèvement. Mettez votre carte à jour pour garder le forfait {plan}.",
+        title: "Votre dernier paiement a échoué",
+      },
       plans: {
         pro: { audience: "Pour les indépendants installés", name: "Pro" },
         solo: { audience: "Pour les monteurs solo", name: "Solo" },
@@ -2054,9 +2195,12 @@ const fr: Messages = {
       },
       summary: {
         billing: "Facturation",
+        cancelNote:
+          "Résilié : votre forfait {plan} reste actif jusqu'au {date}, puis votre espace revient aux limites Solo.",
+        endsAt: "Prend fin le",
         founder: "Offre Fondateur",
         liveNote:
-          "Carte, factures, changement de forfait et résiliation se géreront depuis le portail client Stripe.",
+          "Votre carte, vos factures et vos informations de facturation se gèrent dans le portail client Stripe.",
         month: "Mensuelle",
         noSubscription:
           "Votre espace de travail applique les limites Solo jusqu'à votre abonnement.",
