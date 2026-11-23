@@ -9,8 +9,10 @@ import {
   CardHeader,
   CardTitle,
 } from "@roundcut/ui/components/card";
+import { Progress, ProgressLabel } from "@roundcut/ui/components/progress";
 import {
   Alert,
+  AlertAction,
   AlertDescription,
   AlertTitle,
 } from "@roundcut/ui/components/reui/alert";
@@ -21,6 +23,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   CircleCheckIcon,
   CircleXIcon,
+  ClockAlertIcon,
   CreditCardIcon,
   FileVideoIcon,
   FolderKanbanIcon,
@@ -35,7 +38,7 @@ import {
 } from "react";
 
 import { formatBytes } from "@/components/projects/version-upload-sheet";
-import type { Messages } from "@/i18n/messages";
+import { formatMessage, type Messages } from "@/i18n/messages";
 import { client as api, orpc } from "@/utils/orpc";
 import {
   formatEuros,
@@ -46,6 +49,30 @@ import { SettingsLoadError } from "./settings-form";
 
 type SubscriptionMessages = Messages["account"]["subscription"];
 export type CheckoutOutcome = "cancel" | "success" | null;
+
+const DAY_MS = 86_400_000;
+
+const formatDate = (value: Date | string, locale: Locale) =>
+  new Intl.DateTimeFormat(locale, { dateStyle: "long" }).format(
+    new Date(value)
+  );
+
+// "December 7, 2026 (14 days left)": the trial's last day and what remains.
+const trialEndLabel = (
+  endsAt: Date | string,
+  locale: Locale,
+  messages: SubscriptionMessages["trial"]
+) => {
+  const count = Math.max(
+    1,
+    Math.ceil((new Date(endsAt).getTime() - Date.now()) / DAY_MS)
+  );
+  const left = formatMessage(
+    count === 1 ? messages.daysLeftOne : messages.daysLeftOther,
+    { count }
+  );
+  return `${formatDate(endsAt, locale)} (${left})`;
+};
 
 const statusBadge = (
   status: string | null
@@ -81,10 +108,32 @@ function PlanSummaryCard({
   onChoosePlan: () => void;
   status: SubscriptionStatus;
 }) {
-  const { available, catalog, founder, subscription } = status;
-  const badge = statusBadge(subscription.status);
-  const entry = catalog.find((item) => item.plan === subscription.plan);
+  const { available, catalog, effectivePlan, founder, subscription, trial } =
+    status;
+  const badge = statusBadge(trial.active ? "trialing" : subscription.status);
+  const entry = catalog.find((item) => item.plan === effectivePlan);
   const { interval, live } = subscription;
+  let note = messages.summary.noSubscription;
+  if (live) {
+    note = messages.summary.liveNote;
+  } else if (trial.active) {
+    note = formatMessage(messages.trial.note, {
+      plan: messages.plans[trial.plan].name,
+    });
+  }
+  let renewal = {
+    label: messages.summary.renewsAt,
+    value:
+      live && subscription.renewsAt
+        ? formatDate(subscription.renewsAt, locale)
+        : "—",
+  };
+  if (trial.active) {
+    renewal = {
+      label: messages.trial.endsAt,
+      value: trialEndLabel(trial.endsAt, locale, messages.trial),
+    };
+  }
   let price: ReactNode = null;
   if (live && entry && interval) {
     const cents = subscription.founder
@@ -107,16 +156,7 @@ function PlanSummaryCard({
       label: messages.summary.billing,
       value: interval ? messages.summary[interval] : "—",
     },
-    {
-      id: "renewal",
-      label: messages.summary.renewsAt,
-      value:
-        live && subscription.renewsAt
-          ? new Intl.DateTimeFormat(locale, { dateStyle: "long" }).format(
-              new Date(subscription.renewsAt)
-            )
-          : "—",
-    },
+    { id: "renewal", ...renewal },
     {
       id: "seats",
       label: messages.summary.seats,
@@ -146,7 +186,7 @@ function PlanSummaryCard({
             </IconTile>
             <div className="flex min-w-0 flex-col gap-2">
               <div className="flex flex-wrap items-center gap-2">
-                <CardTitle>{messages.plans[subscription.plan].name}</CardTitle>
+                <CardTitle>{messages.plans[effectivePlan].name}</CardTitle>
                 <Badge size="sm" variant={badge.variant}>
                   {messages.statuses[badge.key]}
                 </Badge>
@@ -158,9 +198,7 @@ function PlanSummaryCard({
               </div>
               {price}
               <p className="max-w-xl text-muted-foreground text-sm leading-6">
-                {live
-                  ? messages.summary.liveNote
-                  : messages.summary.noSubscription}
+                {note}
               </p>
             </div>
           </div>
@@ -185,7 +223,38 @@ function PlanSummaryCard({
   );
 }
 
-function LimitsCard({
+// Shown once the free trial is over and no subscription took over (SUB-02).
+function TrialEndedAlert({
+  messages,
+  onChoosePlan,
+  status,
+}: {
+  messages: SubscriptionMessages;
+  onChoosePlan: () => void;
+  status: SubscriptionStatus;
+}) {
+  if (status.subscription.live || status.trial.active) {
+    return null;
+  }
+  return (
+    <Alert variant="warning">
+      <ClockAlertIcon aria-hidden="true" />
+      <AlertTitle>{messages.trial.endedTitle}</AlertTitle>
+      <AlertDescription>{messages.trial.endedDescription}</AlertDescription>
+      {status.available ? (
+        <AlertAction>
+          <Button onClick={onChoosePlan} size="sm" type="button">
+            {messages.pricing.open}
+          </Button>
+        </AlertAction>
+      ) : null}
+    </Alert>
+  );
+}
+
+// The usage gauges (SUB-02): active projects and storage against the limits
+// of the plan in effect, next to the size limit per file.
+function UsageCard({
   locale,
   messages,
   status,
@@ -195,33 +264,49 @@ function LimitsCard({
   status: SubscriptionStatus;
 }) {
   const limits = status.catalog.find(
-    (entry) => entry.plan === status.subscription.plan
+    (entry) => entry.plan === status.effectivePlan
   )?.limits;
   if (!limits) {
     return null;
   }
+  const { usage } = status;
+  const percent = new Intl.NumberFormat(locale, {
+    maximumFractionDigits: 1,
+    style: "percent",
+  });
   const metrics = [
     {
+      caption:
+        limits.activeProjects === null
+          ? messages.unlimited
+          : formatMessage(messages.of, { limit: limits.activeProjects }),
       description: messages.activeProjectsDescription,
       icon: FolderKanbanIcon,
       id: "projects",
-      title: messages.activeProjects,
-      value:
+      ratio:
         limits.activeProjects === null
-          ? messages.unlimited
-          : String(limits.activeProjects),
+          ? null
+          : usage.activeProjects / limits.activeProjects,
+      title: messages.activeProjects,
+      value: String(usage.activeProjects),
     },
     {
+      caption: formatMessage(messages.of, {
+        limit: formatBytes(limits.storageBytes, locale),
+      }),
       description: messages.storageDescription,
       icon: HardDriveIcon,
       id: "storage",
+      ratio: usage.storageBytes / limits.storageBytes,
       title: messages.storage,
-      value: formatBytes(limits.storageBytes, locale),
+      value: formatBytes(usage.storageBytes, locale),
     },
     {
+      caption: null,
       description: messages.fileSizeDescription,
       icon: FileVideoIcon,
       id: "file",
+      ratio: null,
       title: messages.fileSize,
       value: formatBytes(limits.maxFileBytes, locale),
     },
@@ -250,9 +335,28 @@ function LimitsCard({
                   </p>
                 </div>
               </div>
-              <p className="font-semibold text-lg tabular-nums tracking-tight">
-                {metric.value}
-              </p>
+              <div className="flex flex-col gap-2">
+                <p className="font-semibold text-lg tabular-nums tracking-tight">
+                  {metric.value}{" "}
+                  {metric.caption ? (
+                    <span className="font-normal text-muted-foreground text-sm">
+                      {metric.caption}
+                    </span>
+                  ) : null}
+                </p>
+                {metric.ratio === null ? null : (
+                  <Progress
+                    aria-label={metric.title}
+                    value={Math.min(metric.ratio, 1) * 100}
+                  >
+                    <ProgressLabel className="text-muted-foreground">
+                      {formatMessage(messages.usage, {
+                        percent: percent.format(metric.ratio),
+                      })}
+                    </ProgressLabel>
+                  </Progress>
+                )}
+              </div>
             </div>
           ))}
         </CardContent>
@@ -333,13 +437,18 @@ export function SubscriptionSettings({
   } else if (data) {
     body = (
       <>
+        <TrialEndedAlert
+          messages={messages}
+          onChoosePlan={handleChoosePlan}
+          status={data}
+        />
         <PlanSummaryCard
           locale={locale}
           messages={messages}
           onChoosePlan={handleChoosePlan}
           status={data}
         />
-        <LimitsCard locale={locale} messages={messages.limits} status={data} />
+        <UsageCard locale={locale} messages={messages.limits} status={data} />
         <PricingDialog
           locale={locale}
           messages={messages}

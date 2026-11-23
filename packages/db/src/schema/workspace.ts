@@ -1,3 +1,4 @@
+import { sql } from "drizzle-orm";
 import {
   boolean,
   integer,
@@ -7,7 +8,12 @@ import {
   timestamp,
 } from "drizzle-orm/pg-core";
 
-import { type BillingInterval, DEFAULT_PLAN, type Plan } from "../plan";
+import {
+  type BillingInterval,
+  DEFAULT_PLAN,
+  type Plan,
+  TRIAL_DAYS,
+} from "../plan";
 import { DEFAULT_REVISION_TERMS, type RevisionTerms } from "../revision-terms";
 import { user } from "./auth";
 
@@ -70,6 +76,10 @@ export const workspace = pgTable("workspace", {
     .notNull(),
   stripeSubscriptionId: text("stripe_subscription_id").unique(),
   timezone: text("timezone").default("Europe/Paris").notNull(),
+  // End of the free trial (SUB-02), TRIAL_DAYS after the workspace's creation.
+  trialEndsAt: timestamp("trial_ends_at")
+    .default(sql.raw(`now() + interval '${TRIAL_DAYS} days'`))
+    .notNull(),
   updatedAt: timestamp("updated_at")
     .defaultNow()
     .$onUpdate(() => /* @__PURE__ */ new Date())

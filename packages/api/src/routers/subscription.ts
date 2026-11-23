@@ -3,17 +3,24 @@ import {
   BILLING_INTERVALS,
   FOUNDER_OFFER,
   isLiveSubscription,
+  isTrialing,
   PLAN_CURRENCY,
   PLAN_LIMITS,
   PLANS,
   planPriceCents,
+  TRIAL_PLAN,
+  workspacePlan,
 } from "@roundcut/db/plan";
+import { deliverable } from "@roundcut/db/schema/deliverable";
+import { project } from "@roundcut/db/schema/project";
+import { version } from "@roundcut/db/schema/version";
 import { workspace } from "@roundcut/db/schema/workspace";
-import { and, eq, isNull } from "drizzle-orm";
+import { and, count, eq, isNull, ne, notInArray, sql } from "drizzle-orm";
 import z from "zod";
 
 import { protectedProcedure } from "../index";
 import type { StripeClient } from "../payments";
+import { FINISHED_PROJECT_STATUSES } from "../reminders";
 import {
   FOUNDER_COUPON_ID,
   founderSeatsLeft,
@@ -72,6 +79,39 @@ async function customerId(
     .from(workspace)
     .where(eq(workspace.id, row.id));
   return saved?.stripeCustomerId ?? customer.id;
+}
+
+// What the workspace uses against its plan's limits (SUB-02): projects not
+// finished yet, and the bytes of its published versions.
+async function workspaceUsage(db: WorkspaceDb, workspaceId: string) {
+  const [[projects], [storage]] = await Promise.all([
+    db
+      .select({ active: count() })
+      .from(project)
+      .where(
+        and(
+          eq(project.workspaceId, workspaceId),
+          notInArray(project.status, FINISHED_PROJECT_STATUSES)
+        )
+      ),
+    db
+      .select({
+        bytes: sql`coalesce(sum(${version.sizeBytes}), 0)`.mapWith(Number),
+      })
+      .from(version)
+      .innerJoin(deliverable, eq(version.deliverableId, deliverable.id))
+      .innerJoin(project, eq(deliverable.projectId, project.id))
+      .where(
+        and(
+          eq(project.workspaceId, workspaceId),
+          ne(version.status, "uploading")
+        )
+      ),
+  ]);
+  return {
+    activeProjects: projects?.active ?? 0,
+    storageBytes: storage?.bytes ?? 0,
+  };
 }
 
 const catalog = PLANS.map((plan) => ({
@@ -148,15 +188,18 @@ export const subscriptionRouter = {
     return { refreshed: row.stripeCustomerId !== null };
   }),
 
-  // The workspace's plan, the plan catalog and what's left of the Founder
-  // offer (null when the instance has no Stripe).
+  // The workspace's plan, its trial and usage, the plan catalog and what's
+  // left of the Founder offer (null when the instance has no Stripe).
   status: protectedProcedure.handler(async ({ context }) => {
     const row = await getOrCreateWorkspace(context.db, context.session.user);
     const { stripe } = context;
+    const now = new Date();
     return {
       available: stripe !== null,
       catalog,
       currency: PLAN_CURRENCY,
+      // The plan whose limits apply now: the trial's while it runs.
+      effectivePlan: workspacePlan(row, now),
       founder: {
         ...FOUNDER_OFFER,
         seatsLeft: stripe ? await founderSeatsLeft(stripe) : null,
@@ -169,6 +212,12 @@ export const subscriptionRouter = {
         renewsAt: row.planRenewsAt,
         status: row.planStatus,
       },
+      trial: {
+        active: isTrialing(row, now),
+        endsAt: row.trialEndsAt,
+        plan: TRIAL_PLAN,
+      },
+      usage: await workspaceUsage(context.db, row.id),
     };
   }),
 };

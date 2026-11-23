@@ -1,5 +1,5 @@
 import { ORPCError } from "@orpc/server";
-import { PLAN_LIMITS } from "@roundcut/db/plan";
+import { PLAN_LIMITS, workspacePlan } from "@roundcut/db/plan";
 import { comment } from "@roundcut/db/schema/comment";
 import { deliverable } from "@roundcut/db/schema/deliverable";
 import { round } from "@roundcut/db/schema/round";
@@ -250,7 +250,7 @@ export const uploadRouter = {
           message: "Only MP4 and MOV files are accepted",
         });
       }
-      const maxBytes = PLAN_LIMITS[workspace.plan].maxFileBytes;
+      const maxBytes = PLAN_LIMITS[workspacePlan(workspace)].maxFileBytes;
       if (input.sizeBytes > maxBytes) {
         throw new ORPCError("PAYLOAD_TOO_LARGE", {
           data: { maxBytes },
