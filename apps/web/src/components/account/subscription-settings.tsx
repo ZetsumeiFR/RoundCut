@@ -28,6 +28,7 @@ import {
   FileVideoIcon,
   FolderKanbanIcon,
   HardDriveIcon,
+  TriangleAlertIcon,
 } from "lucide-react";
 import {
   type ReactNode,
@@ -36,19 +37,24 @@ import {
   useRef,
   useState,
 } from "react";
-
+import { toast } from "sonner";
 import { formatBytes } from "@/components/projects/version-upload-sheet";
+
 import { formatMessage, type Messages } from "@/i18n/messages";
 import { client as api, orpc } from "@/utils/orpc";
+import { CancelSubscriptionDialog } from "./cancel-subscription-dialog";
 import {
   formatEuros,
   PricingDialog,
   type SubscriptionStatus,
 } from "./pricing-dialog";
 import { SettingsLoadError } from "./settings-form";
+import { SubscriptionInvoices } from "./subscription-invoices";
 
 type SubscriptionMessages = Messages["account"]["subscription"];
 export type CheckoutOutcome = "cancel" | "success" | null;
+
+type PortalFlow = "payment_method_update" | null;
 
 const DAY_MS = 86_400_000;
 
@@ -97,14 +103,140 @@ const statusBadge = (
   }
 };
 
+// Customer Portal and resume (SUB-03): both leave the page busy until
+// Stripe answers.
+function useBillingActions(messages: SubscriptionMessages["billing"]) {
+  const queryClient = useQueryClient();
+  const [opening, setOpening] = useState(false);
+  const [resuming, setResuming] = useState(false);
+  const openPortal = useCallback(
+    async (flow: PortalFlow) => {
+      setOpening(true);
+      try {
+        const { url } = await api.subscription.portalUrl({ flow });
+        window.location.assign(url);
+      } catch {
+        toast.error(messages.portalError);
+        setOpening(false);
+      }
+    },
+    [messages.portalError]
+  );
+  const resume = useCallback(async () => {
+    setResuming(true);
+    try {
+      await api.subscription.resume();
+      toast.success(messages.resumed);
+    } catch {
+      toast.error(messages.resumeError);
+    } finally {
+      setResuming(false);
+      await queryClient.invalidateQueries({
+        queryKey: orpc.subscription.key(),
+      });
+    }
+  }, [messages.resumeError, messages.resumed, queryClient]);
+  return { opening, openPortal, resume, resuming };
+}
+
+type BillingActions = ReturnType<typeof useBillingActions>;
+
+// A live subscription's actions: the portal, then cancel or, once a
+// cancellation is scheduled, resume.
+function LiveActions({
+  actions,
+  cancelScheduled,
+  messages,
+  onCancel,
+}: {
+  actions: BillingActions;
+  cancelScheduled: boolean;
+  messages: SubscriptionMessages["billing"];
+  onCancel: () => void;
+}) {
+  const { opening, openPortal, resume, resuming } = actions;
+  const handleManage = useCallback(() => openPortal(null), [openPortal]);
+  return (
+    <div className="flex flex-wrap justify-end gap-2">
+      {cancelScheduled ? (
+        <Button
+          disabled={resuming}
+          onClick={resume}
+          size="sm"
+          type="button"
+          variant="outline"
+        >
+          {resuming ? messages.resuming : messages.resume}
+        </Button>
+      ) : (
+        <Button onClick={onCancel} size="sm" type="button" variant="ghost">
+          {messages.cancel}
+        </Button>
+      )}
+      <Button disabled={opening} onClick={handleManage} size="sm" type="button">
+        <CreditCardIcon aria-hidden="true" />
+        {opening ? messages.opening : messages.manage}
+      </Button>
+    </div>
+  );
+}
+
+// The summary's note and its date fact: when the plan renews, ends after a
+// scheduled cancellation (SUB-03) or when the trial ends (SUB-02).
+function summaryTimeline(
+  { subscription, trial }: SubscriptionStatus,
+  locale: Locale,
+  messages: SubscriptionMessages
+) {
+  const { cancelAt, live, renewsAt } = subscription;
+  if (live && cancelAt) {
+    const date = formatDate(cancelAt, locale);
+    return {
+      note: formatMessage(messages.summary.cancelNote, {
+        date,
+        plan: messages.plans[subscription.plan].name,
+      }),
+      renewal: { label: messages.summary.endsAt, value: date },
+    };
+  }
+  if (live) {
+    return {
+      note: messages.summary.liveNote,
+      renewal: {
+        label: messages.summary.renewsAt,
+        value: renewsAt ? formatDate(renewsAt, locale) : "—",
+      },
+    };
+  }
+  if (trial.active) {
+    return {
+      note: formatMessage(messages.trial.note, {
+        plan: messages.plans[trial.plan].name,
+      }),
+      renewal: {
+        label: messages.trial.endsAt,
+        value: trialEndLabel(trial.endsAt, locale, messages.trial),
+      },
+    };
+  }
+  return {
+    note: messages.summary.noSubscription,
+    renewal: { label: messages.summary.renewsAt, value: "—" },
+  };
+}
+
 function PlanSummaryCard({
+  actions,
   locale,
   messages,
+  onCancel,
   onChoosePlan,
   status,
 }: {
+  actions: BillingActions;
   locale: Locale;
   messages: SubscriptionMessages;
+  onCancel: () => void;
   onChoosePlan: () => void;
   status: SubscriptionStatus;
 }) {
@@ -112,28 +244,9 @@ function PlanSummaryCard({
     status;
   const badge = statusBadge(trial.active ? "trialing" : subscription.status);
   const entry = catalog.find((item) => item.plan === effectivePlan);
-  const { interval, live } = subscription;
-  let note = messages.summary.noSubscription;
-  if (live) {
-    note = messages.summary.liveNote;
-  } else if (trial.active) {
-    note = formatMessage(messages.trial.note, {
-      plan: messages.plans[trial.plan].name,
-    });
-  }
-  let renewal = {
-    label: messages.summary.renewsAt,
-    value:
-      live && subscription.renewsAt
-        ? formatDate(subscription.renewsAt, locale)
-        : "—",
-  };
-  if (trial.active) {
-    renewal = {
-      label: messages.trial.endsAt,
-      value: trialEndLabel(trial.endsAt, locale, messages.trial),
-    };
-  }
+  const { cancelAt, interval, live } = subscription;
+  const cancelScheduled = live && cancelAt !== null;
+  const { note, renewal } = summaryTimeline(status, locale, messages);
   let price: ReactNode = null;
   if (live && entry && interval) {
     const cents = subscription.founder
@@ -173,7 +286,14 @@ function PlanSummaryCard({
       <p className="text-muted-foreground text-sm">{messages.unavailable}</p>
     );
   } else if (live) {
-    action = null;
+    action = (
+      <LiveActions
+        actions={actions}
+        cancelScheduled={cancelScheduled}
+        messages={messages.billing}
+        onCancel={onCancel}
+      />
+    );
   }
 
   return (
@@ -223,7 +343,50 @@ function PlanSummaryCard({
   );
 }
 
-// Shown once the free trial is over and no subscription took over (SUB-02).
+// A failed renewal payment (SUB-03): Stripe retries while the plan stays,
+// and the owner can update the card straight away.
+function PastDueAlert({
+  actions,
+  messages,
+  status,
+}: {
+  actions: BillingActions;
+  messages: SubscriptionMessages;
+  status: SubscriptionStatus;
+}) {
+  const { opening, openPortal } = actions;
+  const handleUpdateCard = useCallback(
+    () => openPortal("payment_method_update"),
+    [openPortal]
+  );
+  if (status.subscription.status !== "past_due") {
+    return null;
+  }
+  return (
+    <Alert variant="warning">
+      <TriangleAlertIcon aria-hidden="true" />
+      <AlertTitle>{messages.pastDue.title}</AlertTitle>
+      <AlertDescription>
+        {formatMessage(messages.pastDue.description, {
+          plan: messages.plans[status.subscription.plan].name,
+        })}
+      </AlertDescription>
+      <AlertAction>
+        <Button
+          disabled={opening}
+          onClick={handleUpdateCard}
+          size="sm"
+          type="button"
+        >
+          {opening ? messages.billing.opening : messages.pastDue.action}
+        </Button>
+      </AlertAction>
+    </Alert>
+  );
+}
+
+// Shown once the free trial is over, or the subscription has ended, and no
+// subscription took over (SUB-02, SUB-03).
 function TrialEndedAlert({
   messages,
   onChoosePlan,
@@ -236,11 +399,19 @@ function TrialEndedAlert({
   if (status.subscription.live || status.trial.active) {
     return null;
   }
+  // A workspace that subscribed once keeps its last Stripe status.
+  const subscribedBefore = status.subscription.status !== null;
+  const title = subscribedBefore
+    ? messages.ended.title
+    : messages.trial.endedTitle;
+  const description = subscribedBefore
+    ? messages.ended.description
+    : messages.trial.endedDescription;
   return (
     <Alert variant="warning">
       <ClockAlertIcon aria-hidden="true" />
-      <AlertTitle>{messages.trial.endedTitle}</AlertTitle>
-      <AlertDescription>{messages.trial.endedDescription}</AlertDescription>
+      <AlertTitle>{title}</AlertTitle>
+      <AlertDescription>{description}</AlertDescription>
       {status.available ? (
         <AlertAction>
           <Button onClick={onChoosePlan} size="sm" type="button">
@@ -410,9 +581,12 @@ export function SubscriptionSettings({
     orpc.subscription.status.queryOptions({ meta: { inlineError: true } })
   );
   const [pricingOpen, setPricingOpen] = useState(false);
+  const [cancelOpen, setCancelOpen] = useState(false);
+  const actions = useBillingActions(messages.billing);
   const refreshed = useRef<boolean>(false);
   const handleRetry = useCallback(() => refetch(), [refetch]);
   const handleChoosePlan = useCallback(() => setPricingOpen(true), []);
+  const handleCancel = useCallback(() => setCancelOpen(true), []);
 
   useEffect(() => {
     if (checkout !== "success" || refreshed.current) {
@@ -437,18 +611,36 @@ export function SubscriptionSettings({
   } else if (data) {
     body = (
       <>
+        <PastDueAlert actions={actions} messages={messages} status={data} />
         <TrialEndedAlert
           messages={messages}
           onChoosePlan={handleChoosePlan}
           status={data}
         />
         <PlanSummaryCard
+          actions={actions}
           locale={locale}
           messages={messages}
+          onCancel={handleCancel}
           onChoosePlan={handleChoosePlan}
           status={data}
         />
         <UsageCard locale={locale} messages={messages.limits} status={data} />
+        {data.available ? (
+          <SubscriptionInvoices
+            locale={locale}
+            messages={messages.invoices}
+            retryLabel={messages.retry}
+          />
+        ) : null}
+        <CancelSubscriptionDialog
+          locale={locale}
+          messages={messages}
+          onOpenChange={setCancelOpen}
+          open={cancelOpen}
+          plan={data.subscription.plan}
+          renewsAt={data.subscription.renewsAt}
+        />
         <PricingDialog
           locale={locale}
           messages={messages}

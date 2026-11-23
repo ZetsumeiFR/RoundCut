@@ -46,8 +46,10 @@ export const workspace = pgTable("workspace", {
     .references(() => user.id, { onDelete: "cascade" }),
   // Subscription plan (SUB-01); sets the upload limits (VER-02). Kept in
   // sync with the RoundCut Stripe subscription by its webhook: its status,
-  // interval, next renewal and whether it carries the Founder coupon.
+  // interval, next renewal, the end date of a scheduled cancellation
+  // (SUB-03) and whether it carries the Founder coupon.
   plan: text("plan").$type<Plan>().default(DEFAULT_PLAN).notNull(),
+  planCancelAt: timestamp("plan_cancel_at"),
   planFounder: boolean("plan_founder").default(false).notNull(),
   planInterval: text("plan_interval").$type<BillingInterval>(),
   planRenewsAt: timestamp("plan_renews_at"),

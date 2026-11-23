@@ -1,6 +1,8 @@
 import { ORPCError } from "@orpc/server";
 import {
   BILLING_INTERVALS,
+  CANCELLATION_COMMENT_MAX_LENGTH,
+  CANCELLATION_REASONS,
   FOUNDER_OFFER,
   isLiveSubscription,
   isTrialing,
@@ -25,8 +27,11 @@ import {
   FOUNDER_COUPON_ID,
   founderSeatsLeft,
   isFounderChoice,
+  PORTAL_FLOWS,
   planPriceId,
+  portalSessionUrl,
   syncLatestSubscription,
+  syncSubscription,
 } from "../subscription";
 import { getOrCreateWorkspace } from "./workspace";
 
@@ -41,6 +46,29 @@ const checkoutSchema = z.object({
   interval: z.enum(BILLING_INTERVALS),
   plan: z.enum(PLANS),
 });
+
+const portalSchema = z.object({
+  flow: z.enum(PORTAL_FLOWS).nullable().default(null),
+});
+
+const cancelSchema = z.object({
+  comment: z.string().trim().max(CANCELLATION_COMMENT_MAX_LENGTH).default(""),
+  reason: z.enum(CANCELLATION_REASONS),
+});
+
+// Invoices listed on the subscription page; older ones are in the portal.
+const INVOICE_LIMIT = 12;
+
+export interface InvoiceSummary {
+  amountCents: number;
+  createdAt: Date;
+  currency: string;
+  hostedUrl: string | null;
+  id: string;
+  number: string | null;
+  pdfUrl: string | null;
+  status: string | null;
+}
 
 const requireStripe = (stripe: StripeClient | null) => {
   if (!stripe) {
@@ -114,6 +142,16 @@ async function workspaceUsage(db: WorkspaceDb, workspaceId: string) {
   };
 }
 
+// The workspace's live subscription, which cancel and resume act on.
+function liveSubscriptionId(row: WorkspaceRow) {
+  if (!(isLiveSubscription(row.planStatus) && row.stripeSubscriptionId)) {
+    throw new ORPCError("CONFLICT", {
+      message: "This workspace has no subscription",
+    });
+  }
+  return row.stripeSubscriptionId;
+}
+
 const catalog = PLANS.map((plan) => ({
   limits: PLAN_LIMITS[plan],
   plan,
@@ -124,10 +162,37 @@ const catalog = PLANS.map((plan) => ({
 }));
 
 export const subscriptionRouter = {
+  // Cancels at the end of the paid period (SUB-03), with the owner's reason
+  // kept on the Stripe subscription. The workspace is updated right away
+  // from Stripe's answer; the webhook brings the same state.
+  cancel: protectedProcedure
+    .input(cancelSchema)
+    .handler(async ({ context, input }) => {
+      const stripe = requireStripe(context.stripe);
+      const row = await getOrCreateWorkspace(context.db, context.session.user);
+      const subscription = await stripe.subscriptions.update(
+        liveSubscriptionId(row),
+        {
+          cancel_at_period_end: true,
+          cancellation_details: {
+            comment: input.comment || undefined,
+            feedback: input.reason,
+          },
+        }
+      );
+      await syncSubscription(context.db, subscription);
+      return {
+        cancelAt: subscription.cancel_at
+          ? new Date(subscription.cancel_at * 1000)
+          : null,
+      };
+    }),
+
   // Where the owner's browser subscribes: a Stripe Checkout session for the
   // chosen plan and interval, with the Founder coupon when asked for.
-  // Changing an ongoing subscription goes through the Customer Portal
-  // (SUB-03), so a live one refuses a second Checkout.
+  // A live subscription refuses a second Checkout: it is canceled or resumed
+  // from the subscription page, its card and invoices are in the Customer
+  // Portal (SUB-03).
   checkoutUrl: protectedProcedure
     .input(checkoutSchema)
     .handler(async ({ context, input }) => {
@@ -177,6 +242,54 @@ export const subscriptionRouter = {
       return { url: session.url };
     }),
 
+  // The workspace's last invoices from Stripe, newest first.
+  invoices: protectedProcedure.handler(async ({ context }) => {
+    const stripe = requireStripe(context.stripe);
+    const row = await getOrCreateWorkspace(context.db, context.session.user);
+    if (!row.stripeCustomerId) {
+      return [];
+    }
+    const { data } = await stripe.invoices.list({
+      customer: row.stripeCustomerId,
+      limit: INVOICE_LIMIT,
+    });
+    return data
+      .filter((invoice) => invoice.status !== "draft")
+      .map(
+        (invoice): InvoiceSummary => ({
+          amountCents: invoice.total,
+          createdAt: new Date(invoice.created * 1000),
+          currency: invoice.currency.toUpperCase(),
+          hostedUrl: invoice.hosted_invoice_url ?? null,
+          id: invoice.id,
+          number: invoice.number,
+          pdfUrl: invoice.invoice_pdf ?? null,
+          status: invoice.status,
+        })
+      );
+  }),
+
+  // The Stripe Customer Portal (SUB-03): card, invoices, billing details and
+  // cancellation; `flow` opens straight on the card update.
+  portalUrl: protectedProcedure
+    .input(portalSchema)
+    .handler(async ({ context, input }) => {
+      const stripe = requireStripe(context.stripe);
+      const row = await getOrCreateWorkspace(context.db, context.session.user);
+      if (!row.stripeCustomerId) {
+        throw new ORPCError("CONFLICT", {
+          message: "This workspace has never subscribed",
+        });
+      }
+      const url = await portalSessionUrl(stripe, {
+        customer: row.stripeCustomerId,
+        flow: input.flow,
+        locale: row.locale,
+        returnUrl: `${context.notifications.appUrl}/account/subscription`,
+      });
+      return { url };
+    }),
+
   // Back from Checkout: the subscription as Stripe has it, in case the
   // webhook hasn't arrived yet.
   refresh: protectedProcedure.handler(async ({ context }) => {
@@ -186,6 +299,20 @@ export const subscriptionRouter = {
       await syncLatestSubscription(context.db, stripe, row.stripeCustomerId);
     }
     return { refreshed: row.stripeCustomerId !== null };
+  }),
+
+  // Takes back a scheduled cancellation: the subscription renews again.
+  resume: protectedProcedure.handler(async ({ context }) => {
+    const stripe = requireStripe(context.stripe);
+    const row = await getOrCreateWorkspace(context.db, context.session.user);
+    const subscription = await stripe.subscriptions.update(
+      liveSubscriptionId(row),
+      // An empty cancel_at clears both kinds of scheduled cancellation;
+      // Stripe refuses it next to cancel_at_period_end.
+      { cancel_at: "" }
+    );
+    await syncSubscription(context.db, subscription);
+    return { resumed: subscription.cancel_at === null };
   }),
 
   // The workspace's plan, its trial and usage, the plan catalog and what's
@@ -205,6 +332,8 @@ export const subscriptionRouter = {
         seatsLeft: stripe ? await founderSeatsLeft(stripe) : null,
       },
       subscription: {
+        // End of a scheduled cancellation, null while it renews.
+        cancelAt: row.planCancelAt,
         founder: row.planFounder,
         interval: row.planInterval,
         live: isLiveSubscription(row.planStatus),
